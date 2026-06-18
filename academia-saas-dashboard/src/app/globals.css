@@ -1,0 +1,401 @@
+@import "tailwindcss";
+
+:root {
+  /* Backgrounds */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f6f8;
+  --bg-tertiary: #f0f2f5;
+  --bg-sidebar: #ffffff;
+
+  /* Textos */
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #9ca3af;
+  --text-muted: #d1d5db;
+
+  /* Bordas */
+  --border-color: #e2e5e9;
+  --border-strong: #d0d4da;
+
+  /* Cards */
+  --card-bg: #ffffff;
+  --card-border: #e8eaed;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+
+  /* Sidebar */
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #374151;
+  --sidebar-text-muted: #6b7280;
+  --sidebar-active-bg: rgba(23,135,95,0.08);
+  --sidebar-active-text: #17875f;
+  --sidebar-border: #e8eaed;
+
+  /* Header */
+  --header-bg: #ffffff;
+  --header-border: #e8eaed;
+
+  /* Skeleton */
+  --skeleton-from: #f0f2f5;
+  --skeleton-to: #e4e7eb;
+
+  /* Semanticas */
+  --success-bg: #ecfdf5;
+  --success-text: #065f46;
+  --warning-bg: #fffbeb;
+  --warning-text: #92400e;
+  --danger-bg: #fef2f2;
+  --danger-text: #991b1b;
+  --info-bg: #eff6ff;
+  --info-text: #1e40af;
+
+  /* Accent */
+  --accent: #17875f;
+  --accent-hover: #0f6e4a;
+  --accent-text: #ffffff;
+  --shadow: var(--card-shadow);
+
+  /* Backward-compatible theme tokens used across components */
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+  --surface: var(--bg-secondary);
+  --surface-strong: var(--bg-tertiary);
+  --muted: var(--text-secondary);
+  --line: var(--border-color);
+  --brand: var(--accent);
+  --brand-strong: var(--accent-hover);
+}
+
+.dark {
+  --bg-primary: #13151f;
+  --bg-secondary: #1a1d27;
+  --bg-tertiary: #0f1117;
+  --bg-sidebar: #1a1d27;
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --text-muted: #374151;
+  --border-color: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.15);
+  --card-bg: #1a1d27;
+  --card-border: rgba(255,255,255,0.08);
+  --card-shadow: none;
+  --sidebar-bg: #1a1d27;
+  --sidebar-text: #e5e7eb;
+  --sidebar-text-muted: #6b7280;
+  --sidebar-active-bg: rgba(29,158,117,0.15);
+  --sidebar-active-text: #1D9E75;
+  --sidebar-border: rgba(255,255,255,0.06);
+  --header-bg: #1a1d27;
+  --header-border: rgba(255,255,255,0.08);
+  --skeleton-from: #1f2335;
+  --skeleton-to: #252a3a;
+  --success-bg: rgba(29,158,117,0.15);
+  --success-text: #34d399;
+  --warning-bg: rgba(245,158,11,0.15);
+  --warning-text: #fbbf24;
+  --danger-bg: rgba(239,68,68,0.15);
+  --danger-text: #f87171;
+  --info-bg: rgba(59,130,246,0.15);
+  --info-text: #60a5fa;
+  --accent: #1D9E75;
+  --accent-hover: #22c55e;
+  --accent-text: #ffffff;
+  --shadow: var(--card-shadow);
+
+  /* Backward-compatible theme tokens used across components */
+  --background: var(--bg-tertiary);
+  --foreground: var(--text-primary);
+  --surface: var(--bg-secondary);
+  --surface-strong: var(--bg-tertiary);
+  --muted: var(--text-secondary);
+  --line: var(--border-color);
+  --brand: var(--accent);
+  --brand-strong: var(--accent-hover);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+}
+
+*::before,
+*::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+}
+
+button,
+a,
+input {
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+              color 0.15s ease, opacity 0.15s ease;
+}
+
+/* Safety net: avoid white-on-white text in light mode while legacy classes are being migrated */
+html:not(.dark) [class*="text-white"] {
+  color: var(--text-primary) !important;
+}
+
+html:not(.dark) [class*="bg-brand"][class*="text-white"] {
+  color: var(--accent-text) !important;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  background-image:
+    radial-gradient(circle at top, color-mix(in srgb, var(--info-text) 18%, transparent), transparent 28%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--accent) 14%, transparent), transparent 24%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--foreground);
+}
+
+/* Kanban finalizar animation */
+@keyframes fadeOutCard {
+  0%   { opacity: 1; transform: scale(1); }
+  60%  { opacity: 1; transform: scale(1.02); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  100% { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes pulse {
+  0%,
+  100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.finalizing {
+  animation: fadeOutCard 0.6s ease forwards;
+  pointer-events: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--line) 75%, var(--foreground));
+}
+
+/* ─── Tour Driver.js — identidade Pyra ─────────────────────────────────────── */
+
+/* Popover container */
+.pyra-tour-popover {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  border-top: 3px solid #1D9E75 !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+  box-shadow:
+    0 0 0 1px rgba(29, 158, 117, 0.08),
+    0 12px 40px rgba(0, 0, 0, 0.22),
+    0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  max-width: 340px !important;
+  min-width: 300px !important;
+}
+
+/* Título */
+.pyra-tour-popover .driver-popover-title {
+  padding: 18px 44px 10px 20px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  margin-bottom: 0 !important;
+  line-height: 1.45 !important;
+}
+
+/* Descrição */
+.pyra-tour-popover .driver-popover-description {
+  padding: 0 20px 18px !important;
+  font-size: 12.5px !important;
+  color: var(--text-secondary) !important;
+  line-height: 1.7 !important;
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid var(--card-border) !important;
+}
+
+/* Footer */
+.pyra-tour-popover .driver-popover-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 12px 20px 14px !important;
+  gap: 8px !important;
+  position: relative !important;
+}
+
+/* Track da barra de progresso */
+.pyra-tour-popover .driver-popover-footer::before {
+  content: '';
+  position: absolute !important;
+  top: 0 !important;
+  left: 20px !important;
+  right: 20px !important;
+  height: 2px !important;
+  border-radius: 99px !important;
+  background: var(--card-border) !important;
+}
+
+/* Fill animado — controlado por --pyra-tour-pct via JS */
+.pyra-tour-popover .driver-popover-footer::after {
+  content: '';
+  position: absolute !important;
+  top: 0 !important;
+  left: 20px !important;
+  height: 2px !important;
+  border-radius: 99px !important;
+  background: linear-gradient(90deg, #1D9E75, #22c55e) !important;
+  width: calc((100% - 40px) * var(--pyra-tour-pct, 0.1)) !important;
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 0 6px rgba(29, 158, 117, 0.5) !important;
+}
+
+/* Texto do progresso */
+.pyra-tour-popover .driver-popover-progress-text {
+  font-size: 11px !important;
+  color: var(--text-tertiary) !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: 0.03em !important;
+}
+
+/* Grupo de botões */
+.pyra-tour-popover .driver-popover-navigation-btns {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* Botão Próximo / Concluir */
+.pyra-tour-popover .driver-popover-next-btn {
+  background: #1D9E75 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  padding: 7px 16px !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+  text-shadow: none !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  box-shadow: 0 3px 12px rgba(29, 158, 117, 0.38) !important;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.1s !important;
+  white-space: nowrap !important;
+}
+
+.pyra-tour-popover .driver-popover-next-btn:hover {
+  background: #22c55e !important;
+  box-shadow: 0 5px 18px rgba(34, 197, 94, 0.45) !important;
+}
+
+.pyra-tour-popover .driver-popover-next-btn:active {
+  transform: scale(0.97) !important;
+}
+
+/* Botão Anterior */
+.pyra-tour-popover .driver-popover-prev-btn {
+  background: transparent !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  padding: 7px 14px !important;
+  color: var(--text-secondary) !important;
+  text-shadow: none !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  transition: border-color 0.2s, color 0.2s, background 0.2s !important;
+  white-space: nowrap !important;
+}
+
+.pyra-tour-popover .driver-popover-prev-btn:hover {
+  border-color: var(--text-tertiary) !important;
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Botão fechar (×) */
+.pyra-tour-popover .driver-popover-close-btn {
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 7px !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  color: var(--text-tertiary) !important;
+  cursor: pointer !important;
+  transition: background 0.15s, color 0.15s !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.pyra-tour-popover .driver-popover-close-btn:hover {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Seta de direção do popover */
+.pyra-tour-popover.driver-popover-arrow-none .driver-popover-arrow {
+  display: none !important;
+}
+
+/* Overlay */
+.driver-overlay {
+  background: rgba(4, 10, 20, 0.36) !important;
+  backdrop-filter: blur(0.5px) !important;
+}
+
+/* Highlight do elemento selecionado */
+.driver-active-element,
+.driver-highlighted-element {
+  border-radius: 10px !important;
+  outline: 2px solid rgba(34, 197, 94, 0.9) !important;
+  outline-offset: 3px !important;
+  box-shadow:
+    0 0 0 4px rgba(34, 197, 94, 0.22),
+    0 0 24px rgba(34, 197, 94, 0.25) !important;
+  filter: brightness(1.12) saturate(1.08) !important;
+}

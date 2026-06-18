@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.env
+.git
+*.md
+QUICKSTART.sh
+setup_hybrid_catalog.sh
+scripts/
+screenshots/

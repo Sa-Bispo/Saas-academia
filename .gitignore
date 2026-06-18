@@ -1,0 +1,44 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor
+.idea/
+*.swp
+*.swo
+
+# Environment files (safety net — also covered in subdirectory .gitignores)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next/
+out/
+
+# Build outputs
+dist/
+build/
+
+# Sensitive / large data
+vectorstore_data/
+credentials.json
+token.json
+*.pem
+*.key

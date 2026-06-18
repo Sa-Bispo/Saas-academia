@@ -1,0 +1,32 @@
+# Servidor
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+pydantic
+
+# LangChain / RAG
+langchain
+langchain-chroma
+langchain-classic
+langchain-community
+langchain-core
+langchain-openai
+langchain-text-splitters
+pypdf
+
+# IA
+google-genai
+openai
+rapidfuzz
+
+# Banco de dados / cache
+asyncpg
+redis[asyncio]
+
+# Google Sheets
+gspread
+google-auth-oauthlib
+
+# HTTP
+requests
