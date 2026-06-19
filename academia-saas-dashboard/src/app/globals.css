@@ -79,12 +79,12 @@
   --card-bg: #1a1d27;
   --card-border: rgba(255,255,255,0.08);
   --card-shadow: none;
-  --sidebar-bg: #1a1d27;
-  --sidebar-text: #e5e7eb;
-  --sidebar-text-muted: #6b7280;
-  --sidebar-active-bg: rgba(29,158,117,0.15);
-  --sidebar-active-text: #1D9E75;
-  --sidebar-border: rgba(255,255,255,0.06);
+  --sidebar-bg: #1c2333;
+  --sidebar-text: #c9d1d9;
+  --sidebar-text-muted: #8b949e;
+  --sidebar-active-bg: rgba(29,158,117,0.18);
+  --sidebar-active-text: #3dd68c;
+  --sidebar-border: rgba(255,255,255,0.1);
   --header-bg: #1a1d27;
   --header-border: rgba(255,255,255,0.08);
   --skeleton-from: #1f2335;
@@ -155,6 +155,41 @@ html:not(.dark) [class*="bg-brand"][class*="text-white"] {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* ── Sidebar + layout — !important para garantir que nada sobreescreva ── */
+.sidebar-desktop {
+  display: none !important;
+}
+@media (min-width: 1024px) {
+  .sidebar-desktop {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 240px !important;
+    min-height: 100vh !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+.sidebar-mobile-bar {
+  display: flex !important;
+}
+@media (min-width: 1024px) {
+  .sidebar-mobile-bar {
+    display: none !important;
+  }
+}
+
+.dashboard-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+}
+@media (min-width: 1024px) {
+  .dashboard-layout {
+    display: grid !important;
+    grid-template-columns: 240px 1fr !important;
+  }
 }
 
 body {

@@ -63,10 +63,41 @@ const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set",
 const DIAS_PT  = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const PLANO_CORES = ["#1D9E75", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"];
 
+function createLocalAcademiaDashboardData(): AcademiaDashboardData {
+  return {
+    totalAtivos: 0,
+    totalInadimplentes: 0,
+    novosEsseMes: 0,
+    crescimentoAtivos: 0,
+    receitaVariacaoPct: 0,
+    receitaMesCents: 0,
+    renovacoesProximas: 0,
+    renovacoesValorCents: 0,
+    cobrancasPendentes: { count: 0, totalCents: 0 },
+    taxaChurnPct: 0,
+    ltvMedioCents: 0,
+    frequenciaMediaSemanal: 0,
+    receitaMensal: Array.from({ length: 6 }, (_, index) => {
+      const now = new Date();
+      const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+      return { mes: MESES_PT[date.getMonth()], receita: 0, meta: 0 };
+    }),
+    distribuicaoPlanos: [],
+    frequenciaSemanal: DIAS_PT.map((dia) => ({ dia, presencas: 0 })),
+    rankingAlunos: [],
+    cobrancasVencendo: [],
+    ultimosAlunos: [],
+    aniversariantes: [],
+    alunosEmRisco: [],
+  };
+}
+
 // ─── Main action ──────────────────────────────────────────────────────────────
 
 export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData> {
   const tenantId = await getTenantId();
+
+  try {
 
   const now       = new Date();
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -407,4 +438,8 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
     aniversariantes,
     alunosEmRisco,
   };
+
+  } catch {
+    return createLocalAcademiaDashboardData();
+  }
 }

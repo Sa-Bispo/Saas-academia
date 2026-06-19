@@ -74,6 +74,12 @@ Bot de WhatsApp construído em Python com FastAPI, que usa Google Gemini (gemini
 
 ---
 
+## Repositório oficial
+
+O repositório oficial do projeto é **https://github.com/Sa-Bispo/Saas-academia**, criado em 18/06/2026 com histórico de commits limpo — sem herdar o histórico de versões anteriores do projeto multi-nicho.
+
+---
+
 ## Regra crítica
 
 Os projetos abaixo são originais de produção e **nunca devem ser tocados**:

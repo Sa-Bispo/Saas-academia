@@ -1,0 +1,22 @@
+# graphifyignore — mesma sintaxe do .gitignore
+# Arquivos já excluídos pelo .gitignore não precisam ser repetidos aqui
+
+# Gerados / build
+.next/
+graphify-out/
+public/
+
+# Config e skill do Claude
+.claude/
+
+# Arquivos de texto/mídia (causam erro de encoding no Windows sem API key)
+*.md
+*.txt
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.gif
+*.webp
+*.ico
+*.pdf

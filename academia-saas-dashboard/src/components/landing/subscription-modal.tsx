@@ -8,7 +8,6 @@ import {
   signupWithNicho,
   activateSubscriptionFake,
 } from "@/actions/subscription-modal.actions";
-import type { SubNicho } from "@/lib/nicho";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,29 +17,15 @@ type Plan = {
   priceCents: number;
 };
 
-type NichoOption = {
-  id: SubNicho;
-  emoji: string;
-  title: string;
-  subtitle: string;
-};
-
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const NICHO_OPTIONS: NichoOption[] = [
-  { id: "adega", emoji: "🍺", title: "Adega de bairro", subtitle: "Bebidas, combos e narguilé" },
-  { id: "lanchonete", emoji: "🥪", title: "Lanchonete", subtitle: "Lanches, combos e sucos" },
-  { id: "pizzaria", emoji: "🍕", title: "Pizzaria", subtitle: "Pizzas, tamanhos e bordas" },
-];
-
-const PLACEHOLDER_BY_NICHO: Record<SubNicho, string> = {
-  adega: "Sua adega",
-  lanchonete: "Sua lanchonete",
-  pizzaria: "Sua pizzaria",
-};
 
 const FAKE_PIX_CODE =
   "00020126580014BR.GOV.BCB.PIX0136a629532e-7693-4846-852d-1bbff817b5a8520400005303986540589.905802BR5925PyraLabs Pagamentos LTDA6009SAO PAULO62290525pix-pyralabs-sub-demo63041234";
+
+const ACADEMIA_OPTION = {
+  emoji: "🏋️",
+  title: "Academia",
+};
 
 function toCurrencyBRL(cents: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -51,11 +36,10 @@ function toCurrencyBRL(cents: number) {
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
+function StepIndicator({ step }: { step: 1 | 2 }) {
   const steps = [
-    { n: 1, label: "Negócio" },
-    { n: 2, label: "Cadastro" },
-    { n: 3, label: "Pagamento" },
+    { n: 1, label: "Cadastro" },
+    { n: 2, label: "Pagamento" },
   ];
   return (
     <div className="flex items-center justify-center gap-2">
@@ -117,113 +101,15 @@ function ModalBackdrop({ onClose, children }: { onClose: () => void; children: R
   );
 }
 
-// ─── Step 1 — Nicho ───────────────────────────────────────────────────────────
+// ─── Step 1 — Cadastro ────────────────────────────────────────────────────────
 
-function Step1Nicho({
+function StepCadastro({
   plan,
-  selected,
-  onSelect,
-  onContinue,
-  onClose,
-}: {
-  plan: Plan;
-  selected: SubNicho | null;
-  onSelect: (n: SubNicho) => void;
-  onContinue: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="p-7">
-      <div className="mb-5 flex items-start justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-white">Qual é o seu tipo de negócio?</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Escolha pra gente configurar tudo certinho pra você
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      <StepIndicator step={1} />
-
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {NICHO_OPTIONS.map((opt) => {
-          const active = selected === opt.id;
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => onSelect(opt.id)}
-              className={`relative flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all duration-200 ${
-                active
-                  ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/30"
-                  : "border-slate-700/60 bg-slate-800/40 hover:border-slate-600 hover:bg-slate-800/70"
-              }`}
-            >
-              {active && (
-                <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500">
-                  <Check size={11} strokeWidth={3} className="text-slate-950" />
-                </span>
-              )}
-              <span className="text-3xl leading-none">{opt.emoji}</span>
-              <div>
-                <p className={`text-sm font-semibold ${active ? "text-emerald-400" : "text-white"}`}>
-                  {opt.title}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-400">{opt.subtitle}</p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Footer */}
-      <div className="mt-6 flex items-center justify-between border-t border-slate-800 pt-5">
-        <div className="text-sm text-slate-400">
-          <span className="font-medium text-white">{plan.name}</span>
-          {" · "}
-          <span className="text-emerald-400">{toCurrencyBRL(plan.priceCents)}/mês</span>
-        </div>
-        <button
-          type="button"
-          disabled={!selected}
-          onClick={onContinue}
-          className="flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Continuar
-          <ArrowRight size={15} />
-        </button>
-      </div>
-
-      <div className="mt-3 text-center">
-        <a
-          href={`/test-drive?niche=${selected ?? "adega"}`}
-          className="text-xs text-slate-500 underline underline-offset-2 transition hover:text-slate-300"
-        >
-          Prefiro testar grátis primeiro
-        </a>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2 — Cadastro ────────────────────────────────────────────────────────
-
-function Step2Cadastro({
-  plan,
-  subNicho,
   onBack,
   onDone,
   onClose,
 }: {
   plan: Plan;
-  subNicho: SubNicho;
   onBack: () => void;
   onDone: (tenantId: string) => void;
   onClose: () => void;
@@ -243,7 +129,6 @@ function Step2Cadastro({
         email,
         password,
         planCode: plan.code,
-        subNicho,
       });
       if (!result.success) {
         setError(result.error);
@@ -269,19 +154,19 @@ function Step2Cadastro({
         </button>
       </div>
 
-      <StepIndicator step={2} />
+      <StepIndicator step={1} />
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-slate-400">
-            Nome do negócio
+            Nome da academia
           </label>
           <input
             type="text"
             required
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
-            placeholder={PLACEHOLDER_BY_NICHO[subNicho]}
+            placeholder="Sua academia"
             className="w-full rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none transition focus:border-emerald-500/60 focus:bg-slate-800"
           />
         </div>
@@ -349,17 +234,15 @@ function Step2Cadastro({
   );
 }
 
-// ─── Step 3 — Pagamento ───────────────────────────────────────────────────────
+// ─── Step 2 — Pagamento ───────────────────────────────────────────────────────
 
-function Step3Pagamento({
+function StepPagamento({
   plan,
-  subNicho,
   tenantId,
   onBack,
   onClose,
 }: {
   plan: Plan;
-  subNicho: SubNicho;
   tenantId: string;
   onBack: () => void;
   onClose: () => void;
@@ -368,8 +251,6 @@ function Step3Pagamento({
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  const nichoOption = NICHO_OPTIONS.find((o) => o.id === subNicho)!;
 
   function handleCopy() {
     void navigator.clipboard.writeText(FAKE_PIX_CODE);
@@ -405,16 +286,16 @@ function Step3Pagamento({
         </button>
       </div>
 
-      <StepIndicator step={3} />
+      <StepIndicator step={2} />
 
       {/* Order summary */}
       <div className="mt-6 rounded-2xl border border-slate-700/60 bg-slate-800/40 p-4">
         <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Resumo do pedido</p>
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl">{nichoOption.emoji}</span>
+            <span className="text-2xl">{ACADEMIA_OPTION.emoji}</span>
             <div>
-              <p className="text-sm font-semibold text-white">{nichoOption.title}</p>
+              <p className="text-sm font-semibold text-white">{ACADEMIA_OPTION.title}</p>
               <p className="text-xs text-slate-400">{plan.name}</p>
             </div>
           </div>
@@ -514,16 +395,13 @@ export function SubscriptionModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [subNicho, setSubNicho] = useState<SubNicho | null>(null);
+  const [step, setStep] = useState<1 | 2>(1);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
   function handleClose() {
     onClose();
-    // Reset after animation
     setTimeout(() => {
       setStep(1);
-      setSubNicho(null);
       setTenantId(null);
     }, 300);
   }
@@ -533,32 +411,21 @@ export function SubscriptionModal({
   return (
     <ModalBackdrop onClose={handleClose}>
       {step === 1 && (
-        <Step1Nicho
+        <StepCadastro
           plan={plan}
-          selected={subNicho}
-          onSelect={setSubNicho}
-          onContinue={() => setStep(2)}
-          onClose={handleClose}
-        />
-      )}
-      {step === 2 && subNicho && (
-        <Step2Cadastro
-          plan={plan}
-          subNicho={subNicho}
-          onBack={() => setStep(1)}
+          onBack={handleClose}
           onDone={(id) => {
             setTenantId(id);
-            setStep(3);
+            setStep(2);
           }}
           onClose={handleClose}
         />
       )}
-      {step === 3 && subNicho && tenantId && (
-        <Step3Pagamento
+      {step === 2 && tenantId && (
+        <StepPagamento
           plan={plan}
-          subNicho={subNicho}
           tenantId={tenantId}
-          onBack={() => setStep(2)}
+          onBack={() => setStep(1)}
           onClose={handleClose}
         />
       )}

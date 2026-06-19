@@ -5,19 +5,18 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
-import { getDefaultsForSubNicho, type SubNicho } from "@/lib/nicho";
+import { DEFAULTS_ACADEMIA } from "@/lib/nicho";
 
 // ─── signupWithNicho ──────────────────────────────────────────────────────────
 
-const signupWithNichoSchema = z.object({
+const signupSchema = z.object({
   businessName: z.string().trim().min(2, "Nome do negócio inválido").max(120),
   email: z.string().trim().email("E-mail inválido").max(255),
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
   planCode: z.string().min(1),
-  subNicho: z.enum(["adega", "pizzaria", "lanchonete", "academia"]),
 });
 
-export type SignupWithNichoInput = z.infer<typeof signupWithNichoSchema>;
+export type SignupWithNichoInput = z.infer<typeof signupSchema>;
 export type SignupWithNichoResult =
   | { success: true; tenantId: string }
   | { success: false; error: string };
@@ -25,13 +24,13 @@ export type SignupWithNichoResult =
 export async function signupWithNicho(
   input: SignupWithNichoInput,
 ): Promise<SignupWithNichoResult> {
-  const parsed = signupWithNichoSchema.safeParse(input);
+  const parsed = signupSchema.safeParse(input);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return { success: false, error: first?.message ?? "Dados inválidos." };
   }
 
-  const { businessName, email, password, planCode, subNicho } = parsed.data;
+  const { businessName, email, password, planCode } = parsed.data;
 
   try {
     const plan = await prisma.plan.findUnique({
@@ -71,7 +70,6 @@ export async function signupWithNicho(
       return { success: false, error: "Não foi possível finalizar o cadastro agora." };
     }
 
-    const defaults = getDefaultsForSubNicho(subNicho as SubNicho);
     const now = new Date();
     const periodEnd = new Date(now);
     periodEnd.setDate(periodEnd.getDate() + 30);
@@ -88,7 +86,10 @@ export async function signupWithNicho(
           nome: businessName,
           userId: authUserId,
           companyName: businessName,
-          configNicho: { ...defaults, onboarding_niche: "DELIVERY" } as Prisma.InputJsonValue,
+          configNicho: {
+            ...DEFAULTS_ACADEMIA,
+            categorias_customizadas: [...DEFAULTS_ACADEMIA.categorias_padrao],
+          } as Prisma.InputJsonValue,
         },
         select: { id: true },
       });
@@ -103,10 +104,9 @@ export async function signupWithNicho(
         },
       });
 
-      // Seed example products and editable categories
-      if (defaults.produtos_exemplo.length > 0) {
+      if (DEFAULTS_ACADEMIA.produtos_exemplo.length > 0) {
         await tx.stockItem.createMany({
-          data: defaults.produtos_exemplo.map((p) => ({
+          data: DEFAULTS_ACADEMIA.produtos_exemplo.map((p) => ({
             nome: p.nome,
             variacao: p.categoria,
             preco: p.preco,
@@ -116,9 +116,9 @@ export async function signupWithNicho(
         });
       }
 
-      if (subNicho !== "adega" && Array.isArray(defaults.categorias_padrao) && defaults.categorias_padrao.length > 0) {
+      if (DEFAULTS_ACADEMIA.categorias_padrao.length > 0) {
         await tx.categoriaCardapio.createMany({
-          data: defaults.categorias_padrao.map((nome, ordem) => ({
+          data: DEFAULTS_ACADEMIA.categorias_padrao.map((nome, ordem) => ({
             tenant_id: t.id,
             nome,
             ordem,
@@ -158,7 +158,6 @@ export async function activateSubscriptionFake(
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
-        configNicho: true,
         subscription: { select: { id: true, status: true } },
       },
     });
@@ -184,8 +183,7 @@ export async function activateSubscriptionFake(
       },
     });
 
-    // Redirect to nicho selector which auto-skips to setup wizard (sub_nicho already set)
-    return { success: true, redirectTo: "/setup/nicho?niche=DELIVERY" };
+    return { success: true, redirectTo: "/setup" };
   } catch (err) {
     console.error("[activateSubscriptionFake]", err);
     return { success: false, error: "Erro ao ativar a assinatura. Tente novamente." };

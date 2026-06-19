@@ -7,7 +7,6 @@ import { Clock, MapPin, Package, ShoppingBag, TrendingUp, Wallet } from "lucide-
 import { AnalyticsDashboard, type AnalyticsData } from "@/components/analytics/analytics-dashboard";
 import { FeatureGate } from "@/components/ui/feature-gate";
 import type { PedidoHistoricoDTO, MetricasHistorico } from "@/actions/historico.actions";
-import type { SubNicho } from "@/lib/nicho";
 
 type Periodo = "hoje" | "semana" | "mes";
 type Tab = "pedidos" | "analytics";
@@ -16,25 +15,6 @@ const PERIODO_LABELS: Record<Periodo, string> = {
   hoje: "Hoje",
   semana: "Esta semana",
   mes: "Este mês",
-};
-
-const NICHO_BADGE: Record<SubNicho, { label: string; className: string }> = {
-  adega: {
-    label: "Adega",
-    className: "bg-purple-500/15 text-purple-300 border-purple-500/25",
-  },
-  pizzaria: {
-    label: "Pizzaria",
-    className: "bg-orange-500/15 text-orange-300 border-orange-500/25",
-  },
-  lanchonete: {
-    label: "Lanchonete",
-    className: "bg-yellow-500/15 text-yellow-300 border-yellow-500/25",
-  },
-  academia: {
-    label: "Academia",
-    className: "bg-cyan-500/15 text-cyan-300 border-cyan-500/25",
-  },
 };
 
 function toCurrency(value: number | string) {
@@ -70,15 +50,12 @@ export function HistoricoClient({
   pedidos,
   metricas,
   analytics,
-  subNicho,
 }: {
   periodo: Periodo;
   pedidos: PedidoHistoricoDTO[];
   metricas: MetricasHistorico;
   analytics: AnalyticsData;
-  subNicho: SubNicho;
 }) {
-  const nichoBadge = NICHO_BADGE[subNicho];
   const [tabAtiva, setTabAtiva] = useState<Tab>("pedidos");
 
   return (
@@ -219,11 +196,6 @@ export function HistoricoClient({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-semibold text-foreground">
                           {pedido.customer.nome}
-                        </span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${nichoBadge.className}`}
-                        >
-                          {nichoBadge.label}
                         </span>
                         {isCancelado && (
                           <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400">

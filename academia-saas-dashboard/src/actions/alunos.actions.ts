@@ -65,6 +65,10 @@ export async function buscarAluno(alunoId: string) {
       cobrancas: {
         orderBy: { dataVencimento: "desc" },
       },
+      frequencias: {
+        orderBy: { data: "desc" },
+        take: 10,
+      },
     },
   });
 }

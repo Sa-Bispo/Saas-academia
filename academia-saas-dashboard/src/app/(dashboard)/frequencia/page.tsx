@@ -2,10 +2,14 @@ import { listarAlunosParaCheckin, listarFrequenciaHoje } from "@/actions/frequen
 import { FrequenciaPageClient } from "./frequencia-client";
 
 export default async function FrequenciaPage() {
-  const [alunos, presencasHoje] = await Promise.all([
-    listarAlunosParaCheckin(),
-    listarFrequenciaHoje(),
-  ]);
+  try {
+    const [alunos, presencasHoje] = await Promise.all([
+      listarAlunosParaCheckin(),
+      listarFrequenciaHoje(),
+    ]);
 
-  return <FrequenciaPageClient alunos={alunos} presencasHoje={presencasHoje} />;
+    return <FrequenciaPageClient alunos={alunos} presencasHoje={presencasHoje} />;
+  } catch {
+    return <FrequenciaPageClient alunos={[]} presencasHoje={[]} />;
+  }
 }

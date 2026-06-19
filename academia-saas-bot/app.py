@@ -25,7 +25,9 @@ from database_api import (
 )
 from academia_flow import process_academia_message, AcademiaState
 from message_buffer import buffer_message
-from config import GEMINI_API_KEY
+from config import GEMINI_API_KEY, REDIS_URL as _REDIS_URL
+
+_REDIS_URI = _REDIS_URL or 'redis://redis:6379/6'
 from evolution_api import send_whatsapp_message
 from router import detect_intent, detect_intent_with_context, is_within_hours
 from script_responses import (
@@ -51,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 async def _get_redis_async():
     import redis.asyncio as aioredis
-    return aioredis.from_url('redis://localhost:6379/6', decode_responses=True)
+    return aioredis.from_url(_REDIS_URI, decode_responses=True)
 
 
 from contextlib import asynccontextmanager
@@ -248,10 +250,7 @@ async def _process_chat_message(
             return {'reply': reply, 'response': reply, 'sale_complete': False, 'confetti': False}
 
         import redis
-        redis_async = redis.asyncio.from_url(
-            'redis://localhost:6379/6',
-            decode_responses=True
-        )
+        redis_async = redis.asyncio.from_url(_REDIS_URI, decode_responses=True)
         intent = await detect_intent_with_context(
             text=message,
             tenant_id=tenant_id,
@@ -520,7 +519,7 @@ async def enqueue_cobrancas(request: Request):
 
     from cobranca_worker import _queue_key, _progress_key
     import redis.asyncio as aioredis
-    redis_async = aioredis.from_url('redis://localhost:6379/6', decode_responses=True)
+    redis_async = aioredis.from_url(_REDIS_URI, decode_responses=True)
 
     try:
         queue_key = _queue_key(tenant_id)
@@ -553,7 +552,7 @@ async def progresso_cobrancas(tenant_id: str):
     """Retorna o progresso atual do disparo em lote para o tenant."""
     from cobranca_worker import _progress_key, _queue_key, _daily_key
     import redis.asyncio as aioredis
-    redis_async = aioredis.from_url('redis://localhost:6379/6', decode_responses=True)
+    redis_async = aioredis.from_url(_REDIS_URI, decode_responses=True)
 
     try:
         progress = await redis_async.hgetall(_progress_key(tenant_id))

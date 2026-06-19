@@ -11,7 +11,6 @@ type ProfilePopoverProps = {
   };
   tenant: {
     name: string;
-    subNicho: string;
     plano: string;
   };
   onSignOut: () => Promise<void> | void;
@@ -46,9 +45,6 @@ export function ProfilePopover({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("") || "?";
-
-  const nichoLabel =
-    tenant.subNicho.charAt(0).toUpperCase() + tenant.subNicho.slice(1);
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -112,7 +108,7 @@ export function ProfilePopover({
               color: "var(--sidebar-text-muted)",
             }}
           >
-            {tenant.plano} · {nichoLabel}
+            {tenant.plano}
           </div>
         </div>
 

@@ -8,7 +8,6 @@ import { getMetricasHistorico, getPedidosHistorico } from "@/actions/historico.a
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
-import type { SubNicho } from "@/lib/nicho";
 import { HistoricoClient } from "./historico-client";
 
 type Periodo = "hoje" | "semana" | "mes";
@@ -22,13 +21,11 @@ export default async function HistoricoPage({
   const periodo: Periodo =
     periodoParam === "semana" || periodoParam === "mes" ? periodoParam : "hoje";
 
-  // Buscar sub-nicho do tenant
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let subNicho: SubNicho = "adega";
   let tenantId = "";
   if (user) {
     const tenantData = await ensureTenantForUser({
@@ -37,15 +34,6 @@ export default async function HistoricoPage({
       nome: (user.user_metadata?.nome as string | undefined) ?? undefined,
     });
     tenantId = tenantData.tenant.id;
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantData.tenant.id },
-      select: { configNicho: true },
-    });
-    const config = tenant?.configNicho as { sub_nicho?: string } | null;
-    const raw = config?.sub_nicho;
-    if (raw === "pizzaria" || raw === "lanchonete" || raw === "adega" || raw === "academia") {
-      subNicho = raw;
-    }
   }
 
   const [pedidos, metricas, faturamento, produtos, horarios, comparativo] = await Promise.all([
@@ -70,7 +58,6 @@ export default async function HistoricoPage({
       pedidos={pedidos}
       metricas={metricas}
       analytics={{ faturamento, produtos, horarios, comparativo }}
-      subNicho={subNicho}
     />
   );
 }

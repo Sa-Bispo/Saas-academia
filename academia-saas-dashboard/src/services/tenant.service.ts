@@ -35,6 +35,7 @@ type TenantBootstrapResult = {
     ordersReceived: number;
     activeFlows: number;
   };
+  localFallback?: boolean;
 };
 
 async function ensureLocalAcademiaBootstrap(tenantId: string) {
@@ -106,6 +107,31 @@ function inferName(input: AuthenticatedUser) {
   return "Cliente";
 }
 
+function createLocalFallbackBootstrap(authUser: AuthenticatedUser): TenantBootstrapResult {
+  const email = authUser.email ?? `${authUser.id}@no-email.local`;
+  const nome = inferName(authUser);
+
+  return {
+    user: {
+      id: authUser.id,
+      email,
+      nome,
+    },
+    tenant: {
+      id: authUser.id,
+      nome: "Minha Loja",
+      botName: null,
+      companyName: null,
+    },
+    metrics: {
+      stockItems: 0,
+      ordersReceived: 0,
+      activeFlows: 0,
+    },
+    localFallback: true,
+  };
+}
+
 /**
  * Garante que o usuário autenticado possua registro local em `users`
  * e pelo menos um tenant associado. Todas as consultas são filtradas
@@ -117,87 +143,74 @@ export async function ensureTenantForUser(
   const email = authUser.email ?? `${authUser.id}@no-email.local`;
   const nome = inferName(authUser);
 
-  const existingByEmail = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-
-  const user = existingByEmail
-    ? await prisma.user.update({
-        where: { id: existingByEmail.id },
-        data: { nome },
-        select: {
-          id: true,
-          email: true,
-          nome: true,
-        },
-      })
-    : await prisma.user.upsert({
-        where: { id: authUser.id },
-        create: {
-          id: authUser.id,
-          email,
-          nome,
-        },
-        update: {
-          email,
-          nome,
-        },
-        select: {
-          id: true,
-          email: true,
-          nome: true,
-        },
-      });
-
-  const cookieStore = await cookies();
-  const impersonatedTenantId = cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value;
-
-  if (isPlatformAdmin(authUser.email) && impersonatedTenantId) {
-    const impersonatedTenant = await prisma.tenant.findUnique({
-      where: { id: impersonatedTenantId },
-      select: {
-        id: true,
-        nome: true,
-        botName: true,
-        companyName: true,
-      },
+  try {
+    const existingByEmail = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
     });
 
-    if (impersonatedTenant) {
-      const stockItems = await prisma.stockItem.count({
-        where: { tenantId: impersonatedTenant.id },
+    const user = existingByEmail
+      ? await prisma.user.update({
+          where: { id: existingByEmail.id },
+          data: { nome },
+          select: {
+            id: true,
+            email: true,
+            nome: true,
+          },
+        })
+      : await prisma.user.upsert({
+          where: { id: authUser.id },
+          create: {
+            id: authUser.id,
+            email,
+            nome,
+          },
+          update: {
+            email,
+            nome,
+          },
+          select: {
+            id: true,
+            email: true,
+            nome: true,
+          },
+        });
+
+    const cookieStore = await cookies();
+    const impersonatedTenantId = cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value;
+
+    if (isPlatformAdmin(authUser.email) && impersonatedTenantId) {
+      const impersonatedTenant = await prisma.tenant.findUnique({
+        where: { id: impersonatedTenantId },
+        select: {
+          id: true,
+          nome: true,
+          botName: true,
+          companyName: true,
+        },
       });
 
-      return {
-        user,
-        tenant: impersonatedTenant,
-        metrics: {
-          stockItems,
-          ordersReceived: 0,
-          activeFlows: 0,
-        },
-      };
+      if (impersonatedTenant) {
+        const stockItems = await prisma.stockItem.count({
+          where: { tenantId: impersonatedTenant.id },
+        });
+
+        return {
+          user,
+          tenant: impersonatedTenant,
+          metrics: {
+            stockItems,
+            ordersReceived: 0,
+            activeFlows: 0,
+          },
+        };
+      }
     }
-  }
 
-  let tenant = await prisma.tenant.findFirst({
-    where: { userId: user.id },
-    orderBy: { dataCriacao: "desc" },
-    select: {
-      id: true,
-      nome: true,
-      botName: true,
-      companyName: true,
-    },
-  });
-
-  if (!tenant) {
-    tenant = await prisma.tenant.create({
-      data: {
-        nome: "Minha Loja",
-        userId: user.id,
-      },
+    let tenant = await prisma.tenant.findFirst({
+      where: { userId: user.id },
+      orderBy: { dataCriacao: "desc" },
       select: {
         id: true,
         nome: true,
@@ -205,26 +218,43 @@ export async function ensureTenantForUser(
         companyName: true,
       },
     });
-  }
 
-  await ensureLocalAcademiaBootstrap(tenant.id);
+    if (!tenant) {
+      tenant = await prisma.tenant.create({
+        data: {
+          nome: "Minha Loja",
+          userId: user.id,
+        },
+        select: {
+          id: true,
+          nome: true,
+          botName: true,
+          companyName: true,
+        },
+      });
+    }
 
-  const stockItems = await prisma.stockItem.count({
-    where: {
-      tenant: {
-        userId: user.id,
+    await ensureLocalAcademiaBootstrap(tenant.id);
+
+    const stockItems = await prisma.stockItem.count({
+      where: {
+        tenant: {
+          userId: user.id,
+        },
       },
-    },
-  });
+    });
 
-  return {
-    user,
-    tenant,
-    metrics: {
-      stockItems,
-      // Placeholders para dashboard inicial.
-      ordersReceived: 0,
-      activeFlows: 0,
-    },
-  };
+    return {
+      user,
+      tenant,
+      metrics: {
+        stockItems,
+        // Placeholders para dashboard inicial.
+        ordersReceived: 0,
+        activeFlows: 0,
+      },
+    };
+  } catch {
+    return createLocalFallbackBootstrap(authUser);
+  }
 }

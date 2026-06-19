@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   Users,
   Wallet,
@@ -19,6 +20,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
+import { DashboardMetricCard } from "@/components/ui/dashboard-metric-card";
 
 import {
   ReceitaMensalChart,
@@ -65,6 +67,12 @@ function KpiCard({
   icon: React.ElementType;
 }) {
   return (
+    <motion.div
+      whileHover={{ y: -4, boxShadow: "0 12px 36px rgba(0,0,0,0.35)" }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 400, damping: 22 }}
+      style={{ borderRadius: 16 }}
+    >
     <Link
       href={href}
       style={{
@@ -73,18 +81,9 @@ function KpiCard({
         borderRadius: 16,
         padding: "20px 22px",
         textDecoration: "none",
-        transition: "transform 0.15s ease, box-shadow 0.15s ease",
         boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
         position: "relative",
         overflow: "hidden",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 32px rgba(0,0,0,0.3)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(0,0,0,0.2)";
       }}
     >
       <div style={{
@@ -120,38 +119,7 @@ function KpiCard({
         </p>
       )}
     </Link>
-  );
-}
-
-function KpiMini({
-  label, value, icon: Icon, color, desc,
-}: {
-  label: string;
-  value: string;
-  icon: React.ElementType;
-  color: string;
-  desc: string;
-}) {
-  return (
-    <div style={{
-      background: "var(--card-bg)",
-      border: "1px solid var(--card-border)",
-      borderRadius: 14,
-      padding: "16px 20px",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          background: color + "20",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <Icon size={14} color={color} />
-        </div>
-        <span style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
-      </div>
-      <p style={{ fontSize: 22, fontWeight: 700, color, marginBottom: 3 }}>{value}</p>
-      <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{desc}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -290,9 +258,27 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
 
       {/* ── KPIs extras (faixa fina) ── */}
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <KpiMini label="Taxa de churn" value={`${taxaChurnPct}%`} icon={Activity} color="#f59e0b" desc="Inadimplentes / total" />
-        <KpiMini label="LTV médio" value={formatCents(ltvMedioCents)} icon={Target} color="#3b82f6" desc="Valor vitalício por aluno" />
-        <KpiMini label="Frequência média" value={`${frequenciaMediaSemanal}x/sem`} icon={Dumbbell} color="#8b5cf6" desc="Média de treinos semanais" />
+        <DashboardMetricCard
+          title="Taxa de churn"
+          value={`${taxaChurnPct}%`}
+          icon={Activity}
+          trendChange="Inadimplentes / total"
+          trendType="neutral"
+        />
+        <DashboardMetricCard
+          title="LTV médio"
+          value={formatCents(ltvMedioCents)}
+          icon={Target}
+          trendChange="Valor vitalício por aluno"
+          trendType="neutral"
+        />
+        <DashboardMetricCard
+          title="Frequência média"
+          value={`${frequenciaMediaSemanal}x/sem`}
+          icon={Dumbbell}
+          trendChange="Média de treinos semanais"
+          trendType="neutral"
+        />
       </div>
 
       {/* ── Alerta cobranças pendentes ── */}

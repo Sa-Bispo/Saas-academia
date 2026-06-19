@@ -7,7 +7,6 @@ import { PlanoProvider } from "@/components/ui/plano-provider";
 import { mapPlano } from "@/lib/plano";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
-import type { SubNicho } from "@/lib/nicho";
 import { ensureTenantForUser } from "@/services/tenant.service";
 
 function getAdminEmail() {
@@ -36,6 +35,23 @@ export default async function DashboardLayout({
     nome: (user.user_metadata?.nome as string | undefined) ?? undefined,
   });
 
+  if (tenantData.localFallback) {
+    return (
+      <div className="dashboard-layout bg-background text-foreground">
+        <SidebarNicho
+          tenantName={tenantData.tenant.companyName ?? tenantData.tenant.nome}
+          planName="Academia Pro"
+          botAtivo={false}
+          userEmail={user.email}
+          userName={(user.user_metadata?.nome as string | undefined) ?? user.email ?? undefined}
+        />
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 sm:py-9">{children}</div>
+        </main>
+      </div>
+    );
+  }
+
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantData.tenant.id },
     select: {
@@ -44,7 +60,6 @@ export default async function DashboardLayout({
       companyName: true,
       whatsappStatus: true,
       plano: true,
-      configNicho: true,
       subscription: {
         select: {
           status: true,
@@ -61,23 +76,14 @@ export default async function DashboardLayout({
     return <NoPlanState />;
   }
 
-  const config = tenant.configNicho as { sub_nicho?: string };
-  const subNicho = (config?.sub_nicho) as SubNicho | undefined;
-
-  // Sem sub-nicho → escolher nicho
-  if (subNicho !== "academia") {
-    redirect("/setup/nicho");
-  }
-
   const suporteNaoLidas = await getNaoLidas(tenant.id);
 
   const planoAtual = mapPlano(tenant.plano || tenant.subscription.plan.code);
 
   return (
     <PlanoProvider plano={planoAtual}>
-      <div className="flex min-h-screen flex-col bg-background text-foreground lg:grid lg:grid-cols-[240px_1fr]">
+      <div className="dashboard-layout bg-background text-foreground">
         <SidebarNicho
-          subNicho={subNicho}
           tenantName={tenant.companyName || tenant.nome}
           planName={tenant.subscription.plan.name}
           botAtivo={tenant.whatsappStatus === "CONNECTED"}

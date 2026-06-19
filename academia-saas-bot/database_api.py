@@ -281,6 +281,15 @@ def _normalize_phone(value: str) -> str:
     return re.sub(r'\D', '', value or '')
 
 
+def _alt_phone(digits: str) -> str | None:
+    """Returns the alternative Brazilian mobile format (with/without 9th digit)."""
+    if len(digits) == 11 and digits[2] == '9':
+        return digits[:2] + digits[3:]
+    if len(digits) == 10:
+        return digits[:2] + '9' + digits[2:]
+    return None
+
+
 async def _fetch_customer_by_phone(tenant_id: str, phone: str) -> dict[str, str] | None:
     if not BOT_DATABASE_CONNECTION_URI:
         raise RuntimeError('DATABASE_CONNECTION_URI não configurada.')
@@ -1148,7 +1157,8 @@ async def save_pizza_order(tenant_id: str, phone: str, session: dict[str, Any]) 
 # ─── Academia ─────────────────────────────────────────────────────────────────
 
 async def get_aluno_by_phone(tenant_id: str, phone: str) -> dict[str, Any] | None:
-    """Busca um aluno pelo número de telefone (normalizado, só dígitos)."""
+    """Busca um aluno pelo número de telefone (normalizado, só dígitos).
+    Tenta também a variação com/sem o 9º dígito móvel brasileiro."""
     if not BOT_DATABASE_CONNECTION_URI:
         return None
 
@@ -1156,19 +1166,35 @@ async def get_aluno_by_phone(tenant_id: str, phone: str) -> dict[str, Any] | Non
     if not phone_digits:
         return None
 
+    alt = _alt_phone(phone_digits)
     conn = await asyncpg.connect(BOT_DATABASE_CONNECTION_URI)
     try:
-        row = await conn.fetchrow(
-            """
-            SELECT id, nome, telefone, status
-            FROM alunos
-            WHERE tenant_id = $1
-              AND regexp_replace(telefone, '[^0-9]', '', 'g') = $2
-            LIMIT 1
-            """,
-            tenant_id,
-            phone_digits,
-        )
+        if alt:
+            row = await conn.fetchrow(
+                """
+                SELECT id, nome, telefone, status
+                FROM alunos
+                WHERE tenant_id = $1
+                  AND regexp_replace(telefone, '[^0-9]', '', 'g') IN ($2, $3)
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                tenant_id,
+                phone_digits,
+                alt,
+            )
+        else:
+            row = await conn.fetchrow(
+                """
+                SELECT id, nome, telefone, status
+                FROM alunos
+                WHERE tenant_id = $1
+                  AND regexp_replace(telefone, '[^0-9]', '', 'g') = $2
+                LIMIT 1
+                """,
+                tenant_id,
+                phone_digits,
+            )
         return dict(row) if row else None
     finally:
         await conn.close()

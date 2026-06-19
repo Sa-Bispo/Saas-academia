@@ -41,26 +41,39 @@ export default async function PlanoEUsoPage() {
 
   if (!user) redirect("/login");
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { userId: user.id },
-    orderBy: { dataCriacao: "asc" },
-    select: {
-      nome: true,
-      subscription: {
-        select: {
-          status: true,
-          currentPeriodEnd: true,
-          plan: {
-            select: {
-              name: true,
-              priceCents: true,
-              niche: true,
+  let tenant: {
+    nome: string;
+    subscription: {
+      status: "ACTIVE" | "PENDING" | "PAST_DUE" | "CANCELLED" | "EXPIRED";
+      currentPeriodEnd: Date;
+      plan: { name: string; priceCents: number; niche: "DELIVERY" | "CLINICA" | "EMPRESA" };
+    } | null;
+  } | null = null;
+
+  try {
+    tenant = await prisma.tenant.findFirst({
+      where: { userId: user.id },
+      orderBy: { dataCriacao: "asc" },
+      select: {
+        nome: true,
+        subscription: {
+          select: {
+            status: true,
+            currentPeriodEnd: true,
+            plan: {
+              select: {
+                name: true,
+                priceCents: true,
+                niche: true,
+              },
             },
           },
         },
       },
-    },
-  });
+    });
+  } catch {
+    redirect("/planos/delivery");
+  }
 
   if (!tenant?.subscription?.plan) {
     redirect("/planos/delivery");

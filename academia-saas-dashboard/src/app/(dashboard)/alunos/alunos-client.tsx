@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   Users,
   Plus,
@@ -9,14 +9,27 @@ import {
   UserX,
   AlertTriangle,
   ChevronDown,
+  ChevronRight,
   X,
   Phone,
   Mail,
   Calendar,
   Dumbbell,
+  Pencil,
+  Trash2,
+  IdCard,
+  Cake,
+  FileText,
+  Receipt,
+  ClipboardList,
+  Loader2,
+  MessageCircle,
+  UserPlus,
+  Clock,
 } from "lucide-react";
+import FloatingActionMenu from "@/components/ui/floating-action-menu";
 
-import { criarAluno, atualizarAluno, excluirAluno } from "@/actions/alunos.actions";
+import { criarAluno, atualizarAluno, excluirAluno, buscarAluno } from "@/actions/alunos.actions";
 import { matricularAluno, criarPlanoAcademia } from "@/actions/planos-academia.actions";
 
 type Plano = {
@@ -64,8 +77,55 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   SUSPENSO: { label: "Suspenso", color: "bg-amber-500/15 text-amber-400", icon: AlertTriangle },
 };
 
+const MATRICULA_STATUS_COLOR: Record<string, string> = {
+  ATIVA: "bg-emerald-500/15 text-emerald-400",
+  VENCIDA: "bg-red-500/15 text-red-400",
+  CANCELADA: "bg-slate-500/15 text-slate-400",
+};
+
+const COBRANCA_STATUS_LABEL: Record<string, string> = {
+  PENDENTE: "Pendente",
+  AGUARDANDO_VALIDACAO: "Aguardando validação",
+  PAGO: "Pago",
+  VENCIDO: "Vencido",
+  CANCELADA: "Cancelada",
+};
+
+const COBRANCA_STATUS_COLOR: Record<string, string> = {
+  PENDENTE: "bg-amber-500/15 text-amber-400",
+  AGUARDANDO_VALIDACAO: "bg-amber-500/15 text-amber-400",
+  PAGO: "bg-emerald-500/15 text-emerald-400",
+  VENCIDO: "bg-red-500/15 text-red-400",
+  CANCELADA: "bg-slate-500/15 text-slate-400",
+};
+
 function formatCents(cents: number) {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatData(d: Date | string | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("pt-BR");
+}
+
+function formatCpf(cpf: string | null | undefined) {
+  if (!cpf) return null;
+  const digits = cpf.replace(/\D/g, "");
+  if (digits.length !== 11) return cpf;
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+}
+
+function maskCpf(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+}
+
+function toDateInputValue(d: Date | string | null | undefined) {
+  if (!d) return "";
+  return new Date(d).toISOString().split("T")[0];
 }
 
 function isVencendo(dataVencimento: Date) {
@@ -101,6 +161,10 @@ function ModalNovoAluno({
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [observacoes, setObservacoes] = useState("");
+  const [maisDetalhes, setMaisDetalhes] = useState(false);
 
   // Form matrícula
   const [planoId, setPlanoId] = useState(planos[0]?.id ?? "");
@@ -122,7 +186,14 @@ function ModalNovoAluno({
   async function handleSalvarAluno() {
     if (!nome.trim() || !telefone.trim()) return;
     startTransition(async () => {
-      const aluno = await criarAluno({ nome, telefone, email: email || undefined });
+      const aluno = await criarAluno({
+        nome,
+        telefone,
+        email: email || undefined,
+        cpf: cpf || undefined,
+        dataNascimento: dataNascimento || undefined,
+        observacoes: observacoes || undefined,
+      });
       setAlunoId(aluno.id);
       setStep("matricula");
     });
@@ -202,6 +273,53 @@ function ModalNovoAluno({
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
+
+              <button
+                type="button"
+                onClick={() => setMaisDetalhes(!maisDetalhes)}
+                className="flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+              >
+                <ChevronDown
+                  size={13}
+                  className={`transition ${maisDetalhes ? "rotate-180" : ""}`}
+                />
+                {maisDetalhes ? "Ocultar detalhes" : "+ Adicionar mais detalhes (opcional)"}
+              </button>
+
+              {maisDetalhes && (
+                <div className="space-y-3 rounded-xl border border-line/50 bg-white/[0.03] p-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-muted">CPF</label>
+                      <input
+                        className="w-full rounded-lg border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                        placeholder="000.000.000-00"
+                        value={cpf}
+                        onChange={(e) => setCpf(maskCpf(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-muted">Nascimento</label>
+                      <input
+                        type="date"
+                        className="w-full rounded-lg border border-line bg-white/5 px-3 py-2 text-sm text-white focus:border-brand/50 focus:outline-none"
+                        value={dataNascimento}
+                        onChange={(e) => setDataNascimento(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-muted">Observações</label>
+                    <textarea
+                      className="w-full resize-none rounded-lg border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                      placeholder="Restrições médicas, objetivo, indicação, etc."
+                      rows={2}
+                      value={observacoes}
+                      onChange={(e) => setObservacoes(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -347,12 +465,422 @@ function ModalNovoAluno({
   );
 }
 
+// ─── Modal Detalhe / Editar Aluno ──────────────────────────────────────────────
+
+type AlunoDetalhe = {
+  id: string;
+  nome: string;
+  telefone: string;
+  email: string | null;
+  cpf: string | null;
+  dataNascimento: Date | string | null;
+  observacoes: string | null;
+  status: string;
+  createdAt: Date | string;
+  matriculas: {
+    id: string;
+    dataInicio: Date | string;
+    dataVencimento: Date | string;
+    status: string;
+    plano: { nome: string; valorCents: number; periodicidade: string };
+  }[];
+  cobrancas: {
+    id: string;
+    status: string;
+    valorCents: number;
+    dataVencimento: Date | string;
+    dataPagamento: Date | string | null;
+  }[];
+  frequencias: {
+    id: string;
+    data: Date | string;
+    horaEntrada: string | null;
+    horaSaida: string | null;
+  }[];
+};
+
+function SecaoCard({
+  icon: Icon,
+  titulo,
+  children,
+}: {
+  icon: React.ElementType;
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-line/50 bg-white/[0.03] p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+        <Icon size={12} />
+        {titulo}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function ModalDetalheAluno({
+  alunoId,
+  onClose,
+}: {
+  alunoId: string;
+  onClose: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [carregando, setCarregando] = useState(true);
+  const [aluno, setAluno] = useState<AlunoDetalhe | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+
+  // Form de edição
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [observacoes, setObservacoes] = useState("");
+  const [status, setStatus] = useState<"ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO">("ATIVO");
+
+  function carregarFormDeAluno(a: AlunoDetalhe) {
+    setNome(a.nome);
+    setTelefone(a.telefone);
+    setEmail(a.email ?? "");
+    setCpf(a.cpf ?? "");
+    setDataNascimento(toDateInputValue(a.dataNascimento));
+    setObservacoes(a.observacoes ?? "");
+    setStatus(a.status as "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO");
+  }
+
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      const data = await buscarAluno(alunoId);
+      if (!ativo) return;
+      if (data) {
+        setAluno(data as unknown as AlunoDetalhe);
+        carregarFormDeAluno(data as unknown as AlunoDetalhe);
+      }
+      setCarregando(false);
+    })();
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alunoId]);
+
+  async function handleSalvarEdicao() {
+    if (!nome.trim() || !telefone.trim()) return;
+    startTransition(async () => {
+      await atualizarAluno(alunoId, {
+        nome,
+        telefone,
+        email: email || undefined,
+        cpf: cpf || undefined,
+        dataNascimento: dataNascimento || undefined,
+        observacoes: observacoes || undefined,
+        status,
+      });
+      const atualizado = await buscarAluno(alunoId);
+      if (atualizado) {
+        setAluno(atualizado as unknown as AlunoDetalhe);
+        carregarFormDeAluno(atualizado as unknown as AlunoDetalhe);
+      }
+      setEditando(false);
+    });
+  }
+
+  async function handleExcluir() {
+    if (!confirmandoExclusao) {
+      setConfirmandoExclusao(true);
+      return;
+    }
+    startTransition(async () => {
+      await excluirAluno(alunoId);
+      onClose();
+    });
+  }
+
+  const statusCfg = aluno ? STATUS_CONFIG[aluno.status] ?? STATUS_CONFIG.INATIVO : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-line bg-surface shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <div>
+            <h2 className="text-sm font-semibold text-white">
+              {carregando ? "Carregando..." : aluno?.nome ?? "Aluno"}
+            </h2>
+            {statusCfg && !editando && (
+              <span
+                className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusCfg.color}`}
+              >
+                <statusCfg.icon size={10} />
+                {statusCfg.label}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-muted transition hover:text-foreground"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          {carregando ? (
+            <div className="flex items-center justify-center py-10 text-muted">
+              <Loader2 size={20} className="animate-spin" />
+            </div>
+          ) : !aluno ? (
+            <p className="py-10 text-center text-sm text-muted">Aluno não encontrado.</p>
+          ) : editando ? (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted">Nome completo *</label>
+                <input
+                  className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted">Telefone *</label>
+                  <input
+                    className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                    value={telefone}
+                    onChange={(e) => setTelefone(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted">E-mail</label>
+                  <input
+                    type="email"
+                    className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted">CPF</label>
+                  <input
+                    className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                    placeholder="000.000.000-00"
+                    value={cpf}
+                    onChange={(e) => setCpf(maskCpf(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted">Nascimento</label>
+                  <input
+                    type="date"
+                    className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white focus:border-brand/50 focus:outline-none"
+                    value={dataNascimento}
+                    onChange={(e) => setDataNascimento(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted">Status</label>
+                <select
+                  className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-white focus:border-brand/50 focus:outline-none"
+                  value={status}
+                  onChange={(e) =>
+                    setStatus(e.target.value as "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO")
+                  }
+                >
+                  <option value="ATIVO">Ativo</option>
+                  <option value="INADIMPLENTE">Inadimplente</option>
+                  <option value="INATIVO">Inativo</option>
+                  <option value="SUSPENSO">Suspenso</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted">Observações</label>
+                <textarea
+                  className="w-full resize-none rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                  rows={3}
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <SecaoCard icon={Phone} titulo="Contato">
+                <div className="space-y-1.5">
+                  <p className="flex items-center gap-1.5 text-sm text-foreground">
+                    <Phone size={12} className="text-muted" /> {aluno.telefone}
+                  </p>
+                  {aluno.email && (
+                    <p className="flex items-center gap-1.5 text-sm text-foreground">
+                      <Mail size={12} className="text-muted" /> {aluno.email}
+                    </p>
+                  )}
+                </div>
+              </SecaoCard>
+
+              <SecaoCard icon={IdCard} titulo="Dados pessoais">
+                <div className="grid grid-cols-2 gap-2 text-sm text-foreground">
+                  <p className="flex items-center gap-1.5">
+                    <IdCard size={12} className="text-muted" /> {formatCpf(aluno.cpf) ?? "—"}
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <Cake size={12} className="text-muted" /> {formatData(aluno.dataNascimento)}
+                  </p>
+                </div>
+                <p className="mt-2 text-xs text-muted">Aluno desde {formatData(aluno.createdAt)}</p>
+              </SecaoCard>
+
+              {aluno.observacoes && (
+                <SecaoCard icon={FileText} titulo="Observações">
+                  <p className="whitespace-pre-wrap text-sm text-foreground">{aluno.observacoes}</p>
+                </SecaoCard>
+              )}
+
+              <SecaoCard icon={Dumbbell} titulo="Matrículas">
+                {aluno.matriculas.length === 0 ? (
+                  <p className="text-sm text-muted">Nenhuma matrícula registrada.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {aluno.matriculas.map((m) => (
+                      <div key={m.id} className="flex items-center justify-between text-sm">
+                        <div>
+                          <p className="text-foreground">{m.plano.nome}</p>
+                          <p className="text-xs text-muted">
+                            {formatData(m.dataInicio)} → {formatData(m.dataVencimento)}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            MATRICULA_STATUS_COLOR[m.status] ?? "bg-slate-500/15 text-slate-400"
+                          }`}
+                        >
+                          {m.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SecaoCard>
+
+              <SecaoCard icon={Receipt} titulo="Cobranças">
+                {aluno.cobrancas.length === 0 ? (
+                  <p className="text-sm text-muted">Nenhuma cobrança registrada.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {aluno.cobrancas.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between text-sm">
+                        <div>
+                          <p className="text-foreground">{formatCents(c.valorCents)}</p>
+                          <p className="text-xs text-muted">
+                            Venc. {formatData(c.dataVencimento)}
+                            {c.dataPagamento && ` · Pago em ${formatData(c.dataPagamento)}`}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            COBRANCA_STATUS_COLOR[c.status] ?? "bg-slate-500/15 text-slate-400"
+                          }`}
+                        >
+                          {COBRANCA_STATUS_LABEL[c.status] ?? c.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SecaoCard>
+
+              <SecaoCard icon={ClipboardList} titulo="Frequência recente">
+                {aluno.frequencias.length === 0 ? (
+                  <p className="text-sm text-muted">Nenhum check-in registrado.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {aluno.frequencias.map((f) => (
+                      <div key={f.id} className="flex items-center justify-between text-sm">
+                        <span className="text-foreground">{formatData(f.data)}</span>
+                        <span className="text-xs text-muted">
+                          {f.horaEntrada ?? "—"} {f.horaSaida ? `→ ${f.horaSaida}` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SecaoCard>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {aluno && (
+          <div className="flex items-center justify-between border-t border-line px-5 py-4">
+            {editando ? (
+              <>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setEditando(false);
+                    carregarFormDeAluno(aluno);
+                  }}
+                  className="rounded-xl border border-line px-4 py-2 text-sm text-muted transition hover:text-foreground disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={pending || !nome || !telefone}
+                  onClick={handleSalvarEdicao}
+                  className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90 disabled:opacity-50"
+                >
+                  {pending ? "Salvando..." : "Salvar alterações"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={handleExcluir}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition disabled:opacity-50 ${
+                    confirmandoExclusao
+                      ? "bg-red-500/20 text-red-400"
+                      : "text-muted hover:text-red-400"
+                  }`}
+                >
+                  <Trash2 size={13} />
+                  {confirmandoExclusao ? "Confirmar exclusão?" : "Excluir aluno"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditando(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
+                >
+                  <Pencil size={13} />
+                  Editar
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function AlunosPageClient({ alunos, planos }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [modalAberto, setModalAberto] = useState(false);
+  const [alunoSelecionadoId, setAlunoSelecionadoId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const alunosFiltrados = alunos.filter((a) => {
@@ -360,7 +888,12 @@ export function AlunosPageClient({ alunos, planos }: Props) {
       !busca ||
       a.nome.toLowerCase().includes(busca.toLowerCase()) ||
       a.telefone.includes(busca);
-    const matchStatus = filtroStatus === "todos" || a.status === filtroStatus;
+    let matchStatus = true;
+    if (filtroStatus === "VENCENDO") {
+      matchStatus = !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
+    } else if (filtroStatus !== "todos") {
+      matchStatus = a.status === filtroStatus;
+    }
     return matchBusca && matchStatus;
   });
 
@@ -369,6 +902,7 @@ export function AlunosPageClient({ alunos, planos }: Props) {
     ATIVO: alunos.filter((a) => a.status === "ATIVO").length,
     INADIMPLENTE: alunos.filter((a) => a.status === "INADIMPLENTE").length,
     INATIVO: alunos.filter((a) => a.status === "INATIVO").length,
+    VENCENDO: alunos.filter((a) => !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento)).length,
   };
 
   return (
@@ -396,6 +930,7 @@ export function AlunosPageClient({ alunos, planos }: Props) {
           { key: "ATIVO", label: "Ativos", count: totais.ATIVO },
           { key: "INADIMPLENTE", label: "Inadimplentes", count: totais.INADIMPLENTE },
           { key: "INATIVO", label: "Inativos", count: totais.INATIVO },
+          { key: "VENCENDO", label: "Vencendo", count: totais.VENCENDO },
         ].map(({ key, label, count }) => (
           <button
             key={key}
@@ -443,12 +978,13 @@ export function AlunosPageClient({ alunos, planos }: Props) {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-surface/60">
           {/* Header da tabela — desktop */}
-          <div className="hidden grid-cols-[2fr_1fr_1.5fr_1fr_1fr] gap-4 border-b border-line/50 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted lg:grid">
+          <div className="hidden grid-cols-[2fr_1fr_1.5fr_1fr_1fr_auto] gap-4 border-b border-line/50 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted lg:grid">
             <span>Aluno</span>
             <span>Status</span>
             <span>Plano ativo</span>
             <span>Vencimento</span>
             <span>Pendência</span>
+            <span></span>
           </div>
 
           <div className="divide-y divide-line/30">
@@ -461,7 +997,8 @@ export function AlunosPageClient({ alunos, planos }: Props) {
               return (
                 <div
                   key={aluno.id}
-                  className="grid grid-cols-1 gap-3 px-5 py-4 transition hover:bg-white/[0.02] lg:grid-cols-[2fr_1fr_1.5fr_1fr_1fr] lg:items-center lg:gap-4"
+                  onClick={() => setAlunoSelecionadoId(aluno.id)}
+                  className="grid cursor-pointer grid-cols-1 gap-3 px-5 py-4 transition hover:bg-white/[0.02] lg:grid-cols-[2fr_1fr_1.5fr_1fr_1fr_auto] lg:items-center lg:gap-4"
                 >
                   {/* Nome + contato */}
                   <div className="min-w-0">
@@ -535,6 +1072,21 @@ export function AlunosPageClient({ alunos, planos }: Props) {
                       <span className="text-xs text-emerald-400">Em dia ✓</span>
                     )}
                   </div>
+
+                  {/* Ações rápidas */}
+                  <div className="hidden items-center justify-end gap-1 lg:flex">
+                    <a
+                      href={`https://wa.me/55${aluno.telefone.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Abrir WhatsApp"
+                      className="rounded-lg p-1.5 text-muted/40 transition hover:bg-emerald-500/10 hover:text-emerald-400"
+                    >
+                      <MessageCircle size={14} />
+                    </a>
+                    <ChevronRight size={16} className="text-muted/50" />
+                  </div>
                 </div>
               );
             })}
@@ -545,6 +1097,33 @@ export function AlunosPageClient({ alunos, planos }: Props) {
       {modalAberto && (
         <ModalNovoAluno onClose={() => setModalAberto(false)} planos={planos} />
       )}
+
+      {alunoSelecionadoId && (
+        <ModalDetalheAluno
+          alunoId={alunoSelecionadoId}
+          onClose={() => setAlunoSelecionadoId(null)}
+        />
+      )}
+
+      <FloatingActionMenu
+        options={[
+          {
+            label: "Novo aluno",
+            Icon: <UserPlus size={14} />,
+            onClick: () => setModalAberto(true),
+          },
+          {
+            label: `Inadimplentes (${totais.INADIMPLENTE})`,
+            Icon: <AlertTriangle size={14} />,
+            onClick: () => setFiltroStatus("INADIMPLENTE"),
+          },
+          {
+            label: `Vencendo esta semana (${totais.VENCENDO})`,
+            Icon: <Clock size={14} />,
+            onClick: () => setFiltroStatus("VENCENDO"),
+          },
+        ]}
+      />
     </section>
   );
 }

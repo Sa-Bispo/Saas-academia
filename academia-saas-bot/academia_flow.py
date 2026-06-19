@@ -120,12 +120,20 @@ _PATTERNS_NAO = [
     r'^(nao|não|n|negativo|errado)[\s!.]*$',
 ]
 
+_PATTERNS_RENOVAR = [
+    r'\b(renov(ar|acao|ação)|quero renovar|renovar matricula|renovar plano)\b',
+    r'\b(como renov|preciso renov)\b',
+]
+
 
 def _detectar_intent(text: str) -> str:
     t = _norm(text)
     for p in _PATTERNS_PAGUEI:
         if re.search(p, t):
             return 'paguei'
+    for p in _PATTERNS_RENOVAR:
+        if re.search(p, t):
+            return 'renovar'
     for p in _PATTERNS_PIX:
         if re.search(p, t):
             return 'pix'
@@ -161,12 +169,18 @@ def _msg_nao_encontrado() -> str:
 
 def _msg_menu(nome: str, matricula: dict | None, cobrancas: list[dict]) -> str:
     primeiro_nome = (nome or '').split()[0]
+    dias = _dias_ate(matricula.get('data_vencimento')) if matricula else None
+    vencendo = dias is not None and dias <= 7
+
     linhas = [f'Olá, *{primeiro_nome}*! 💪 O que posso ajudar?\n']
     linhas.append('1️⃣ Minha matrícula')
     linhas.append('2️⃣ Cobranças pendentes')
     if cobrancas:
         linhas.append('3️⃣ Ver chave Pix para pagamento')
         linhas.append('4️⃣ Já fiz o pagamento')
+        linhas.append('5️⃣ Quero renovar minha matrícula')
+    elif vencendo or not matricula:
+        linhas.append('3️⃣ Quero renovar minha matrícula')
     linhas.append('\nDigite o número ou descreva o que precisa 😊')
     return '\n'.join(linhas)
 
@@ -249,6 +263,43 @@ def _msg_pedir_comprovante(cobrancas: list[dict]) -> str:
     return (
         f'Perfeito! Para eu confirmar o pagamento de *{_fmt_brl(total)}*, '
         f'me envia uma *foto do comprovante* (print do Pix) aqui no chat 📸'
+    )
+
+
+def _msg_renovar(matricula: dict | None, cobrancas: list[dict], pix_chave: str | None) -> str:
+    if cobrancas and pix_chave:
+        total = sum(c.get('valor_cents') or 0 for c in cobrancas)
+        return (
+            f'🔄 *Renovação de Matrícula*\n\n'
+            f'Para renovar, pague a mensalidade em aberto via Pix:\n\n'
+            f'🔑 *Chave Pix:* `{pix_chave}`\n'
+            f'💰 *Valor:* {_fmt_brl(total)}\n\n'
+            f'Depois de pagar, *envie a foto do comprovante aqui* 📸 '
+            f'que eu já registro pra equipe confirmar! 😊'
+        )
+    if cobrancas:
+        return (
+            '🔄 Para renovar sua matrícula, regularize a pendência financeira.\n'
+            'Entre em contato com a recepção para efetuar o pagamento.'
+        )
+    if not matricula:
+        return (
+            '🔄 Você ainda não possui matrícula cadastrada.\n'
+            'Passe pela recepção para se matricular! 😊'
+        )
+    dias = _dias_ate(matricula.get('data_vencimento'))
+    if dias is not None and dias > 7:
+        venc = _fmt_data(matricula.get('data_vencimento'))
+        return (
+            f'✅ Sua matrícula ainda está ativa até *{venc}*.\n\n'
+            f'Quando estiver perto do vencimento, entraremos em contato '
+            f'com a cobrança de renovação. 😊'
+        )
+    return (
+        '🔄 *Renovação de Matrícula*\n\n'
+        'Sua matrícula está próxima do vencimento, mas ainda não há '
+        'cobrança gerada.\n\n'
+        'Entre em contato com a recepção para solicitar a renovação! 😊'
     )
 
 
@@ -353,14 +404,17 @@ def process_academia_message(
         text_norm = _norm(text)
 
         # Atalhos numéricos
+        # 3 e 5 são dinâmicos conforme o menu exibido (com/sem cobranças)
         if text_norm in ('1', '1.'):
             intent = 'matricula'
         elif text_norm in ('2', '2.'):
             intent = 'cobranca'
         elif text_norm in ('3', '3.'):
-            intent = 'pix'
+            intent = 'pix' if cobrancas else 'renovar'
         elif text_norm in ('4', '4.'):
             intent = 'paguei'
+        elif text_norm in ('5', '5.'):
+            intent = 'renovar'
 
         session['state'] = AcademiaState.MENU.value  # permanece no menu por padrão
 
@@ -380,6 +434,11 @@ def process_academia_message(
                 return _msg_pedir_comprovante([]), session
             session['state'] = AcademiaState.AGUARD_COMPROVANTE.value
             return _msg_pedir_comprovante(cobrancas), session
+
+        if intent == 'renovar':
+            if cobrancas and pix_chave:
+                session['state'] = AcademiaState.AGUARD_COMPROVANTE.value
+            return _msg_renovar(matricula, cobrancas, pix_chave), session
 
         if intent == 'encerrar':
             session['state'] = AcademiaState.FINALIZADO.value

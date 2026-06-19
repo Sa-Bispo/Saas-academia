@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
   Bot,
@@ -16,15 +17,13 @@ import {
   X,
   Shield,
   Zap,
+  ChevronRight,
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
-import { FeatureGate } from "@/components/ui/feature-gate";
-import type { SubNicho } from "@/lib/nicho";
 import { ProfilePopover } from "@/components/ui/profile-popover";
 
 type SidebarNichoProps = {
-  subNicho: SubNicho;
   tenantName: string;
   planName: string;
   botAtivo: boolean;
@@ -56,7 +55,6 @@ const SETTINGS_LINKS: LinkItem[] = [
 export function SidebarNicho({
   tenantName,
   planName,
-  subNicho,
   botAtivo,
   userEmail,
   userName,
@@ -87,124 +85,191 @@ export function SidebarNicho({
   }
 
   const navContent = (
-    <>
-      <ProfilePopover
-        user={{ name: userName, email: userEmail }}
-        tenant={{ name: tenantName, subNicho, plano: planName }}
-        onSignOut={handleSignOut}
-        profileHref="/configuracoes"
-      />
-
-      <nav className="flex-1 px-2 py-3">
-        <SectionLabel label="Operacional" />
-
-        {OPERATIONAL_LINKS.map((item) => (
-          <SidebarLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            active={isLinkActive(item)}
-            icon={item.icon ? <item.icon size={15} /> : undefined}
-            onNavigate={() => setMobileOpen(false)}
-          />
-        ))}
-
-        <SectionLabel label="Configurações" className="pt-4" />
-
-        {SETTINGS_LINKS.map((item) => (
-          <SidebarLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            active={isLinkActive(item)}
-            icon={item.icon ? <item.icon size={15} /> : undefined}
-            onNavigate={() => setMobileOpen(false)}
-          />
-        ))}
-
-        {isAdmin ? (
-          <SidebarLink
-            href="/admin"
-            label="Painel admin"
-            active={pathname.startsWith("/admin")}
-            icon={<Shield size={15} />}
-            onNavigate={() => setMobileOpen(false)}
-          />
-        ) : null}
-      </nav>
-
+    <div className="flex h-full flex-col">
+      {/* ── Brand ── */}
       <div
-        style={{
-          padding: "12px 14px",
-          borderTop: "0.5px solid var(--sidebar-border)",
-        }}
+        className="flex items-center gap-3 px-4 py-4"
+        style={{ borderBottom: "1px solid var(--sidebar-border)" }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span
-            style={{
-              width: "7px",
-              height: "7px",
-              borderRadius: "50%",
-              background: botAtivo ? "#1D9E75" : "#ef4444",
-              display: "inline-block",
-            }}
-          />
-          <span style={{ fontSize: "12px", color: "var(--sidebar-text-muted)" }}>
-            {isSigningOut ? "Saindo..." : botAtivo ? "Bot ativo" : "Bot desconectado"}
-          </span>
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            background: "linear-gradient(135deg, rgba(29,158,117,0.25) 0%, rgba(29,158,117,0.1) 100%)",
+            border: "1px solid rgba(29,158,117,0.3)",
+          }}
+        >
+          <Zap size={16} style={{ color: "#1D9E75" }} />
+        </div>
+        <div className="min-w-0">
+          <p
+            className="truncate text-[13px] font-semibold leading-tight"
+            style={{ color: "var(--sidebar-text)" }}
+          >
+            {tenantName}
+          </p>
+          <p
+            className="text-[10px] font-medium mt-0.5"
+            style={{ color: "#1D9E75", opacity: 0.8 }}
+          >
+            {planName}
+          </p>
         </div>
       </div>
-    </>
+
+      {/* ── Navigation ── */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <NavGroup label="Principal">
+          {OPERATIONAL_LINKS.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={isLinkActive(item)}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          ))}
+        </NavGroup>
+
+        <NavGroup label="Configurações" className="mt-5">
+          {SETTINGS_LINKS.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={isLinkActive(item)}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          ))}
+        </NavGroup>
+
+        {isAdmin && (
+          <NavGroup label="Admin" className="mt-5">
+            <NavItem
+              href="/admin"
+              label="Painel admin"
+              icon={Shield}
+              active={pathname.startsWith("/admin")}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          </NavGroup>
+        )}
+      </nav>
+
+      {/* ── Footer: bot status + profile ── */}
+      <div style={{ borderTop: "1px solid var(--sidebar-border)" }}>
+        {/* Bot status */}
+        <div className="flex items-center gap-2 px-4 py-3">
+          <span
+            className="relative flex h-2 w-2 shrink-0"
+          >
+            {botAtivo && (
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                style={{ background: "var(--accent)" }}
+              />
+            )}
+            <span
+              className="relative inline-flex h-2 w-2 rounded-full"
+              style={{ background: botAtivo ? "var(--accent)" : "#ef4444" }}
+            />
+          </span>
+          <span className="text-xs" style={{ color: "var(--sidebar-text-muted)" }}>
+            {isSigningOut ? "Saindo..." : botAtivo ? "Bot conectado" : "Bot desconectado"}
+          </span>
+        </div>
+
+        {/* Profile */}
+        <div className="px-2 pb-3">
+          <ProfilePopover
+            user={{ name: userName, email: userEmail }}
+            tenant={{ name: tenantName, plano: planName }}
+            onSignOut={handleSignOut}
+            profileHref="/configuracoes"
+          />
+        </div>
+      </div>
+    </div>
   );
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-line bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
+      {/* ── Mobile top bar ── */}
+      <div
+        className="sidebar-mobile-bar items-center justify-between px-4 py-3"
+        style={{
+          background: "var(--sidebar-bg)",
+          borderBottom: "1px solid var(--sidebar-border)",
+        }}
+      >
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/20">
-            <Zap size={13} className="text-brand" />
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ background: "rgba(29,158,117,0.15)" }}
+          >
+            <Zap size={13} style={{ color: "var(--accent)" }} />
           </div>
-          <span className="max-w-[140px] truncate text-sm font-semibold" style={{ color: "var(--sidebar-text)" }}>
+          <span
+            className="max-w-[160px] truncate text-sm font-semibold"
+            style={{ color: "var(--sidebar-text)" }}
+          >
             {tenantName}
           </span>
         </div>
         <button
           type="button"
-          onClick={() => setMobileOpen((value) => !value)}
-          className="rounded-lg p-1.5 text-muted transition hover:text-foreground"
-          style={{ background: "var(--bg-secondary)" }}
+          onClick={() => setMobileOpen((v) => !v)}
+          className="rounded-lg p-2 transition-colors"
+          style={{
+            color: "var(--sidebar-text-muted)",
+            background: "var(--bg-secondary)",
+          }}
         >
-          {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+          {mobileOpen ? <X size={17} /> : <Menu size={17} />}
         </button>
       </div>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMobileOpen(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <aside
-            className="absolute left-0 top-0 flex h-full w-72 flex-col border-r"
-            style={{
-              background: "var(--sidebar-bg)",
-              borderColor: "var(--sidebar-border)",
-              borderRightStyle: "solid",
-              borderRightWidth: "0.5px",
-            }}
-            onClick={(event) => event.stopPropagation()}
+      {/* ── Mobile drawer ── */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-40 lg:hidden"
+            onClick={() => setMobileOpen(false)}
           >
-            {navContent}
-          </aside>
-        </div>
-      )}
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <motion.div
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: "spring", stiffness: 380, damping: 34 }}
+              className="absolute left-0 top-0 h-full w-64"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <aside
+                className="flex h-full flex-col"
+                style={{
+                  background: "var(--sidebar-bg)",
+                  borderRight: "1px solid var(--sidebar-border)",
+                }}
+              >
+                {navContent}
+              </aside>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* ── Desktop sidebar ── */}
       <aside
-        className="hidden lg:flex lg:min-h-screen lg:flex-col border-r"
+        className="sidebar-desktop"
         style={{
-          width: "220px",
           background: "var(--sidebar-bg)",
-          borderColor: "var(--sidebar-border)",
-          borderRightStyle: "solid",
-          borderRightWidth: "0.5px",
-          flexShrink: 0,
+          borderRight: "1px solid var(--sidebar-border)",
         }}
       >
         {navContent}
@@ -213,66 +278,92 @@ export function SidebarNicho({
   );
 }
 
-function SectionLabel({ label, className }: { label: string; className?: string }) {
+// ── NavGroup ──────────────────────────────────────────────────────────────────
+
+function NavGroup({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div
-      className={className}
-      style={{
-        fontSize: "10px",
-        fontWeight: 700,
-        letterSpacing: "0.6px",
-        textTransform: "uppercase",
-        color: "var(--sidebar-text-muted)",
-        padding: "8px 8px 4px",
-      }}
-    >
-      {label}
+    <div className={className}>
+      <p
+        className="mb-1 px-2 text-[10px] font-bold uppercase tracking-widest"
+        style={{ color: "var(--sidebar-text-muted)" }}
+      >
+        {label}
+      </p>
+      <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   );
 }
 
-function SidebarLink({
+// ── NavItem ───────────────────────────────────────────────────────────────────
+
+function NavItem({
   href,
   label,
+  icon: Icon,
   active,
-  icon,
-  small,
   onNavigate,
 }: {
   href: string;
   label: string;
+  icon?: React.ElementType;
   active: boolean;
-  icon?: React.ReactNode;
-  small?: boolean;
   onNavigate?: () => void;
 }) {
   return (
-    <Link
-      href={href}
-      prefetch={true}
-      onClick={onNavigate}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        padding: small ? "6px 10px" : "8px 10px",
-        borderRadius: "var(--border-radius-md, 10px)",
-        background: active ? "var(--sidebar-active-bg)" : "transparent",
-        color: active ? "var(--sidebar-active-text)" : "var(--sidebar-text)",
-        fontSize: small ? "12px" : "13px",
-        fontWeight: active ? 600 : 400,
-        textDecoration: "none",
-        transition: "background 0.15s, color 0.15s",
-      }}
-      onMouseEnter={(event) => {
-        if (!active) event.currentTarget.style.background = "var(--bg-secondary)";
-      }}
-      onMouseLeave={(event) => {
-        if (!active) event.currentTarget.style.background = "transparent";
-      }}
+    <motion.div
+      whileTap={{ scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className="relative"
     >
-      {icon ? <span style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }}>{icon}</span> : null}
-      {label}
-    </Link>
+      {/* active left accent bar */}
+      {active && (
+        <span
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+          style={{ background: "var(--sidebar-active-text)" }}
+        />
+      )}
+      <Link
+        href={href}
+        prefetch
+        onClick={onNavigate}
+        className="flex items-center gap-2.5 rounded-lg pl-3 pr-2.5 py-[7px] text-[13px] transition-colors duration-150"
+        style={{
+          background: active ? "var(--sidebar-active-bg)" : "transparent",
+          color: active ? "var(--sidebar-active-text)" : "var(--sidebar-text)",
+          fontWeight: active ? 600 : 400,
+        }}
+        onMouseEnter={(e) => {
+          if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.background = "transparent";
+        }}
+      >
+        {Icon && (
+          <Icon
+            size={15}
+            style={{
+              color: active ? "var(--sidebar-active-text)" : "var(--sidebar-text-muted)",
+              flexShrink: 0,
+            }}
+          />
+        )}
+        <span className="flex-1 truncate">{label}</span>
+        {active && (
+          <ChevronRight
+            size={11}
+            style={{ color: "var(--sidebar-active-text)", opacity: 0.5 }}
+          />
+        )}
+      </Link>
+    </motion.div>
   );
 }

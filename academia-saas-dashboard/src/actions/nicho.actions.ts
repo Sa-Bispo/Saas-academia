@@ -6,21 +6,14 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
-import {
-  type SubNicho,
-  type ConfigNicho,
-  getTenantSubNicho,
-  getDefaultsForSubNicho,
-} from "@/lib/nicho";
+import { type ConfigNicho, getTenantSubNicho } from "@/lib/nicho";
 
 function getEditableCategories(config: ConfigNicho): string[] {
   const custom = Array.isArray(config.categorias_customizadas)
     ? config.categorias_customizadas.filter((value): value is string => typeof value === "string")
     : [];
 
-  if (custom.length > 0) {
-    return custom;
-  }
+  if (custom.length > 0) return custom;
 
   return Array.isArray(config.categorias_padrao)
     ? config.categorias_padrao.filter((value): value is string => typeof value === "string")
@@ -29,26 +22,20 @@ function getEditableCategories(config: ConfigNicho): string[] {
 
 function uniqueCategories(values: string[]): string[] {
   const normalized = new Map<string, string>();
-
   for (const value of values) {
     const trimmed = value.replace(/\s+/g, " ").trim();
     if (!trimmed) continue;
-
     const key = trimmed.toLowerCase();
-    if (!normalized.has(key)) {
-      normalized.set(key, trimmed);
-    }
+    if (!normalized.has(key)) normalized.set(key, trimmed);
   }
-
   return Array.from(normalized.values());
 }
 
-function getFallbackCategory(subNicho: SubNicho | null | undefined, deletingName?: string): string {
-  const preferred = subNicho === "adega" ? "Cardápio Geral" : "Outros";
+function getFallbackCategory(deletingName?: string): string {
+  const preferred = "Outros";
   if (!deletingName || deletingName.trim().toLowerCase() !== preferred.toLowerCase()) {
     return preferred;
   }
-
   return "Sem categoria";
 }
 
@@ -69,98 +56,19 @@ async function getAuthenticatedTenant() {
   });
 }
 
-// ─── saveSubNicho (Tarefas 2 + 4) ────────────────────────────────────────────
-
-const saveSubNichoSchema = z.object({
-  subNicho: z.enum(["adega", "pizzaria", "lanchonete", "academia"]),
-});
-
 const createCustomCategorySchema = z.object({
   nome: z.string().trim().min(2, "Nome da categoria muito curto").max(80),
 });
 
-/**
- * Salva o sub_nicho no configNicho do tenant, injeta os defaults do nicho
- * e popula produtos de exemplo com quantidade=0 (rascunho) se o tenant
- * ainda não tiver nenhum StockItem.
- */
-export async function saveSubNicho(subNicho: SubNicho) {
-  const { subNicho: validatedSubNicho } = saveSubNichoSchema.parse({ subNicho });
-  const tenantData = await getAuthenticatedTenant();
-  const tenantId = tenantData.tenant.id;
-
-  const defaults = getDefaultsForSubNicho(validatedSubNicho);
-
-  // Persistir configNicho no tenant
-  await prisma.tenant.update({
-    where: { id: tenantId },
-    data: {
-      configNicho: {
-        ...defaults,
-        categorias_customizadas: Array.isArray(defaults.categorias_padrao)
-          ? [...defaults.categorias_padrao]
-          : [],
-      },
-    },
-  });
-
-  if (validatedSubNicho !== "adega" && Array.isArray(defaults.categorias_padrao) && defaults.categorias_padrao.length > 0) {
-    const existingCategorias = await prisma.categoriaCardapio.count({
-      where: { tenant_id: tenantId },
-    });
-
-    if (existingCategorias === 0) {
-      await prisma.categoriaCardapio.createMany({
-        data: defaults.categorias_padrao.map((nome, index) => ({
-          tenant_id: tenantId,
-          nome,
-          ordem: index,
-        })),
-      });
-    }
-  }
-
-  // Tarefa 4: inserir produtos_exemplo se tenant ainda não tem itens
-  const existingCount = await prisma.stockItem.count({
-    where: { tenantId },
-  });
-
-  if (existingCount === 0 && defaults.produtos_exemplo.length > 0) {
-    await prisma.stockItem.createMany({
-      data: defaults.produtos_exemplo.map((produto) => ({
-        nome: produto.nome,
-        variacao: produto.categoria,
-        preco: produto.preco,
-        // quantidade = 0 → status "rascunho/esgotado" → não aparece pro cliente
-        quantidade: 0,
-        tenantId,
-      })),
-    });
-  }
-
-  revalidatePath("/estoque");
-  revalidatePath("/dashboard");
-
-  return { success: true };
-}
-
 // ─── getTenantSubNichoAction ──────────────────────────────────────────────────
 
-/**
- * Retorna o sub_nicho do tenant autenticado.
- * Wrapper server action sobre o helper de lib para uso em client components.
- */
-export async function getTenantSubNichoAction(): Promise<SubNicho | null> {
+export async function getTenantSubNichoAction() {
   const tenantData = await getAuthenticatedTenant();
   return getTenantSubNicho(tenantData.tenant.id);
 }
 
 // ─── getConfigNichoAction ─────────────────────────────────────────────────────
 
-/**
- * Retorna o configNicho completo do tenant autenticado.
- * Útil para componentes que precisam de mais dados (ex: tamanhos, bordas).
- */
 export async function getConfigNichoAction(): Promise<ConfigNicho> {
   const tenantData = await getAuthenticatedTenant();
 
@@ -171,6 +79,8 @@ export async function getConfigNichoAction(): Promise<ConfigNicho> {
 
   return (tenant?.configNicho as ConfigNicho) ?? {};
 }
+
+// ─── Gerenciamento de categorias customizadas ─────────────────────────────────
 
 export async function createCustomCategory(nome: string): Promise<{ categories: string[] }> {
   const { nome: validatedName } = createCustomCategorySchema.parse({ nome });
@@ -204,9 +114,7 @@ export async function createCustomCategory(nome: string): Promise<{ categories: 
   revalidatePath("/estoque");
   revalidatePath("/dashboard");
 
-  return {
-    categories: nextCustom,
-  };
+  return { categories: nextCustom };
 }
 
 export async function renameCustomCategory(
@@ -278,6 +186,7 @@ export async function reorderCustomCategories(ordered: string[]): Promise<void> 
     },
   });
 }
+
 export async function deleteCustomCategory(name: string): Promise<{ categories: string[] }> {
   const validatedName = z.string().min(1).parse(name);
   const tenantData = await getAuthenticatedTenant();
@@ -291,7 +200,7 @@ export async function deleteCustomCategory(name: string): Promise<{ categories: 
   const config = (tenant?.configNicho as ConfigNicho | null) ?? {};
   const editableCategories = getEditableCategories(config);
 
-  const fallbackCategory = getFallbackCategory(config.sub_nicho, validatedName);
+  const fallbackCategory = getFallbackCategory(validatedName);
   const linkedItems = await prisma.stockItem.count({
     where: { tenantId, variacao: validatedName },
   });
@@ -313,10 +222,7 @@ export async function deleteCustomCategory(name: string): Promise<{ categories: 
       },
     }),
     prisma.stockItem.updateMany({
-      where: {
-        tenantId,
-        variacao: validatedName,
-      },
+      where: { tenantId, variacao: validatedName },
       data: { variacao: fallbackCategory },
     }),
   ]);

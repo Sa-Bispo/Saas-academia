@@ -20,29 +20,33 @@ export default async function AlunosPage() {
 
   const tenantId = tenant.id;
 
-  const [alunos, planos] = await Promise.all([
-    prisma.aluno.findMany({
-      where: { tenantId },
-      orderBy: { nome: "asc" },
-      include: {
-        matriculas: {
-          where: { status: "ATIVA" },
-          orderBy: { dataVencimento: "desc" },
-          take: 1,
-          include: { plano: true },
+  try {
+    const [alunos, planos] = await Promise.all([
+      prisma.aluno.findMany({
+        where: { tenantId },
+        orderBy: { nome: "asc" },
+        include: {
+          matriculas: {
+            where: { status: "ATIVA" },
+            orderBy: { dataVencimento: "desc" },
+            take: 1,
+            include: { plano: true },
+          },
+          cobrancas: {
+            where: { status: { in: ["PENDENTE", "VENCIDO"] } },
+            orderBy: { dataVencimento: "asc" },
+            take: 1,
+          },
         },
-        cobrancas: {
-          where: { status: { in: ["PENDENTE", "VENCIDO"] } },
-          orderBy: { dataVencimento: "asc" },
-          take: 1,
-        },
-      },
-    }),
-    prisma.planoAcademia.findMany({
-      where: { tenantId, ativo: true },
-      orderBy: { valorCents: "asc" },
-    }),
-  ]);
+      }),
+      prisma.planoAcademia.findMany({
+        where: { tenantId, ativo: true },
+        orderBy: { valorCents: "asc" },
+      }),
+    ]);
 
-  return <AlunosPageClient alunos={alunos} planos={planos} />;
+    return <AlunosPageClient alunos={alunos} planos={planos} />;
+  } catch {
+    return <AlunosPageClient alunos={[]} planos={[]} />;
+  }
 }

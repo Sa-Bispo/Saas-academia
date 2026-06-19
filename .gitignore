@@ -42,3 +42,7 @@ credentials.json
 token.json
 *.pem
 *.key
+
+# Arquivos acidentais na raiz
+/components/
+/package-lock.json
