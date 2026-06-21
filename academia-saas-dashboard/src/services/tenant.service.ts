@@ -224,6 +224,7 @@ export async function ensureTenantForUser(
         data: {
           nome: "Minha Loja",
           userId: user.id,
+          configNicho: { sub_nicho: "academia" },
         },
         select: {
           id: true,
@@ -232,6 +233,28 @@ export async function ensureTenantForUser(
           companyName: true,
         },
       });
+
+      // Garante que o novo tenant sempre tenha uma assinatura ativa
+      const defaultPlan = await prisma.plan.findFirst({
+        where: { code: "academia_basico" },
+        select: { id: true },
+      });
+      if (defaultPlan) {
+        const now = new Date();
+        const periodEnd = new Date(now);
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+        await prisma.subscription.upsert({
+          where: { tenantId: tenant.id },
+          create: {
+            tenantId: tenant.id,
+            planId: defaultPlan.id,
+            status: "ACTIVE",
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+          },
+          update: {},
+        });
+      }
     }
 
     await ensureLocalAcademiaBootstrap(tenant.id);

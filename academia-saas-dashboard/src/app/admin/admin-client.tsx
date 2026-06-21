@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   AlertTriangle,
   CheckCircle2,
+  Clock,
   Loader2,
   LogOut,
   Plus,
@@ -15,9 +17,8 @@ import {
   Trash2,
   Wifi,
   XCircle,
+  Zap,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-
 import {
   type AdminPlanSummary,
   type AdminStats,
@@ -34,10 +35,21 @@ type Props = {
   plans: AdminPlanSummary[];
   isImpersonating: boolean;
   totalAbertos: number;
+  pendingBotCount: number;
+  botWsUrl: string;
 };
 
 type FilterStatus = "todos" | "ativo" | "inativo" | "vencendo";
 type FilterNiche = "todos" | "adega" | "lanchonete" | "pizzaria";
+
+type FeedItem = {
+  id: string;
+  type: "new_client" | "bot_disconnected" | "expiring";
+  label: string;
+  detail: string;
+  time: Date | null;
+  urgency: number;
+};
 
 const BRL = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -90,8 +102,56 @@ function initials(value: string) {
   return parts.map((item) => item.charAt(0).toUpperCase()).join("");
 }
 
-export default function AdminClient({ data, plans, isImpersonating, totalAbertos }: Props) {
+function formatRelative(date: Date | string | null) {
+  if (!date) return "";
+  const diff = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `há ${mins}min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `há ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `há ${days}d`;
+  return `há ${Math.floor(days / 30)}m`;
+}
+
+function expiryColor(days: number | null) {
+  if (days === null) return "text-muted";
+  if (days <= 3) return "text-red-300";
+  if (days <= 7) return "text-amber-300";
+  return "text-muted";
+}
+
+function feedDot(type: FeedItem["type"]) {
+  if (type === "new_client") return "bg-brand";
+  if (type === "bot_disconnected") return "bg-red-400";
+  return "bg-amber-400";
+}
+
+export default function AdminClient({ data, plans, isImpersonating, totalAbertos, pendingBotCount, botWsUrl }: Props) {
   const router = useRouter();
+  const [botCount, setBotCount] = useState(pendingBotCount);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    let ws: WebSocket;
+    let retry: ReturnType<typeof setTimeout>;
+
+    function connect() {
+      ws = new WebSocket(botWsUrl);
+      wsRef.current = ws;
+      ws.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data as string) as { type: string };
+          if (d.type === "confusion_event") setBotCount((n) => n + 1);
+        } catch { /* ignora */ }
+      };
+      ws.onclose = () => { retry = setTimeout(connect, 4000); };
+    }
+
+    connect();
+    return () => { ws?.close(); clearTimeout(retry); };
+  }, [botWsUrl]);
+
   const [search, setSearch] = useState("");
   const [niche, setNiche] = useState<FilterNiche>("todos");
   const [status, setStatus] = useState<FilterStatus>("todos");
@@ -151,6 +211,35 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
       return byText && byNiche && byStatus;
     });
   }, [data.tenants, search, niche, status]);
+
+  const alerts = useMemo(() => {
+    const disconnected = data.tenants.filter(
+      (t) =>
+        t.whatsappStatus !== "CONNECTED" &&
+        (t.statusLabel === "Ativo" || t.statusLabel.startsWith("Vence em")),
+    );
+    const expiring = data.tenants.filter(
+      (t) => t.daysUntilDue !== null && t.daysUntilDue >= 0 && t.daysUntilDue <= 7,
+    );
+    return { disconnected, expiring };
+  }, [data.tenants]);
+
+  const activityFeed = useMemo((): FeedItem[] => {
+    const items: FeedItem[] = [];
+    for (const t of data.tenants) {
+      const ageDays = (Date.now() - new Date(t.createdAt).getTime()) / 864e5;
+      if (ageDays <= 30) {
+        items.push({ id: `new-${t.id}`, type: "new_client", label: "Novo cliente", detail: t.nome, time: t.createdAt, urgency: 0 });
+      }
+      if (t.whatsappStatus !== "CONNECTED" && (t.statusLabel === "Ativo" || t.statusLabel.startsWith("Vence em"))) {
+        items.push({ id: `bot-${t.id}`, type: "bot_disconnected", label: "Bot offline", detail: t.nome, time: null, urgency: 2 });
+      }
+      if (t.daysUntilDue !== null && t.daysUntilDue >= 0 && t.daysUntilDue <= 7) {
+        items.push({ id: `exp-${t.id}`, type: "expiring", label: `Vence em ${t.daysUntilDue}d`, detail: t.nome, time: t.dueDate, urgency: t.daysUntilDue <= 2 ? 3 : 1 });
+      }
+    }
+    return items.sort((a, b) => b.urgency - a.urgency);
+  }, [data.tenants]);
 
   function showFeedback(message: string) {
     setFeedback(message);
@@ -266,9 +355,8 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
     setFeedback(null);
 
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      window.location.href = "/login?force=1";
+      await fetch("/api/admin-logout", { method: "POST" });
+      window.location.href = "/admin/login";
     } catch {
       setFeedback("Erro ao deslogar. Tente novamente.");
     } finally {
@@ -295,6 +383,20 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
               {isSigningOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
               Sair
             </button>
+
+            <Link
+              href="/admin/bot-corrections"
+              onClick={() => setBotCount(0)}
+              className="relative inline-flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand/20"
+            >
+              <Zap size={14} />
+              Correções do bot
+              {botCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {botCount > 9 ? "9+" : botCount}
+                </span>
+              )}
+            </Link>
 
             <Link
               href="/admin/suporte"
@@ -341,8 +443,43 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
         <MetricCard title="MRR estimado" value={BRL.format(data.mrrCents / 100)} icon={Shield} />
       </div>
 
-      <section className="rounded-2xl border border-line bg-surface/60 p-4 backdrop-blur">
-        <div className="grid gap-3 md:grid-cols-[1fr_200px_200px]">
+      {(alerts.disconnected.length > 0 || alerts.expiring.length > 0) && (
+        <section className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <AlertTriangle size={14} className="text-amber-400" />
+            <p className="text-sm font-semibold text-amber-300">Atenção necessária</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {alerts.disconnected.length > 0 && (
+              <span className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                {alerts.disconnected.length} bot{alerts.disconnected.length > 1 ? "s" : ""} desconectado
+                {alerts.disconnected.length > 1 ? "s" : ""}
+              </span>
+            )}
+            {alerts.expiring.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setStatus("vencendo")}
+                className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 transition hover:bg-amber-500/15"
+              >
+                <Clock size={11} />
+                {alerts.expiring.length} assinatura{alerts.expiring.length > 1 ? "s" : ""} vencendo em ≤7d
+              </button>
+            )}
+          </div>
+          {alerts.disconnected.length > 0 && (
+            <p className="mt-2 text-[11px] text-muted/70">
+              Offline: {alerts.disconnected.map((t) => t.nome).join(", ")}
+            </p>
+          )}
+        </section>
+      )}
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_260px]">
+        <div className="space-y-4">
+          <section className="rounded-2xl border border-line bg-surface/60 p-4 backdrop-blur">
+            <div className="grid gap-3 md:grid-cols-[1fr_200px_200px]">
           <label className="relative">
             <Search className="pointer-events-none absolute left-3 top-3.5 text-muted" size={15} />
             <input
@@ -399,8 +536,11 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
               className="grid gap-4 rounded-2xl border border-line bg-surface/60 p-4 backdrop-blur transition hover:border-brand/25 lg:grid-cols-[1.4fr_1fr_1fr_auto]"
             >
               <div className="flex items-start gap-3">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${nichePalette(tenant.subNicho)}`}>
-                  <span className="text-sm font-semibold">{initials(tenant.nome)}</span>
+                <div className="relative shrink-0">
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${nichePalette(tenant.subNicho)}`}>
+                    <span className="text-sm font-semibold">{initials(tenant.nome)}</span>
+                  </div>
+                  <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-zinc-900 ${bot.dot}`} />
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -415,8 +555,13 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">{tenant.email}</p>
-                  <p className="mt-1 text-xs text-muted">
-                    {tenant.planName} · vence em {formatDate(tenant.dueDate)}
+                  <p className={`mt-1 text-xs font-medium ${expiryColor(tenant.daysUntilDue)}`}>
+                    {tenant.planName}
+                    {tenant.daysUntilDue !== null
+                      ? ` · vence em ${tenant.daysUntilDue}d`
+                      : tenant.dueDate
+                        ? ` · ${formatDate(tenant.dueDate)}`
+                        : ""}
                   </p>
                 </div>
               </div>
@@ -475,6 +620,35 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
             </article>
           );
         })}
+      </div>
+        </div>
+
+        <aside>
+          <div className="sticky top-6 rounded-2xl border border-line bg-surface/60 p-4 backdrop-blur">
+            <div className="mb-4 flex items-center gap-2">
+              <Activity size={14} className="text-muted" />
+              <h2 className="text-sm font-semibold text-white">Atividade recente</h2>
+            </div>
+            {activityFeed.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted">Tudo em dia — sem alertas.</p>
+            ) : (
+              <div className="space-y-3">
+                {activityFeed.slice(0, 15).map((item) => (
+                  <div key={item.id} className="flex items-start gap-2.5">
+                    <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${feedDot(item.type)}`} />
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium text-white">{item.detail}</p>
+                      <p className="text-[11px] text-muted">{item.label}</p>
+                      {item.time && (
+                        <p className="text-[11px] text-muted/50">{formatRelative(item.time)}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
 
       {pending && (

@@ -8,7 +8,10 @@ import {
   Banknote,
   Bot,
   Building2,
+  CalendarDays,
   Clock,
+  CreditCard,
+  Dumbbell,
   Loader2,
   MapPin,
   MessageSquare,
@@ -36,6 +39,10 @@ const formSchema = z.object({
     .regex(/^\+?[0-9]{8,20}$/, "Número inválido.")
     .optional()
     .or(z.literal("")),
+  // Academia
+  pixChave: z.string().trim().max(200).optional().or(z.literal("")),
+  diasAntecedenciaCobranca: z.coerce.number().int().min(1).max(30).optional(),
+  limiteDiarioCobrancas: z.coerce.number().int().min(1).max(500).optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -83,6 +90,17 @@ const SERVICE_MODALITIES = [
   { id: "Híbrido", label: "Híbrido" },
 ];
 
+const ACADEMIA_MODALITIES = [
+  { id: "Musculação", label: "Musculação" },
+  { id: "Crossfit", label: "Crossfit" },
+  { id: "Funcional", label: "Funcional" },
+  { id: "Yoga", label: "Yoga" },
+  { id: "Pilates", label: "Pilates" },
+  { id: "Luta/MMA", label: "Luta/MMA" },
+  { id: "Spinning", label: "Spinning" },
+  { id: "Natação", label: "Natação" },
+];
+
 type OperationDetails = {
   businessHours: string;
   deliveryArea: string;
@@ -94,7 +112,7 @@ type OperationDetails = {
   cancellationPolicy: string;
 };
 
-function parseOperationContext(text: string, isSchedulingNiche: boolean): OperationDetails {
+function parseOperationContext(text: string, isSchedulingNiche: boolean, isAcademia: boolean = false): OperationDetails {
   const base: OperationDetails = {
     businessHours: "",
     deliveryArea: "",
@@ -106,8 +124,8 @@ function parseOperationContext(text: string, isSchedulingNiche: boolean): Operat
     cancellationPolicy: "",
   };
   if (!text) return base;
-  const h = text.match(/Hor[aá]rio(?: de atendimento)?[:\s]+([^\n]+)/i);
-  const a = text.match(/(?:[AÁ]rea de entrega|Local de atendimento)[:\s]+([^\n]+)/i);
+  const h = text.match(/Hor[aá]rio(?: de (?:atendimento|funcionamento))?[:\s]+([^\n]+)/i);
+  const a = text.match(/(?:[AÁ]rea de entrega|Local de atendimento|Endere[çc]o)[:\s]+([^\n]+)/i);
   const t = text.match(/Tempo de entrega[:\s]+([^\n]+)/i);
   const m = text.match(/(?:Pedido m[ií]nimo|Ticket m[ií]nimo)[:\s]+([^\n]+)/i);
   const p = text.match(/Formas de pagamento[:\s]+([^\n]+)/i);
@@ -134,16 +152,21 @@ function parseOperationContext(text: string, isSchedulingNiche: boolean): Operat
     base.paymentMethods = methods;
   }
 
-  if (isSchedulingNiche && base.modalities.length === 0) {
+  if (isSchedulingNiche && !isAcademia && base.modalities.length === 0) {
     base.modalities = ["Presencial"];
   }
 
   return base;
 }
 
-function compileOperationContext(d: OperationDetails, isSchedulingNiche: boolean): string {
+function compileOperationContext(d: OperationDetails, isSchedulingNiche: boolean, isAcademia: boolean = false): string {
   const parts: string[] = [];
-  if (isSchedulingNiche) {
+  if (isAcademia) {
+    if (d.businessHours.trim()) parts.push(`Horário de funcionamento: ${d.businessHours.trim()}`);
+    if (d.deliveryArea.trim()) parts.push(`Endereço: ${d.deliveryArea.trim()}`);
+    if (d.modalities.length > 0) parts.push(`Modalidades: ${d.modalities.join(", ")}`);
+    if (d.paymentMethods.length > 0) parts.push(`Formas de pagamento: ${d.paymentMethods.join(", ")}`);
+  } else if (isSchedulingNiche) {
     if (d.businessHours.trim()) parts.push(`Horário de atendimento: ${d.businessHours.trim()}`);
     if (d.deliveryArea.trim()) parts.push(`Local de atendimento: ${d.deliveryArea.trim()}`);
     if (d.modalities.length > 0) parts.push(`Modalidades: ${d.modalities.join(", ")}`);
@@ -216,9 +239,10 @@ function Textarea({ ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement
 
 export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO }) {
   const isSchedulingNiche = tenant.niche === "CLINICA";
+  const isAcademia = tenant.subNicho === "academia";
   const [toast, setToast] = useState<ToastState>(null);
   const [operationDetails, setOperationDetails] = useState<OperationDetails>(
-    () => parseOperationContext(tenant.operationContext ?? "", isSchedulingNiche)
+    () => parseOperationContext(tenant.operationContext ?? "", isSchedulingNiche, isAcademia)
   );
 
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -229,6 +253,9 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
       toneOfVoice: (tenant.toneOfVoice as FormData["toneOfVoice"]) ?? "DESCONTRAIDO",
       strictRules: tenant.strictRules ?? "",
       whatsappAdmin: tenant.whatsappAdmin ?? "",
+      pixChave: tenant.pixChave ?? "",
+      diasAntecedenciaCobranca: tenant.diasAntecedenciaCobranca,
+      limiteDiarioCobrancas: tenant.limiteDiarioCobrancas,
     },
   });
 
@@ -236,18 +263,23 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
 
   const previewPrompt = useMemo(() => {
     const name = watched.botName?.trim() || "Assistente";
-    const company = watched.companyName?.trim() || "nossa empresa";
+    const company = watched.companyName?.trim() || (isAcademia ? "nossa academia" : "nossa empresa");
     const tone = TONE_LABELS[watched.toneOfVoice || ""] || "amigável e prestativo";
 
-    const objective = isSchedulingNiche
-      ? "captar o interesse do cliente e agendar horários, confirmações e remarcações"
-      : "conduzir o cliente até o fechamento do pedido, coletando os dados necessários para entrega";
+    let objective: string;
+    if (isAcademia) {
+      objective = "atender alunos e interessados, responder dúvidas sobre modalidades, horários, planos e pagamentos";
+    } else if (isSchedulingNiche) {
+      objective = "captar o interesse do cliente e agendar horários, confirmações e remarcações";
+    } else {
+      objective = "conduzir o cliente até o fechamento do pedido, coletando os dados necessários para entrega";
+    }
 
-    let text = `Você é ${name}, o assistente virtual da ${company}. Seu tom de voz deve ser ${tone}.\n\nOBJETIVO: ${objective}.`;
+    let text = `Você é ${name}, atendente virtual da ${company}.\nTom de voz: ${tone}.\n\nOBJETIVO: ${objective}.`;
 
-    const compiledContext = compileOperationContext(operationDetails, isSchedulingNiche);
+    const compiledContext = compileOperationContext(operationDetails, isSchedulingNiche, isAcademia);
     if (compiledContext.trim()) {
-      text += `\n\n--- INFORMAÇÕES DA OPERAÇÃO ---\n${compiledContext}`;
+      text += `\n\n--- ${isAcademia ? "INFORMAÇÕES DA ACADEMIA" : "INFORMAÇÕES DA OPERAÇÃO"} ---\n${compiledContext}`;
     }
 
     if (watched.strictRules?.trim()) {
@@ -255,12 +287,12 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
     }
 
     return text;
-  }, [watched, operationDetails, isSchedulingNiche]);
+  }, [watched, operationDetails, isSchedulingNiche, isAcademia]);
 
   async function onSubmit(data: FormData) {
     setToast(null);
     try {
-      const compiledContext = compileOperationContext(operationDetails, isSchedulingNiche);
+      const compiledContext = compileOperationContext(operationDetails, isSchedulingNiche, isAcademia);
       const result = await updateTenantConfig({
         ...data,
         operationContext: compiledContext,
@@ -274,6 +306,7 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
       });
     }
   }
+
 
   return (
     <section className="space-y-6 max-w-3xl">
@@ -294,7 +327,7 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
       {toast && (
         <div className={`rounded-xl border px-4 py-3 text-sm ${
           toast.type === "success"
-            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+            ? "border-brand/30 bg-brand/10 text-brand"
             : "border-red-500/30 bg-red-500/10 text-red-400"
         }`}>
           {toast.message}
@@ -320,7 +353,13 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
               <FieldLabel><Building2 size={13} className="inline mr-1.5 opacity-60" />Nome do Estabelecimento</FieldLabel>
               <Input
                 {...register("companyName")}
-                placeholder={isSchedulingNiche ? "Ex: Studio Bella, Barbearia Prime" : "Ex: Pizzaria do Zé"}
+                placeholder={
+                  isAcademia
+                    ? "Ex: Smart Fit Centro, Academia Power"
+                    : isSchedulingNiche
+                    ? "Ex: Studio Bella, Barbearia Prime"
+                    : "Ex: Pizzaria do Zé"
+                }
               />
               {errors.companyName && <p className="mt-1 text-xs text-red-400">{errors.companyName.message}</p>}
             </div>
@@ -347,65 +386,94 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
         <SectionCard
           icon={<Store size={18} />}
           label="Seção 2"
-          title="Detalhes da Operação"
+          title={isAcademia ? "Detalhes da Academia" : "Detalhes da Operação"}
           subtitle={
-            isSchedulingNiche
+            isAcademia
+              ? "O bot usa essas informações para responder dúvidas dos alunos com precisão."
+              : isSchedulingNiche
               ? "Parâmetros de agenda para o bot responder com disponibilidade e regras corretas."
               : "Preencha os campos abaixo — o bot usa essas informações para responder clientes com precisão."
           }
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <FieldLabel><Clock size={13} className="inline mr-1.5 opacity-60" />{isSchedulingNiche ? "Horário de atendimento" : "Horário de funcionamento"}</FieldLabel>
+              <FieldLabel>
+                <Clock size={13} className="inline mr-1.5 opacity-60" />
+                Horário de funcionamento
+              </FieldLabel>
               <Input
                 value={operationDetails.businessHours}
                 onChange={(e) => setOperationDetails((p) => ({ ...p, businessHours: e.target.value }))}
-                placeholder={isSchedulingNiche ? "Ex: Seg-Sex 09h-19h, Sab 09h-14h" : "Ex: Seg-Sex 18h-23h, Sab-Dom 17h-00h"}
+                placeholder={
+                  isAcademia
+                    ? "Ex: Seg-Sex 6h-22h, Sab 8h-18h, Dom 8h-13h"
+                    : isSchedulingNiche
+                    ? "Ex: Seg-Sex 09h-19h, Sab 09h-14h"
+                    : "Ex: Seg-Sex 18h-23h, Sab-Dom 17h-00h"
+                }
               />
             </div>
             <div>
-              <FieldLabel><MapPin size={13} className="inline mr-1.5 opacity-60" />{isSchedulingNiche ? "Local de atendimento" : "Área de entrega"}</FieldLabel>
+              <FieldLabel>
+                <MapPin size={13} className="inline mr-1.5 opacity-60" />
+                {isAcademia ? "Endereço da academia" : isSchedulingNiche ? "Local de atendimento" : "Área de entrega"}
+              </FieldLabel>
               <Input
                 value={operationDetails.deliveryArea}
                 onChange={(e) => setOperationDetails((p) => ({ ...p, deliveryArea: e.target.value }))}
-                placeholder={isSchedulingNiche ? "Ex: Rua X, 123 ou Online" : "Ex: Centro, Boa Vista, Jardim America"}
-              />
-            </div>
-            <div>
-              <FieldLabel><Timer size={13} className="inline mr-1.5 opacity-60" />{isSchedulingNiche ? "Duração média por atendimento" : "Tempo de entrega"}</FieldLabel>
-              <Input
-                value={isSchedulingNiche ? operationDetails.averageDuration : operationDetails.deliveryTime}
-                onChange={(e) =>
-                  setOperationDetails((p) =>
-                    isSchedulingNiche
-                      ? { ...p, averageDuration: e.target.value }
-                      : { ...p, deliveryTime: e.target.value },
-                  )
+                placeholder={
+                  isAcademia
+                    ? "Ex: Rua das Flores, 123 — Centro"
+                    : isSchedulingNiche
+                    ? "Ex: Rua X, 123 ou Online"
+                    : "Ex: Centro, Boa Vista, Jardim America"
                 }
-                placeholder={isSchedulingNiche ? "Ex: 45 min" : "Ex: 40-60 minutos"}
               />
             </div>
-            <div>
-              <FieldLabel><ShoppingBag size={13} className="inline mr-1.5 opacity-60" />{isSchedulingNiche ? "Política de cancelamento" : "Pedido mínimo"}</FieldLabel>
-              <Input
-                value={isSchedulingNiche ? operationDetails.cancellationPolicy : operationDetails.minimumOrder}
-                onChange={(e) =>
-                  setOperationDetails((p) =>
-                    isSchedulingNiche
-                      ? { ...p, cancellationPolicy: e.target.value }
-                      : { ...p, minimumOrder: e.target.value },
-                  )
-                }
-                placeholder={isSchedulingNiche ? "Ex: cancelar com 2h de antecedência" : "Ex: R$ 25,00"}
-              />
-            </div>
+
+            {!isAcademia && (
+              <>
+                <div>
+                  <FieldLabel><Timer size={13} className="inline mr-1.5 opacity-60" />{isSchedulingNiche ? "Duração média por atendimento" : "Tempo de entrega"}</FieldLabel>
+                  <Input
+                    value={isSchedulingNiche ? operationDetails.averageDuration : operationDetails.deliveryTime}
+                    onChange={(e) =>
+                      setOperationDetails((p) =>
+                        isSchedulingNiche
+                          ? { ...p, averageDuration: e.target.value }
+                          : { ...p, deliveryTime: e.target.value },
+                      )
+                    }
+                    placeholder={isSchedulingNiche ? "Ex: 45 min" : "Ex: 40-60 minutos"}
+                  />
+                </div>
+                <div>
+                  <FieldLabel><ShoppingBag size={13} className="inline mr-1.5 opacity-60" />{isSchedulingNiche ? "Política de cancelamento" : "Pedido mínimo"}</FieldLabel>
+                  <Input
+                    value={isSchedulingNiche ? operationDetails.cancellationPolicy : operationDetails.minimumOrder}
+                    onChange={(e) =>
+                      setOperationDetails((p) =>
+                        isSchedulingNiche
+                          ? { ...p, cancellationPolicy: e.target.value }
+                          : { ...p, minimumOrder: e.target.value },
+                      )
+                    }
+                    placeholder={isSchedulingNiche ? "Ex: cancelar com 2h de antecedência" : "Ex: R$ 25,00"}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
-          {isSchedulingNiche && (
+          {/* Modalidades — academia ou clínica */}
+          {(isAcademia || isSchedulingNiche) && (
             <div>
-              <FieldLabel><Store size={13} className="inline mr-1.5 opacity-60" />Modalidades de atendimento</FieldLabel>
+              <FieldLabel>
+                <Dumbbell size={13} className="inline mr-1.5 opacity-60" />
+                {isAcademia ? "Modalidades oferecidas" : "Modalidades de atendimento"}
+              </FieldLabel>
               <div className="mt-1.5 flex flex-wrap gap-2">
-                {SERVICE_MODALITIES.map((modality) => {
+                {(isAcademia ? ACADEMIA_MODALITIES : SERVICE_MODALITIES).map((modality) => {
                   const checked = operationDetails.modalities.includes(modality.id);
                   return (
                     <button
@@ -506,6 +574,56 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
             </p>
           </div>
         </SectionCard>
+
+        {/* ── 5. ACADEMIA / COBRANÇAS ── */}
+        {isAcademia && (
+          <SectionCard
+            icon={<Dumbbell size={18} />}
+            label="Seção 5"
+            title="Cobranças e PIX"
+            subtitle="Configurações de cobrança automática para alunos da academia."
+          >
+            <div>
+              <FieldLabel><CreditCard size={13} className="inline mr-1.5 opacity-60" />Chave PIX</FieldLabel>
+              <Input
+                {...register("pixChave")}
+                placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
+              />
+              <p className="mt-1.5 text-xs text-muted">
+                O bot envia essa chave automaticamente ao cobrar o aluno.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <FieldLabel><CalendarDays size={13} className="inline mr-1.5 opacity-60" />Dias de antecedência</FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  {...register("diasAntecedenciaCobranca")}
+                  placeholder="5"
+                />
+                <p className="mt-1.5 text-xs text-muted">
+                  Quantos dias antes do vencimento o aluno é avisado.
+                </p>
+              </div>
+              <div>
+                <FieldLabel><Banknote size={13} className="inline mr-1.5 opacity-60" />Limite diário de cobranças</FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  max={500}
+                  {...register("limiteDiarioCobrancas")}
+                  placeholder="50"
+                />
+                <p className="mt-1.5 text-xs text-muted">
+                  Máximo de mensagens de cobrança por dia (evita spam).
+                </p>
+              </div>
+            </div>
+          </SectionCard>
+        )}
 
         {/* ── Preview do prompt ── */}
         <details className="group rounded-2xl border border-dashed border-line bg-white/2">

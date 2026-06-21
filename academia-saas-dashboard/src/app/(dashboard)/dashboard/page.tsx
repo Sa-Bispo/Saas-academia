@@ -26,6 +26,6 @@ export default async function DashboardPage() {
 
   if (subNicho === "academia") redirect("/dashboard/academia");
 
-  // Fallback: sem sub-nicho → onboarding
-  redirect("/setup/nicho");
+  // Fallback: sem sub-nicho → setup wizard
+  redirect("/setup");
 }

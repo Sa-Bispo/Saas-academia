@@ -48,6 +48,7 @@ function ModalPlano({
   const [periodicidade, setPeriodicidade] = useState<"MENSAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL">(
     (plano?.periodicidade as "MENSAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL") ?? "MENSAL"
   );
+  const [erro, setErro] = useState<string | null>(null);
 
   const isEditing = Boolean(plano);
 
@@ -56,23 +57,28 @@ function ModalPlano({
     const valorCents = Math.round(parseFloat(valor.replace(",", ".")) * 100);
     if (isNaN(valorCents) || valorCents <= 0) return;
 
+    setErro(null);
     startTransition(async () => {
-      if (isEditing && plano) {
-        await atualizarPlanoAcademia(plano.id, {
-          nome,
-          descricao: descricao || undefined,
-          valorCents,
-          periodicidade,
-        });
-      } else {
-        await criarPlanoAcademia({
-          nome,
-          descricao: descricao || undefined,
-          valorCents,
-          periodicidade,
-        });
+      try {
+        if (isEditing && plano) {
+          await atualizarPlanoAcademia(plano.id, {
+            nome,
+            descricao: descricao || undefined,
+            valorCents,
+            periodicidade,
+          });
+        } else {
+          await criarPlanoAcademia({
+            nome,
+            descricao: descricao || undefined,
+            valorCents,
+            periodicidade,
+          });
+        }
+        onClose();
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao salvar plano.");
       }
-      onClose();
     });
   }
 
@@ -138,6 +144,8 @@ function ModalPlano({
           </div>
         </div>
 
+        {erro && <p className="px-5 pb-2 text-xs text-red-400">{erro}</p>}
+
         {/* Footer */}
         <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
           <button
@@ -171,7 +179,11 @@ export function PlanosAcademiaClient({ planos }: Props) {
 
   function handleToggleAtivo(plano: Plano) {
     startTransition(async () => {
-      await atualizarPlanoAcademia(plano.id, { ativo: !plano.ativo });
+      try {
+        await atualizarPlanoAcademia(plano.id, { ativo: !plano.ativo });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erro ao atualizar plano.");
+      }
     });
   }
 
@@ -223,9 +235,9 @@ export function PlanosAcademiaClient({ planos }: Props) {
           <p className="text-xs text-muted">Total de planos</p>
           <p className="mt-2 text-2xl font-semibold text-white tabular-nums">{planos.length}</p>
         </div>
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+        <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4">
           <p className="text-xs text-muted">Ativos</p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-400 tabular-nums">{ativos.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-brand tabular-nums">{ativos.length}</p>
         </div>
         <div className="col-span-2 rounded-2xl border border-line bg-surface/60 p-4 sm:col-span-1">
           <p className="text-xs text-muted">Inativos</p>

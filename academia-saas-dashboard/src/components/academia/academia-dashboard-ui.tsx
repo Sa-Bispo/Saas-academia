@@ -19,8 +19,8 @@ import {
   Trophy,
   CheckCircle2,
   XCircle,
+  ImageIcon,
 } from "lucide-react";
-import { DashboardMetricCard } from "@/components/ui/dashboard-metric-card";
 
 import {
   ReceitaMensalChart,
@@ -39,13 +39,13 @@ function initials(nome: string) {
   return nome.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
 
-const AVATAR_COLORS = ["#1D9E75", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"];
+const AVATAR_COLORS = ["#818CF8", "#34d399", "#f59e0b", "#f87171", "#60a5fa"];
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
-  ATIVO: { bg: "rgba(29,158,117,0.15)", color: "#1D9E75", label: "Ativo" },
-  INADIMPLENTE: { bg: "rgba(239,68,68,0.15)", color: "#f87171", label: "Inadimplente" },
-  INATIVO: { bg: "rgba(100,116,139,0.15)", color: "#94a3b8", label: "Inativo" },
-  SUSPENSO: { bg: "rgba(245,158,11,0.15)", color: "#fbbf24", label: "Suspenso" },
+  ATIVO:        { bg: "rgba(52,211,153,0.12)",  color: "#34d399", label: "Ativo" },
+  INADIMPLENTE: { bg: "rgba(248,113,113,0.12)", color: "#f87171", label: "Inadimplente" },
+  INATIVO:      { bg: "rgba(100,116,139,0.12)", color: "#94a3b8", label: "Inativo" },
+  SUSPENSO:     { bg: "rgba(251,191,36,0.12)",  color: "#fbbf24", label: "Suspenso" },
 };
 
 const MESES_LONGOS = [
@@ -53,77 +53,141 @@ const MESES_LONGOS = [
   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
 ];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── KPI Card — minimal, sem bordas coloridas ────────────────────────────────
 
 function KpiCard({
-  label, value, sub, subPositivo, gradient, href, icon: Icon,
+  label, value, sub, subPositivo, href, icon: Icon, danger,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   subPositivo?: boolean | null;
-  gradient: string;
   href: string;
   icon: React.ElementType;
+  danger?: boolean;
 }) {
   return (
     <motion.div
-      whileHover={{ y: -4, boxShadow: "0 12px 36px rgba(0,0,0,0.35)" }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 400, damping: 22 }}
-      style={{ borderRadius: 16 }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 400, damping: 28 }}
     >
-    <Link
-      href={href}
-      style={{
-        display: "block",
-        background: gradient,
-        borderRadius: 16,
-        padding: "20px 22px",
-        textDecoration: "none",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div style={{
-        position: "absolute", right: -20, top: -20,
-        width: 100, height: 100, borderRadius: "50%",
-        background: "rgba(255,255,255,0.07)",
-      }} />
-      <div style={{
-        position: "absolute", right: 16, top: 16,
-        padding: 8, borderRadius: 10,
-        background: "rgba(255,255,255,0.15)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <Icon size={16} color="rgba(255,255,255,0.9)" />
-      </div>
-      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 500, letterSpacing: "0.04em", marginBottom: 8 }}>
-        {label}
-      </p>
-      <p style={{ fontSize: 28, fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 6 }}>
-        {value}
-      </p>
-      {sub && (
+      <Link
+        href={href}
+        style={{
+          display: "block",
+          background: "var(--card-bg)",
+          border: "1px solid var(--card-border)",
+          borderRadius: "12px",
+          padding: "20px 22px",
+          textDecoration: "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <Icon size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+          <p style={{
+            fontSize: 12, fontWeight: 500,
+            color: "var(--text-tertiary)",
+          }}>
+            {label}
+          </p>
+        </div>
+
         <p style={{
-          fontSize: 11,
-          color: subPositivo === true
-            ? "rgba(255,255,255,0.9)"
-            : subPositivo === false
-            ? "rgba(255,200,200,0.85)"
-            : "rgba(255,255,255,0.6)",
-          fontWeight: subPositivo !== null ? 600 : 400,
+          fontSize: 30, fontWeight: 700, lineHeight: 1,
+          letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums",
+          color: danger ? "#f87171" : "var(--text-primary)",
         }}>
-          {subPositivo === true && "▲ "}{subPositivo === false && "▼ "}{sub}
+          {value}
         </p>
-      )}
-    </Link>
+
+        {sub && (
+          <p style={{
+            fontSize: 12, marginTop: 8,
+            color: subPositivo === true
+              ? "#4ade80"
+              : subPositivo === false
+              ? "#f87171"
+              : "var(--text-tertiary)",
+            fontWeight: 400,
+          }}>
+            {subPositivo === true && "↑ "}
+            {subPositivo === false && "↓ "}
+            {sub}
+          </p>
+        )}
+      </Link>
     </motion.div>
   );
 }
 
-// ─── Main UI component ────────────────────────────────────────────────────────
+// ─── Cartão pequeno de métrica ────────────────────────────────────────────────
+
+function MetricaCard({
+  label, value, desc, icon: Icon,
+}: {
+  label: string;
+  value: string;
+  desc: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div style={{
+      background: "var(--card-bg)",
+      border: "1px solid var(--card-border)",
+      borderRadius: 12, padding: "18px 20px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
+        <Icon size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+        <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
+          {label}
+        </p>
+      </div>
+      <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+        {value}
+      </p>
+      <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 5 }}>{desc}</p>
+    </div>
+  );
+}
+
+// ─── Progress ring para meta de receita ──────────────────────────────────────
+
+function MetaProgressRing({ pct, label }: { pct: number; label: string }) {
+  const R = 26;
+  const circ = 2 * Math.PI * R;
+  const offset = circ * (1 - Math.min(pct, 100) / 100);
+  const cor = pct >= 100 ? "#4ade80" : "var(--accent)";
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <svg width={64} height={64} viewBox="0 0 64 64" style={{ flexShrink: 0 }}>
+        <circle cx="32" cy="32" r={R} fill="none" stroke="var(--border-color)" strokeWidth={5} />
+        <circle
+          cx="32" cy="32" r={R}
+          fill="none"
+          stroke={cor}
+          strokeWidth={5}
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          transform="rotate(-90 32 32)"
+          style={{ transition: "stroke-dashoffset 1s ease" }}
+        />
+        <text x="32" y="32" textAnchor="middle" dominantBaseline="middle"
+          fontSize="11" fontWeight="600" fill="var(--text-primary)" fontFamily="inherit">
+          {Math.round(Math.min(pct, 100))}%
+        </text>
+      </svg>
+      <div>
+        <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>Meta do mês</p>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", marginTop: 3 }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main UI ──────────────────────────────────────────────────────────────────
 
 const PERIODOS = ["Mensal", "Trimestral", "Anual"] as const;
 type Periodo = typeof PERIODOS[number];
@@ -142,6 +206,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
     renovacoesProximas,
     renovacoesValorCents,
     cobrancasPendentes,
+    aguardandoValidacao,
     taxaChurnPct,
     ltvMedioCents,
     frequenciaMediaSemanal,
@@ -155,28 +220,42 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
     rankingAlunos,
   } = data;
 
-  // Inadimplência como % da base total
   const baseTotal = totalAtivos + totalInadimplentes;
   const pctInadimplente = baseTotal > 0
     ? ((totalInadimplentes / baseTotal) * 100).toFixed(1)
     : "0.0";
 
+  // Meta de receita = última entrada de meta no histórico mensal (em reais)
+  const metaMensalCents = (receitaMensal[receitaMensal.length - 1]?.meta ?? 0) * 100;
+  const pctMeta = metaMensalCents > 0 ? (receitaMesCents / metaMensalCents) * 100 : 0;
+
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div>
-            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", color: "var(--text-tertiary)", textTransform: "uppercase" }}>
-              Academia
-            </p>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", marginTop: 2, lineHeight: 1.2 }}>
-              Visão Geral de <span style={{ color: "#1D9E75" }}>Alunos</span>
-            </h1>
-          </div>
+      <div style={{
+        display: "flex", alignItems: "center",
+        justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+      }}>
+        <div>
+          <p style={{
+            fontSize: 11,
+            color: "var(--text-tertiary)",
+          }}>
+            Academia
+          </p>
+          <h1 style={{
+            fontSize: 20, fontWeight: 600,
+            color: "var(--text-primary)", marginTop: 2, lineHeight: 1.3,
+            letterSpacing: "-0.01em",
+          }}>
+            Visão geral
+          </h1>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* Filtro de período */}
           <div style={{
-            display: "flex", gap: 4, background: "var(--bg-secondary)",
+            display: "flex", gap: 3, background: "var(--bg-secondary)",
             borderRadius: 10, padding: "3px", border: "1px solid var(--border-color)",
           }}>
             {PERIODOS.map((p) => (
@@ -184,53 +263,54 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                 key={p}
                 onClick={() => setPeriodo(p)}
                 style={{
-                  padding: "5px 14px", borderRadius: 8, border: "none",
+                  padding: "5px 14px", borderRadius: 7, border: "none",
                   fontSize: 12, fontWeight: 600, cursor: "pointer",
                   transition: "all 0.15s ease",
-                  background: periodo === p ? "#1D9E75" : "transparent",
-                  color: periodo === p ? "#fff" : "var(--text-secondary)",
+                  background: periodo === p ? "var(--bg-tertiary)" : "transparent",
+                  color: periodo === p ? "var(--text-primary)" : "var(--text-tertiary)",
+                  boxShadow: "none",
                 }}
               >
                 {p}
               </button>
             ))}
           </div>
+
+          <Link
+            href="/alunos"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 10,
+              border: "1px solid var(--border-color)",
+              background: "var(--card-bg)",
+              fontSize: 13, fontWeight: 500,
+              color: "var(--text-primary)", textDecoration: "none",
+            }}
+          >
+            <Users size={14} />
+            Alunos
+          </Link>
         </div>
-        <Link
-          href="/alunos"
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "8px 16px", borderRadius: 10,
-            border: "1px solid var(--border-color)",
-            background: "var(--card-bg)",
-            fontSize: 13, fontWeight: 500,
-            color: "var(--text-primary)", textDecoration: "none",
-          }}
-        >
-          <Users size={14} />
-          Gerenciar alunos
-        </Link>
       </div>
 
-      {/* ── KPI Cards principais (coloridos) ── */}
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
+      {/* ── KPI Cards ── */}
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         <KpiCard
           label="Alunos Ativos"
           value={totalAtivos}
           sub={novosEsseMes > 0 ? `+${novosEsseMes} este mês` : undefined}
           subPositivo={novosEsseMes > 0 ? true : null}
-          gradient="linear-gradient(135deg, #0e7f60 0%, #1D9E75 100%)"
           href="/alunos?status=ATIVO"
           icon={UserCheck}
         />
         <KpiCard
           label="Inadimplentes"
           value={totalInadimplentes}
-          sub={`${pctInadimplente}% da base`}
+          sub={totalInadimplentes > 0 ? `${pctInadimplente}% da base` : undefined}
           subPositivo={totalInadimplentes > 0 ? false : null}
-          gradient="linear-gradient(135deg, #991b1b 0%, #ef4444 100%)"
           href="/alunos?status=INADIMPLENTE"
           icon={UserX}
+          danger={totalInadimplentes > 0}
         />
         <KpiCard
           label="Receita do Mês"
@@ -238,67 +318,106 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
           sub={
             receitaVariacaoPct !== 0
               ? `${receitaVariacaoPct > 0 ? "+" : ""}${receitaVariacaoPct}% vs mês anterior`
-              : "sem dados do mês anterior"
+              : undefined
           }
           subPositivo={receitaVariacaoPct > 0 ? true : receitaVariacaoPct < 0 ? false : null}
-          gradient="linear-gradient(135deg, #5b21b6 0%, #8b5cf6 100%)"
           href="/cobrancas"
           icon={TrendingUp}
         />
         <KpiCard
           label="Renovações em 7 dias"
           value={renovacoesProximas}
-          sub={`${formatCents(renovacoesValorCents)} em jogo`}
+          sub={renovacoesProximas > 0 ? `${formatCents(renovacoesValorCents)} em jogo` : undefined}
           subPositivo={null}
-          gradient="linear-gradient(135deg, #92400e 0%, #f59e0b 100%)"
           href="/cobrancas"
           icon={CalendarClock}
         />
       </div>
 
-      {/* ── KPIs extras (faixa fina) ── */}
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <DashboardMetricCard
-          title="Taxa de churn"
+      {/* ── Métricas secundárias + Meta ── */}
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+        <MetricaCard
+          label="Churn"
           value={`${taxaChurnPct}%`}
+          desc="Inadimplentes / base"
           icon={Activity}
-          trendChange="Inadimplentes / total"
-          trendType="neutral"
         />
-        <DashboardMetricCard
-          title="LTV médio"
+        <MetricaCard
+          label="LTV médio"
           value={formatCents(ltvMedioCents)}
+          desc="Por aluno, histórico"
           icon={Target}
-          trendChange="Valor vitalício por aluno"
-          trendType="neutral"
         />
-        <DashboardMetricCard
-          title="Frequência média"
-          value={`${frequenciaMediaSemanal}x/sem`}
+        <MetricaCard
+          label="Frequência"
+          value={`${frequenciaMediaSemanal}×/sem`}
+          desc="Média de treinos"
           icon={Dumbbell}
-          trendChange="Média de treinos semanais"
-          trendType="neutral"
         />
+        <div style={{
+          background: "var(--card-bg)",
+          border: "1px solid var(--card-border)",
+          borderRadius: 12, padding: "18px 20px",
+          display: "flex", alignItems: "center",
+        }}>
+          <MetaProgressRing
+            pct={pctMeta}
+            label={`${formatCents(receitaMesCents)} / ${formatCents(metaMensalCents)}`}
+          />
+        </div>
       </div>
 
-      {/* ── Alerta cobranças pendentes ── */}
-      {cobrancasPendentes.count > 0 && (
+      {/* ── Alertas ── */}
+      {aguardandoValidacao > 0 && (
         <Link
-          href="/cobrancas?status=PENDENTE"
+          href="/cobrancas?status=AGUARDANDO_VALIDACAO"
           style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            borderRadius: 14, border: "1px solid rgba(245,158,11,0.3)",
-            background: "rgba(245,158,11,0.08)", padding: "14px 20px",
+            borderRadius: 14, border: "1px solid rgba(52,211,153,0.3)",
+            background: "rgba(52,211,153,0.07)", padding: "14px 20px",
             textDecoration: "none",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 10,
-              background: "rgba(245,158,11,0.2)", display: "flex",
+              background: "rgba(52,211,153,0.15)", display: "flex",
               alignItems: "center", justifyContent: "center",
             }}>
-              <Wallet size={16} color="#f59e0b" />
+              <ImageIcon size={16} color="#34d399" />
+            </div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
+                {aguardandoValidacao} comprovante{aguardandoValidacao > 1 ? "s" : ""} aguardando validação
+              </p>
+              <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                Alunos enviaram PIX — confirme ou rejeite para atualizar o status
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: 12, color: "#34d399", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+            Validar agora <ArrowUpRight size={13} />
+          </span>
+        </Link>
+      )}
+
+      {cobrancasPendentes.count > 0 && (
+        <Link
+          href="/cobrancas?status=PENDENTE"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            borderRadius: 14, border: "1px solid rgba(251,191,36,0.25)",
+            background: "rgba(251,191,36,0.06)", padding: "14px 20px",
+            textDecoration: "none",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(251,191,36,0.15)", display: "flex",
+              alignItems: "center", justifyContent: "center",
+            }}>
+              <Wallet size={16} color="#fbbf24" />
             </div>
             <div>
               <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
@@ -309,39 +428,39 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
               </p>
             </div>
           </div>
-          <span style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
             Ver cobranças <ArrowUpRight size={13} />
           </span>
         </Link>
       )}
 
-      {/* ── Gráficos: receita mensal + donut planos ── */}
+      {/* ── Gráficos: receita + distribuição ── */}
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>
         <ReceitaMensalChart data={receitaMensal} />
         <DistribuicaoPlanoChart data={distribuicaoPlanos} />
       </div>
 
-      {/* ── Ranking alunos + Frequência semanal ── */}
+      {/* ── Ranking + Frequência semanal ── */}
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>
         {/* Ranking */}
         <div style={{
           background: "var(--card-bg)",
           border: "1px solid var(--card-border)",
-          borderRadius: 16,
-          padding: "20px 24px",
+          borderRadius: 16, padding: "20px 24px",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Trophy size={15} color="#f59e0b" />
+              <Trophy size={14} color="var(--text-tertiary)" />
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Ranking de Alunos</div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>Por LTV · Ticket médio · Meta</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Ranking</div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>LTV · Frequência · Meta</div>
               </div>
             </div>
-            <Link href="/alunos" style={{ fontSize: 11, color: "#1D9E75", fontWeight: 600, textDecoration: "none" }}>
+            <Link href="/alunos" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
               Ver todos
             </Link>
           </div>
+
           {rankingAlunos.length === 0 ? (
             <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "24px 0" }}>
               Nenhum aluno ativo ainda
@@ -352,7 +471,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                 display: "grid", gridTemplateColumns: "28px 1fr 90px 64px 36px",
                 gap: 8, padding: "0 4px 8px",
                 borderBottom: "1px solid var(--border-color)",
-                fontSize: 10, fontWeight: 600,
+                fontSize: 10, fontWeight: 700,
                 color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em",
               }}>
                 <span style={{ textAlign: "center" }}>#</span>
@@ -373,15 +492,15 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                 >
                   <div style={{
                     fontSize: idx < 3 ? 13 : 11, fontWeight: 700, textAlign: "center",
-                    color: idx === 0 ? "#f59e0b" : idx === 1 ? "#94a3b8" : idx === 2 ? "#cd7f32" : "var(--text-tertiary)",
+                    color: idx === 0 ? "#fbbf24" : idx === 1 ? "#94a3b8" : idx === 2 ? "#cd7f32" : "var(--text-tertiary)",
                   }}>
                     {idx < 3 ? ["🥇", "🥈", "🥉"][idx] : idx + 1}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                     <div style={{
                       width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                      background: AVATAR_COLORS[idx % AVATAR_COLORS.length] + "30",
-                      border: `1.5px solid ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}50`,
+                      background: AVATAR_COLORS[idx % AVATAR_COLORS.length] + "20",
+                      border: `1.5px solid ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}40`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 11, fontWeight: 700,
                       color: AVATAR_COLORS[idx % AVATAR_COLORS.length],
@@ -403,8 +522,8 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                   </p>
                   <div style={{ display: "flex", justifyContent: "center" }}>
                     {aluno.meta
-                      ? <CheckCircle2 size={15} color="#1D9E75" />
-                      : <XCircle size={15} color="#ef4444" />
+                      ? <CheckCircle2 size={15} color="#34d399" />
+                      : <XCircle size={15} color="#f87171" />
                     }
                   </div>
                 </div>
@@ -413,7 +532,6 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
           )}
         </div>
 
-        {/* Frequência semanal */}
         <FrequenciaSemanalChart data={frequenciaSemanal} />
       </div>
 
@@ -427,15 +545,13 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(245,158,11,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <CalendarClock size={13} color="#f59e0b" />
-              </div>
+              <CalendarClock size={14} color="var(--text-tertiary)" />
               <div>
                 <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Vencendo em 7 dias</p>
                 <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{cobrancasVencendo.length} cobranças</p>
               </div>
             </div>
-            <Link href="/cobrancas" style={{ fontSize: 11, color: "#1D9E75", fontWeight: 600, textDecoration: "none" }}>
+            <Link href="/cobrancas" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
               Ver todas
             </Link>
           </div>
@@ -464,7 +580,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                   <span style={{
                     flexShrink: 0, fontSize: 11, fontWeight: 700,
                     padding: "3px 10px", borderRadius: 20,
-                    background: "rgba(245,158,11,0.15)", color: "#f59e0b",
+                    background: "rgba(251,191,36,0.12)", color: "#fbbf24",
                   }}>
                     {formatCents(c.valor)}
                   </span>
@@ -477,20 +593,18 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
         {/* Alunos em risco */}
         <div style={{
           background: "var(--card-bg)",
-          border: "1px solid rgba(239,68,68,0.2)",
+          border: "1px solid var(--card-border)",
           borderRadius: 16, padding: "20px 24px",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(239,68,68,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <AlertTriangle size={13} color="#ef4444" />
-              </div>
+              <AlertTriangle size={14} color="var(--text-tertiary)" />
               <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Alunos em risco de churn</p>
-                <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Baixa frequência de treinos</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Risco de churn</p>
+                <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Baixa frequência</p>
               </div>
             </div>
-            <Link href="/alunos" style={{ fontSize: 11, color: "#1D9E75", fontWeight: 600, textDecoration: "none" }}>
+            <Link href="/alunos" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
               Ver todos
             </Link>
           </div>
@@ -514,12 +628,14 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                     <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {a.nome}
                     </p>
-                    <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{a.plano} · {a.frequencia}x/sem · {a.diasSemVir}d sem treinar</p>
+                    <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                      {a.plano} · {a.frequencia}x/sem · {a.diasSemVir}d sem treinar
+                    </p>
                   </div>
                   <span style={{
                     flexShrink: 0, fontSize: 11, fontWeight: 700,
                     padding: "3px 10px", borderRadius: 20,
-                    background: "rgba(239,68,68,0.12)", color: "#f87171",
+                    background: "rgba(248,113,113,0.1)", color: "#f87171",
                   }}>
                     Risco
                   </span>
@@ -539,9 +655,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
           borderRadius: 16, padding: "20px 24px",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(236,72,153,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Cake size={13} color="#ec4899" />
-            </div>
+            <Cake size={14} color="var(--text-tertiary)" />
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
               Aniversariantes de {mesAtual}
             </p>
@@ -565,10 +679,10 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <div style={{
                       width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                      background: "rgba(236,72,153,0.12)",
-                      border: "1.5px solid rgba(236,72,153,0.3)",
+                      background: "rgba(236,72,153,0.1)",
+                      border: "1.5px solid rgba(236,72,153,0.25)",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 12, fontWeight: 700, color: "#ec4899",
+                      fontSize: 12, fontWeight: 800, color: "#ec4899",
                     }}>
                       {a.dia}
                     </div>
@@ -594,7 +708,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Últimos cadastrados</p>
-            <Link href="/alunos" style={{ fontSize: 11, color: "#1D9E75", fontWeight: 600, textDecoration: "none" }}>
+            <Link href="/alunos" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
               Ver todos
             </Link>
           </div>
@@ -619,7 +733,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                       <div style={{
                         width: 30, height: 30, borderRadius: 9, flexShrink: 0,
-                        background: AVATAR_COLORS[idx % AVATAR_COLORS.length] + "25",
+                        background: AVATAR_COLORS[idx % AVATAR_COLORS.length] + "20",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 10, fontWeight: 700,
                         color: AVATAR_COLORS[idx % AVATAR_COLORS.length],
@@ -640,7 +754,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                       {aluno.cobrancaPendente && (
                         <span style={{
                           fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
-                          background: "rgba(239,68,68,0.12)", color: "#f87171",
+                          background: "rgba(248,113,113,0.1)", color: "#f87171",
                         }}>
                           {formatCents(aluno.cobrancaPendente)}
                         </span>

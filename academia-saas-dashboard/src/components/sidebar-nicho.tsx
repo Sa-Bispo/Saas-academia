@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Menu,
   MessageCircle,
+  Settings,
   Users,
   Wallet,
   X,
@@ -30,6 +31,7 @@ type SidebarNichoProps = {
   suporteNaoLidas?: number;
   userEmail?: string;
   userName?: string;
+  subNicho?: string;
 };
 
 type LinkItem = {
@@ -47,8 +49,9 @@ const OPERATIONAL_LINKS: LinkItem[] = [
 ];
 
 const SETTINGS_LINKS: LinkItem[] = [
-  { href: "/bot", label: "Bot", icon: Bot },
+  { href: "/configuracoes", label: "Configurações", icon: Settings },
   { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { href: "/bot", label: "Bot", icon: Bot },
   { href: "/plano-e-uso", label: "Plano e Uso", icon: CreditCard },
 ];
 
@@ -58,10 +61,16 @@ export function SidebarNicho({
   botAtivo,
   userEmail,
   userName,
+  subNicho,
 }: SidebarNichoProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const isAcademia = subNicho === "academia";
+  const settingsLinks = isAcademia
+    ? SETTINGS_LINKS.filter((l) => l.href !== "/bot")
+    : SETTINGS_LINKS;
 
   const isAdmin =
     Boolean(userEmail) &&
@@ -94,11 +103,11 @@ export function SidebarNicho({
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
           style={{
-            background: "linear-gradient(135deg, rgba(29,158,117,0.25) 0%, rgba(29,158,117,0.1) 100%)",
-            border: "1px solid rgba(29,158,117,0.3)",
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border-color)",
           }}
         >
-          <Zap size={16} style={{ color: "#1D9E75" }} />
+          <Zap size={15} style={{ color: "var(--text-secondary)" }} />
         </div>
         <div className="min-w-0">
           <p
@@ -109,7 +118,7 @@ export function SidebarNicho({
           </p>
           <p
             className="text-[10px] font-medium mt-0.5"
-            style={{ color: "#1D9E75", opacity: 0.8 }}
+            style={{ color: "var(--accent)", opacity: 0.85 }}
           >
             {planName}
           </p>
@@ -132,7 +141,7 @@ export function SidebarNicho({
         </NavGroup>
 
         <NavGroup label="Configurações" className="mt-5">
-          {SETTINGS_LINKS.map((item) => (
+          {settingsLinks.map((item) => (
             <NavItem
               key={item.href}
               href={item.href}
@@ -150,7 +159,14 @@ export function SidebarNicho({
               href="/admin"
               label="Painel admin"
               icon={Shield}
-              active={pathname.startsWith("/admin")}
+              active={pathname === "/admin"}
+              onNavigate={() => setMobileOpen(false)}
+            />
+            <NavItem
+              href="/admin/bot-corrections"
+              label="Correções do bot"
+              icon={Zap}
+              active={pathname.startsWith("/admin/bot-corrections")}
               onNavigate={() => setMobileOpen(false)}
             />
           </NavGroup>
@@ -206,7 +222,7 @@ export function SidebarNicho({
         <div className="flex items-center gap-2">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: "rgba(29,158,117,0.15)" }}
+            style={{ background: "var(--bg-secondary)" }}
           >
             <Zap size={13} style={{ color: "var(--accent)" }} />
           </div>

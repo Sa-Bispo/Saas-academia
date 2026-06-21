@@ -91,7 +91,7 @@ export async function gerarCobrancasVencimento(diasAntecedencia: number = 5) {
     },
   });
 
-  const criadas = await Promise.all(
+  const resultados = await Promise.allSettled(
     matriculas.map((m) =>
       prisma.cobrancaAluno.create({
         data: {
@@ -106,10 +106,12 @@ export async function gerarCobrancasVencimento(diasAntecedencia: number = 5) {
     )
   );
 
+  const geradas = resultados.filter((r) => r.status === "fulfilled").length;
+
   revalidatePath("/cobrancas");
   revalidatePath("/dashboard/academia");
 
-  return { geradas: criadas.length };
+  return { geradas };
 }
 
 // ─── Confirmar pagamento (Pix manual) ─────────────────────────────────────────
@@ -119,7 +121,10 @@ export async function confirmarPagamento(cobrancaId: string) {
 
   const cobranca = await prisma.cobrancaAluno.findFirst({
     where: { id: cobrancaId, tenantId },
-    include: { matricula: true },
+    include: {
+      matricula: true,
+      aluno: { select: { id: true, nome: true, telefone: true } },
+    },
   });
 
   if (!cobranca) throw new Error("Cobrança não encontrada");
@@ -165,6 +170,37 @@ export async function confirmarPagamento(cobrancaId: string) {
     where: { id: cobranca.alunoId },
     data: { status: "ATIVO" },
   });
+
+  // Notifica o aluno via WhatsApp
+  try {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { evolutionInstanceName: true, evolutionApiKey: true, companyName: true },
+    });
+    if (tenant?.evolutionInstanceName && cobranca.aluno.telefone) {
+      const valorFmt = (cobranca.valorCents / 100).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+      const texto = [
+        `Olá, ${cobranca.aluno.nome}! 👋`,
+        ``,
+        `✅ *Pagamento confirmado!*`,
+        `Recebemos seu pagamento de *${valorFmt}* — tudo certo por aqui!`,
+        ``,
+        `Sua matrícula está ativa. Bora treinar! 💪`,
+      ].join("\n");
+      const evolution = new EvolutionService();
+      await evolution.sendTextMessage(
+        tenant.evolutionInstanceName,
+        cobranca.aluno.telefone,
+        texto,
+        tenant.evolutionApiKey,
+      );
+    }
+  } catch {
+    // Não bloqueia a confirmação se o WhatsApp falhar
+  }
 
   revalidatePath("/cobrancas");
   revalidatePath("/alunos");

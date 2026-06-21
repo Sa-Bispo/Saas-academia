@@ -3,58 +3,58 @@
 :root {
   /* Backgrounds */
   --bg-primary: #ffffff;
-  --bg-secondary: #f5f6f8;
-  --bg-tertiary: #f0f2f5;
+  --bg-secondary: #f4f5f9;
+  --bg-tertiary: #eef0f5;
   --bg-sidebar: #ffffff;
 
   /* Textos */
-  --text-primary: #111827;
+  --text-primary: #0f1117;
   --text-secondary: #4b5563;
   --text-tertiary: #9ca3af;
   --text-muted: #d1d5db;
 
   /* Bordas */
-  --border-color: #e2e5e9;
-  --border-strong: #d0d4da;
+  --border-color: #e2e5eb;
+  --border-strong: #cbd0d8;
 
   /* Cards */
   --card-bg: #ffffff;
-  --card-border: #e8eaed;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --card-border: #e8eaef;
+  --card-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
 
   /* Sidebar */
   --sidebar-bg: #ffffff;
   --sidebar-text: #374151;
   --sidebar-text-muted: #6b7280;
-  --sidebar-active-bg: rgba(23,135,95,0.08);
-  --sidebar-active-text: #17875f;
-  --sidebar-border: #e8eaed;
+  --sidebar-active-bg: rgba(99, 102, 241, 0.08);
+  --sidebar-active-text: #4F46E5;
+  --sidebar-border: #e8eaef;
 
   /* Header */
   --header-bg: #ffffff;
-  --header-border: #e8eaed;
+  --header-border: #e8eaef;
 
   /* Skeleton */
   --skeleton-from: #f0f2f5;
   --skeleton-to: #e4e7eb;
 
   /* Semanticas */
-  --success-bg: #ecfdf5;
-  --success-text: #065f46;
+  --success-bg: #f0fdf4;
+  --success-text: #166534;
   --warning-bg: #fffbeb;
   --warning-text: #92400e;
   --danger-bg: #fef2f2;
   --danger-text: #991b1b;
-  --info-bg: #eff6ff;
-  --info-text: #1e40af;
+  --info-bg: #eef2ff;
+  --info-text: #3730a3;
 
-  /* Accent */
-  --accent: #17875f;
-  --accent-hover: #0f6e4a;
+  /* Accent — Indigo */
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
   --accent-text: #ffffff;
   --shadow: var(--card-shadow);
 
-  /* Backward-compatible theme tokens used across components */
+  /* Backward-compatible theme tokens */
   --background: var(--bg-primary);
   --foreground: var(--text-primary);
   --surface: var(--bg-secondary);
@@ -66,44 +66,44 @@
 }
 
 .dark {
-  --bg-primary: #13151f;
-  --bg-secondary: #1a1d27;
-  --bg-tertiary: #0f1117;
-  --bg-sidebar: #1a1d27;
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --text-tertiary: #6b7280;
+  --bg-primary: #090B12;
+  --bg-secondary: #0E1018;
+  --bg-tertiary: #070810;
+  --bg-sidebar: #0C0E17;
+  --text-primary: #F1F2F7;
+  --text-secondary: #9CA3AF;
+  --text-tertiary: #6B7280;
   --text-muted: #374151;
-  --border-color: rgba(255,255,255,0.08);
-  --border-strong: rgba(255,255,255,0.15);
-  --card-bg: #1a1d27;
-  --card-border: rgba(255,255,255,0.08);
-  --card-shadow: none;
-  --sidebar-bg: #1c2333;
-  --sidebar-text: #c9d1d9;
-  --sidebar-text-muted: #8b949e;
-  --sidebar-active-bg: rgba(29,158,117,0.18);
-  --sidebar-active-text: #3dd68c;
-  --sidebar-border: rgba(255,255,255,0.1);
-  --header-bg: #1a1d27;
-  --header-border: rgba(255,255,255,0.08);
-  --skeleton-from: #1f2335;
-  --skeleton-to: #252a3a;
-  --success-bg: rgba(29,158,117,0.15);
+  --border-color: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.13);
+  --card-bg: #0E1018;
+  --card-border: rgba(255,255,255,0.07);
+  --card-shadow: 0 1px 12px rgba(0,0,0,0.5);
+  --sidebar-bg: #0C0E17;
+  --sidebar-text: #C9D1D9;
+  --sidebar-text-muted: #8B949E;
+  --sidebar-active-bg: rgba(129, 140, 248, 0.15);
+  --sidebar-active-text: #A5B4FC;
+  --sidebar-border: rgba(255,255,255,0.07);
+  --header-bg: #0C0E17;
+  --header-border: rgba(255,255,255,0.07);
+  --skeleton-from: #131520;
+  --skeleton-to: #1A1D2C;
+  --success-bg: rgba(16, 185, 129, 0.12);
   --success-text: #34d399;
-  --warning-bg: rgba(245,158,11,0.15);
+  --warning-bg: rgba(245,158,11,0.12);
   --warning-text: #fbbf24;
-  --danger-bg: rgba(239,68,68,0.15);
+  --danger-bg: rgba(239,68,68,0.12);
   --danger-text: #f87171;
-  --info-bg: rgba(59,130,246,0.15);
-  --info-text: #60a5fa;
-  --accent: #1D9E75;
-  --accent-hover: #22c55e;
+  --info-bg: rgba(99, 102, 241, 0.12);
+  --info-text: #A5B4FC;
+  --accent: #818CF8;
+  --accent-hover: #A5B4FC;
   --accent-text: #ffffff;
   --shadow: var(--card-shadow);
 
-  /* Backward-compatible theme tokens used across components */
-  --background: var(--bg-tertiary);
+  /* Backward-compatible theme tokens */
+  --background: var(--bg-primary);
   --foreground: var(--text-primary);
   --surface: var(--bg-secondary);
   --surface-strong: var(--bg-tertiary);
@@ -197,8 +197,8 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   background-image:
-    radial-gradient(circle at top, color-mix(in srgb, var(--info-text) 18%, transparent), transparent 28%),
-    radial-gradient(circle at bottom right, color-mix(in srgb, var(--accent) 14%, transparent), transparent 24%);
+    radial-gradient(ellipse at 15% 0%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 100%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 40%);
 }
 
 a {
@@ -207,7 +207,7 @@ a {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
   color: var(--foreground);
 }
 
@@ -256,11 +256,11 @@ a {
 .pyra-tour-popover {
   background: var(--card-bg) !important;
   border: 1px solid var(--card-border) !important;
-  border-top: 3px solid #1D9E75 !important;
+  border-top: 3px solid var(--accent) !important;
   border-radius: 14px !important;
   padding: 0 !important;
   box-shadow:
-    0 0 0 1px rgba(29, 158, 117, 0.08),
+    0 0 0 1px rgba(99, 102, 241, 0.08),
     0 12px 40px rgba(0, 0, 0, 0.22),
     0 4px 12px rgba(0, 0, 0, 0.1) !important;
   max-width: 340px !important;
@@ -317,10 +317,10 @@ a {
   left: 20px !important;
   height: 2px !important;
   border-radius: 99px !important;
-  background: linear-gradient(90deg, #1D9E75, #22c55e) !important;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover)) !important;
   width: calc((100% - 40px) * var(--pyra-tour-pct, 0.1)) !important;
   transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 0 6px rgba(29, 158, 117, 0.5) !important;
+  box-shadow: 0 0 6px rgba(129, 140, 248, 0.3) !important;
 }
 
 /* Texto do progresso */
@@ -340,7 +340,7 @@ a {
 
 /* Botão Próximo / Concluir */
 .pyra-tour-popover .driver-popover-next-btn {
-  background: #1D9E75 !important;
+  background: var(--accent) !important;
   border: none !important;
   border-radius: 8px !important;
   font-size: 12px !important;
@@ -351,14 +351,14 @@ a {
   text-shadow: none !important;
   font-family: inherit !important;
   cursor: pointer !important;
-  box-shadow: 0 3px 12px rgba(29, 158, 117, 0.38) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
   transition: background 0.2s, box-shadow 0.2s, transform 0.1s !important;
   white-space: nowrap !important;
 }
 
 .pyra-tour-popover .driver-popover-next-btn:hover {
-  background: #22c55e !important;
-  box-shadow: 0 5px 18px rgba(34, 197, 94, 0.45) !important;
+  background: var(--accent-hover) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
 }
 
 .pyra-tour-popover .driver-popover-next-btn:active {
@@ -419,18 +419,18 @@ a {
 
 /* Overlay */
 .driver-overlay {
-  background: rgba(4, 10, 20, 0.36) !important;
-  backdrop-filter: blur(0.5px) !important;
+  background: rgba(4, 6, 18, 0.5) !important;
+  backdrop-filter: blur(1px) !important;
 }
 
 /* Highlight do elemento selecionado */
 .driver-active-element,
 .driver-highlighted-element {
   border-radius: 10px !important;
-  outline: 2px solid rgba(34, 197, 94, 0.9) !important;
+  outline: 2px solid rgba(129, 140, 248, 0.9) !important;
   outline-offset: 3px !important;
   box-shadow:
-    0 0 0 4px rgba(34, 197, 94, 0.22),
-    0 0 24px rgba(34, 197, 94, 0.25) !important;
-  filter: brightness(1.12) saturate(1.08) !important;
+    0 0 0 4px rgba(99, 102, 241, 0.22),
+    0 0 24px rgba(99, 102, 241, 0.25) !important;
+  filter: brightness(1.08) !important;
 }

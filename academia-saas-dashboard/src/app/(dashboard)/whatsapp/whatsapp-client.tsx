@@ -195,7 +195,7 @@ function EstadoConectado({
         label: "Conectado desde",
         value: status.connectedAt ? formatDate(status.connectedAt) : "-",
       },
-      { label: "Pedidos hoje", value: `${status.pedidosHoje || 0} pedidos`, highlight: true },
+      { label: "Atendimentos hoje", value: `${status.pedidosHoje || 0} atendimentos`, highlight: true },
       { label: "Mensagens hoje", value: `${status.mensagensHoje || 0} mensagens` },
     ],
     [status.connectedAt, status.mensagensHoje, status.pedidosHoje, status.phoneNumber],
@@ -376,20 +376,12 @@ function EstadoConectado({
               marginBottom: "4px",
             }}
           >
-            Configure seu catálogo no WhatsApp Business
+            Use o WhatsApp Business para a academia
           </div>
           <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
-            Seus clientes podem ver seus produtos antes de pedir. O bot usa o cardápio da plataforma para processar
-            pedidos - são duas coisas que funcionam juntas.
+            Mantenha o número conectado para que o bot atenda os alunos automaticamente. Configure modalidades e
+            horários na página Bot para que as respostas sejam sempre precisas.
           </div>
-          <a
-            href="https://faq.whatsapp.com/1163698171187584"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: "12px", color: "var(--info-text)", marginTop: "6px", display: "block" }}
-          >
-            Como configurar o catálogo →
-          </a>
         </div>
       </div>
     </>

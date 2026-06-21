@@ -28,6 +28,7 @@ from message_buffer import buffer_message
 from config import GEMINI_API_KEY, REDIS_URL as _REDIS_URL
 
 _REDIS_URI = _REDIS_URL or 'redis://redis:6379/6'
+from admin_api import router as admin_router
 from evolution_api import send_whatsapp_message
 from router import detect_intent, detect_intent_with_context, is_within_hours
 from script_responses import (
@@ -39,6 +40,7 @@ from memory import get_session_history
 from order_extractor import build_order_payload_from_history_window_async
 from order_extractor import extract_confirmed_product_from_history, extract_quantity_from_confirmation
 from cobranca_worker import run_cobranca_worker
+from cobranca_scheduler import run_cobranca_scheduler
 
 
 # Configure logging to stdout
@@ -62,18 +64,22 @@ from contextlib import asynccontextmanager
 async def lifespan(app_instance):
     redis_async = await _get_redis_async()
     worker_task = asyncio.create_task(run_cobranca_worker(redis_async))
-    logger.info('[STARTUP] cobrança worker iniciado')
+    scheduler_task = asyncio.create_task(run_cobranca_scheduler(redis_async))
+    logger.info('[STARTUP] cobrança worker e scheduler iniciados')
     yield
     worker_task.cancel()
-    try:
-        await worker_task
-    except asyncio.CancelledError:
-        pass
+    scheduler_task.cancel()
+    for task in (worker_task, scheduler_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     await redis_async.aclose()
-    logger.info('[SHUTDOWN] cobrança worker encerrado')
+    logger.info('[SHUTDOWN] cobrança worker e scheduler encerrados')
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(admin_router)
 logger = logging.getLogger(__name__)
 
 
@@ -190,13 +196,15 @@ async def _fetch_media_base64(instance: str, api_key: str | None, evolution_data
             'apikey': api_key or EVOLUTION_AUTHENTICATION_API_KEY or '',
             'Content-Type': 'application/json',
         }
-        body = {'message': {'key': evolution_data.get('key', {})}, 'convertToMp4': False}
+        # A Evolution API espera o objeto `data` completo (contém key + message + timestamp)
+        message_payload = evolution_data.get('data', evolution_data)
+        body = {'message': message_payload, 'convertToMp4': False}
 
         async with aiohttp.ClientSession() as http_session:
             async with http_session.post(
                 url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=20)
             ) as resp:
-                if resp.status != 200:
+                if resp.status not in (200, 201):
                     logger.warning('[MEDIA] getBase64FromMediaMessage status=%s', resp.status)
                     return None
                 result = await resp.json()
@@ -463,39 +471,23 @@ async def webhook_evolution(request: Request):
     tenant_id = str(tenant.get('id') or '')
     evolution_api_key = tenant.get('evolutionApiKey')
 
-    # Buffer para debounce (agrupa mensagens rápidas do mesmo número)
-    buffered = await buffer_message(tenant_id, phone, message_text)
-    if not buffered:
-        return JSONResponse({'status': 'buffered'})
-
-    try:
-        result = await _process_chat_message(
-            tenant_id=tenant_id,
-            message=buffered,
-            phone=phone,
-            session_id=phone,
-            imagem_recebida=imagem_recebida,
-            instance_name=instance_name,
-            evolution_api_key=evolution_api_key,
-            evolution_raw_data=data.get('data') or {},
-        )
-    except Exception as exc:
-        logger.error('[WEBHOOK] erro ao processar mensagem: %s', exc, exc_info=True)
-        return JSONResponse({'status': 'error', 'detail': str(exc)}, status_code=500)
-
-    # Envia mensagens individuais se houver lista
-    messages_to_send = result.get('messages') or [result.get('reply') or result.get('response') or '']
-    messages_to_send = [m for m in messages_to_send if m]
-
-    for msg in messages_to_send:
+    # Se a mensagem é uma imagem, baixa o base64 agora (enquanto temos o payload completo)
+    # e cacheia no Redis para o _handle_academia_message consumir após o debounce.
+    if imagem_recebida and tenant_id:
         try:
-            # send_whatsapp_message é síncrona (usa requests) — roda em thread
-            # separada para não bloquear o event loop.
-            await asyncio.to_thread(send_whatsapp_message, phone, msg, instance_name or '')
-        except Exception as exc:
-            logger.error('[WEBHOOK] erro ao enviar mensagem: %s', exc, exc_info=True)
+            media_b64 = await _fetch_media_base64(instance_name or '', evolution_api_key, data)
+            if media_b64:
+                import redis as _redis_sync_mod
+                _r = _redis_sync_mod.from_url(_REDIS_URI, decode_responses=True)
+                _r.setex(f'media:{phone}:{tenant_id}', 120, media_b64)
+                _r.close()
+        except Exception as _exc:
+            logger.warning('[WEBHOOK] erro ao cachear mídia: %s', _exc)
 
-    return JSONResponse({'status': 'ok', 'sale_complete': result.get('sale_complete', False)})
+    # Buffer para debounce (agrupa mensagens rápidas do mesmo número).
+    # O envio acontece de forma assíncrona via handle_debounce em message_buffer.py.
+    await buffer_message(phone, message_text, tenant_id=tenant_id, instance_name=instance_name)
+    return JSONResponse({'status': 'buffered'})
 
 
 # ─── Endpoint de enqueue de cobranças ──────────────────────────────────────
@@ -570,3 +562,112 @@ async def progresso_cobrancas(tenant_id: str):
         })
     finally:
         await redis_async.aclose()
+
+
+# ─── Endpoints de teste (apenas para ambiente de desenvolvimento) ──────────────
+
+@app.post('/api/test/seed-cobranca')
+async def test_seed_cobranca(request: Request):
+    """
+    Cria uma cobrança de teste no banco e a enfileira para o worker.
+    Body: {tenant_id, aluno_id, valor_cents?, data_vencimento?, descricao?, pix_chave?, matricula_id?}
+    Retorna: {cobranca_id, enfileirada: true}
+    """
+    import os
+    if os.getenv('ALLOW_TEST_ENDPOINTS', '').lower() not in ('1', 'true', 'yes'):
+        return JSONResponse({'error': 'Endpoints de teste desabilitados. Configure ALLOW_TEST_ENDPOINTS=true.'}, status_code=403)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({'error': 'JSON inválido.'}, status_code=400)
+
+    tenant_id = (data.get('tenant_id') or '').strip()
+    aluno_id = (data.get('aluno_id') or '').strip()
+    if not tenant_id or not aluno_id:
+        return JSONResponse({'error': 'tenant_id e aluno_id são obrigatórios.'}, status_code=422)
+
+    from datetime import date as _date
+    valor_cents = int(data.get('valor_cents') or 9000)
+    descricao = data.get('descricao') or 'Mensalidade Academia - TESTE'
+    pix_chave = data.get('pix_chave') or None
+    matricula_id = data.get('matricula_id') or None
+    _dv_raw = data.get('data_vencimento') or datetime.now().strftime('%Y-%m-%d')
+    data_vencimento = _date.fromisoformat(_dv_raw) if isinstance(_dv_raw, str) else _dv_raw
+
+    from config import BOT_DATABASE_CONNECTION_URI
+    import asyncpg
+    conn = await asyncpg.connect(BOT_DATABASE_CONNECTION_URI)
+    try:
+        cobranca_id = str(uuid.uuid4())
+        now = datetime.now()
+        await conn.execute(
+            '''
+            INSERT INTO cobrancas_alunos
+                (id, tenant_id, aluno_id, matricula_id, valor_cents, data_vencimento,
+                 descricao, pix_chave, status, enviada_whatsapp, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDENTE', false, $9, $9)
+            ''',
+            cobranca_id, tenant_id, aluno_id, matricula_id,
+            valor_cents, data_vencimento,
+            descricao, pix_chave, now,
+        )
+    finally:
+        await conn.close()
+
+    # Enfileira no Redis
+    from cobranca_worker import _queue_key, _progress_key
+    import redis.asyncio as aioredis
+    redis_async = aioredis.from_url(_REDIS_URI, decode_responses=True)
+    try:
+        queue_key = _queue_key(tenant_id)
+        await redis_async.lpush(queue_key, cobranca_id)
+        await redis_async.expire(queue_key, 86400)
+        progress_key = _progress_key(tenant_id)
+        await redis_async.hset(progress_key, mapping={
+            'total': '1',
+            'sent': '0',
+            'failed': '0',
+            'status': 'aguardando',
+            'started_at': now.isoformat(timespec='seconds'),
+        })
+        await redis_async.expire(progress_key, 3600)
+    finally:
+        await redis_async.aclose()
+
+    logger.info('[TEST] Cobrança de teste criada: %s tenant=%s aluno=%s', cobranca_id, tenant_id, aluno_id)
+    return JSONResponse({'cobranca_id': cobranca_id, 'enfileirada': True, 'valor_cents': valor_cents})
+
+
+@app.post('/api/test/reset-daily-limit')
+async def test_reset_daily_limit(request: Request):
+    """
+    Zera o contador diário de cobranças de um tenant (permite reenvio no mesmo dia).
+    Body: {tenant_id}
+    """
+    import os
+    if os.getenv('ALLOW_TEST_ENDPOINTS', '').lower() not in ('1', 'true', 'yes'):
+        return JSONResponse({'error': 'Endpoints de teste desabilitados. Configure ALLOW_TEST_ENDPOINTS=true.'}, status_code=403)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({'error': 'JSON inválido.'}, status_code=400)
+
+    tenant_id = (data.get('tenant_id') or '').strip()
+    if not tenant_id:
+        return JSONResponse({'error': 'tenant_id é obrigatório.'}, status_code=422)
+
+    from cobranca_worker import _daily_key, _progress_key, _queue_key
+    import redis.asyncio as aioredis
+    redis_async = aioredis.from_url(_REDIS_URI, decode_responses=True)
+    try:
+        deleted = await redis_async.delete(
+            _daily_key(tenant_id),
+            _progress_key(tenant_id),
+            _queue_key(tenant_id),
+        )
+    finally:
+        await redis_async.aclose()
+
+    return JSONResponse({'deletadas': deleted, 'status': 'ok'})

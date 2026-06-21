@@ -29,16 +29,13 @@ const horarioTurnoSchema = z.object({
 const botConfigSchema = z.object({
   nome_atendente: z.string().trim().max(80),
   nome_negocio: z.string().trim().max(120),
-  tom_voz: z.enum(["descontraido", "formal", "vendedor"]),
+  tom_voz: z.enum(["descontraido", "formal", "motivador"]),
   horarios: z.array(horarioTurnoSchema),
-  area_entrega: z.string().trim().max(240),
-  pedido_minimo: z.number().min(0),
-  faz_delivery: z.boolean(),
-  faz_retirada: z.boolean(),
+  modalidades: z.array(z.string().trim().min(1).max(80)).max(20),
   regras: z.array(z.string().trim().min(1).max(280)).max(20),
   whatsapp_responsavel: z.string().trim().max(30),
-  notif_novos_pedidos: z.boolean(),
-  notif_estoque_baixo: z.boolean(),
+  notif_novos_alunos: z.boolean(),
+  notif_cobrancas_atraso: z.boolean(),
   notif_bot_desconectado: z.boolean(),
   bot_configurado: z.boolean(),
 });
@@ -48,13 +45,13 @@ export type BotConfigData = z.infer<typeof botConfigSchema>;
 
 function mapToneToTenantTone(value: BotConfigData["tom_voz"]): "DESCONTRAIDO" | "FORMAL" | "VENDEDOR" {
   if (value === "formal") return "FORMAL";
-  if (value === "vendedor") return "VENDEDOR";
+  if (value === "motivador") return "VENDEDOR";
   return "DESCONTRAIDO";
 }
 
 function mapTenantToneToBotTone(value?: string | null): BotConfigData["tom_voz"] {
   if ((value || "").toUpperCase() === "FORMAL") return "formal";
-  if ((value || "").toUpperCase() === "VENDEDOR") return "vendedor";
+  if ((value || "").toUpperCase() === "VENDEDOR") return "motivador";
   return "descontraido";
 }
 
@@ -63,15 +60,11 @@ function formatOperationContext(data: BotConfigData): string {
     .map((h) => `${h.dia_semana}: ${h.abertura}-${h.fechamento}${h.segundo_turno ? ` / ${h.segundo_turno.abertura}-${h.segundo_turno.fechamento}` : ""}`)
     .join("; ");
 
-  const formas = [data.faz_delivery ? "Delivery" : null, data.faz_retirada ? "Retirada" : null]
-    .filter(Boolean)
-    .join(", ");
+  const modalidades = data.modalidades?.length ? data.modalidades.join(", ") : "não informadas";
 
   return [
-    `Horários: ${horarios || "não informado"}`,
-    `Área de entrega: ${data.area_entrega || "não informada"}`,
-    `Pedido mínimo: R$ ${Number.isFinite(data.pedido_minimo) ? data.pedido_minimo.toFixed(2) : "0.00"}`,
-    `Modalidades: ${formas || "não informadas"}`,
+    `Horários de funcionamento: ${horarios || "não informado"}`,
+    `Modalidades disponíveis: ${modalidades}`,
   ].join("\n");
 }
 
@@ -137,16 +130,13 @@ export async function getBotConfig(tenantId: string): Promise<BotConfigData | nu
     nome_negocio: String(botConfigRaw.nome_negocio || tenant.companyName || tenant.nome || ""),
     tom_voz: (botConfigRaw.tom_voz as BotConfigData["tom_voz"]) || mapTenantToneToBotTone(tenant.toneOfVoice),
     horarios: horarios as HorarioTurno[],
-    area_entrega: String(botConfigRaw.area_entrega || ""),
-    pedido_minimo: Number(botConfigRaw.pedido_minimo ?? 0),
-    faz_delivery: Boolean(botConfigRaw.faz_delivery ?? true),
-    faz_retirada: Boolean(botConfigRaw.faz_retirada ?? true),
+    modalidades: Array.isArray(botConfigRaw.modalidades) ? (botConfigRaw.modalidades as string[]) : [],
     regras: Array.isArray(botConfigRaw.regras) && botConfigRaw.regras.length > 0
       ? (botConfigRaw.regras as string[])
       : fallbackRules,
     whatsapp_responsavel: String(botConfigRaw.whatsapp_responsavel || tenant.whatsappAdmin || ""),
-    notif_novos_pedidos: Boolean(botConfigRaw.notif_novos_pedidos ?? true),
-    notif_estoque_baixo: Boolean(botConfigRaw.notif_estoque_baixo ?? true),
+    notif_novos_alunos: Boolean((botConfigRaw as Record<string, unknown>).notif_novos_alunos ?? true),
+    notif_cobrancas_atraso: Boolean((botConfigRaw as Record<string, unknown>).notif_cobrancas_atraso ?? true),
     notif_bot_desconectado: Boolean(botConfigRaw.notif_bot_desconectado ?? true),
     bot_configurado: Boolean(configNicho.bot_configurado ?? botConfigRaw.bot_configurado ?? false),
   };
@@ -167,6 +157,7 @@ export async function saveBotConfig(tenantId: string, data: BotConfigData) {
 
   const nextConfig = {
     ...currentConfig,
+    sub_nicho: 'academia',
     bot_configurado: payload.bot_configurado,
     bot_config: payload,
     nome_atendente: payload.nome_atendente,
@@ -182,7 +173,7 @@ export async function saveBotConfig(tenantId: string, data: BotConfigData) {
       strictRules: payload.regras.join("\n") || null,
       whatsappAdmin: payload.whatsapp_responsavel || null,
       operationContext: formatOperationContext(payload),
-      botObjective: "FECHAR_PEDIDO",
+      botObjective: "ATENDIMENTO_ACADEMIA",
       configNicho: nextConfig,
     },
   });

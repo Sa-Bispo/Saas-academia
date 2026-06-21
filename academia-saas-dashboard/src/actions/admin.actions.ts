@@ -5,9 +5,8 @@ import { cookies } from "next/headers";
 import crypto from "node:crypto";
 import { z } from "zod";
 
+import { getAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 const ADMIN_IMPERSONATION_COOKIE = "admin_impersonation_tenant_id";
 const EXPIRING_IN_DAYS = 7;
@@ -71,10 +70,6 @@ export type AdminStats = {
   tenants: AdminTenantSummary[];
 };
 
-function getAdminEmail() {
-  return process.env.ADMIN_EMAIL ?? process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? "";
-}
-
 function getLoginUrl() {
   return "https://pyralabs.com.br/login";
 }
@@ -120,21 +115,8 @@ function resolveSubscriptionStatusLabel(
 }
 
 async function assertAdmin() {
-  const adminEmail = getAdminEmail();
-  if (!adminEmail) {
-    throw new Error("ADMIN_EMAIL nao configurado.");
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || user.email !== adminEmail) {
-    throw new Error("Nao autorizado");
-  }
-
-  return user;
+  const ok = await getAdminSession();
+  if (!ok) throw new Error("Não autorizado");
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
@@ -291,6 +273,7 @@ export async function createTenant(input: {
 
   const now = new Date();
   const senhaTemp = parsed.senha ?? generateSecurePassword(12);
+  const { createAdminClient } = await import("@/lib/supabase/admin");
   const supabaseAdmin = createAdminClient();
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email: parsed.email,

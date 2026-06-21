@@ -26,7 +26,6 @@ type AlunoComFrequencia = {
   nome: string;
   telefone: string;
   status: string;
-  frequencias: { id: string; horaEntrada: string | null; horaSaida: string | null }[];
 };
 
 type Props = {
@@ -99,9 +98,9 @@ export function FrequenciaPageClient({ alunos, presencasHoje }: Props) {
           <p className="text-xs text-muted">Ativos na academia</p>
           <p className="mt-2 text-2xl font-semibold text-white tabular-nums">{alunos.length}</p>
         </div>
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+        <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4">
           <p className="text-xs text-muted">Presentes hoje</p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-400 tabular-nums">
+          <p className="mt-2 text-2xl font-semibold text-brand tabular-nums">
             {presencasHoje.length}
           </p>
         </div>
@@ -195,7 +194,7 @@ export function FrequenciaPageClient({ alunos, presencasHoje }: Props) {
                             type="button"
                             disabled={isLoading}
                             onClick={() => handleCheckIn(aluno.id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-600/30 disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-brand/10 px-3 py-1.5 text-xs font-medium text-brand transition hover:bg-brand/20 disabled:opacity-50"
                           >
                             <LogIn size={12} />
                             {isLoading ? "..." : "Check-in"}

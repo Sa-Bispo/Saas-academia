@@ -79,58 +79,151 @@ def _norm(text: str) -> str:
     return ''.join(c for c in raw if not unicodedata.combining(c)).strip()
 
 
+# Tabela de expansão de abreviações e erros comuns antes de aplicar os patterns.
+_ABREVIACOES = [
+    (r'\bpgei\b',      'paguei'),
+    (r'\bpguei\b',     'paguei'),
+    (r'\bpaguie\b',    'paguei'),
+    (r'\bpgto\b',      'pagamento'),
+    (r'\bpgt\b',       'pagamento'),
+    (r'\bkd\b',        'cadê'),
+    (r'\bkde\b',       'cadê'),
+    (r'\bcade\b',      'cadê'),
+    (r'\bvc\b',        'voce'),
+    (r'\bvcs\b',       'voces'),
+    (r'\bmsm\b',       'mesmo'),
+    (r'\bmto\b',       'muito'),
+    (r'\btd\b',        'tudo'),
+    (r'\bblz\b',       'beleza'),
+    (r'\bvlw\b',       'valeu'),
+    (r'\bflw\b',       'falou'),
+    (r'\bobg\b',       'obrigado'),
+    (r'\bqto\b',       'quanto'),
+    (r'\bqdo\b',       'quando'),
+    (r'\bqndo\b',      'quando'),
+    (r'\bpq\b',        'porque'),
+    (r'\bmsld\b',      'mensalidade'),
+    (r'\bcomprv\b',    'comprovante'),
+    (r'\bcomprova\b',  'comprovante'),
+    (r'\bcomp\b',      'comprovante'),
+    (r'\bmtri[ck]ula\b', 'matricula'),
+    (r'\breov\b',      'renovar'),
+    (r'\brenov\b',     'renovar'),
+    (r'\btransf\b',    'transferi'),
+    (r'\bmandei\b',    'enviei'),
+    (r'\bja\b',        'ja'),   # já sem acento já está ok no _norm
+    (r'\beh\b',        'e'),
+    (r'\bta\b',        'esta'),
+    (r'\bfiz\b',       'fiz'),
+    (r'\bbolt\b',      'boleto'),
+    (r'\bpend\b',      'pendente'),
+    (r'\bplano\b',     'plano'),
+]
+
+
+def _expandir_abreviacoes(text: str) -> str:
+    result = text
+    for pattern, replacement in _ABREVIACOES:
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    return result
+
+
 # ─── Detecção de intenção ─────────────────────────────────────────────────────
 
 _PATTERNS_MATRICULA = [
-    r'\b(matricula|matrícula|plano|situação|situacao|minha situacao|status|venc(e|imento)|quando vence|vigencia|ativo)\b',
+    r'\b(matricula|matriculas|plano|situacao|minha situacao|status|venci(mento)?|quando vence|vigencia|ativo|cadastro|meu plano)\b',
+    r'\b(ver (minha )?(matricula|situacao|plano))\b',
+    r'\b(como (esta|fica) (minha )?(matricula|plano))\b',
 ]
 
 _PATTERNS_COBRANCA = [
-    r'\b(cobranca|cobrança|mensalidade|debito|devo|boleto|pagar|pagamento|pendente|atrasado|inadimplente)\b',
-    r'\b(tenho (alguma )?(cobranca|cobrança|divida|dívida))\b',
-    r'\b(quanto (devo|fica|é))\b',
+    r'\b(cobranca|mensalidade|debito|devo|boleto|pagar|pagamento|pendente|atrasado|inadimplente|divida|deve)\b',
+    r'\b(tenho (alguma )?(cobranca|divida))\b',
+    r'\b(quanto (devo|fica|e|custa))\b',
+    r'\b(to (devendo|em falta|atrasad))\b',
+    r'\b(ta (devendo|atrasad))\b',
+    r'\b(tem (alguma )?(cobranca|mensalidade|pendencia))\b',
+    r'\b(cade (minha )?(cobranca|mensalidade|fatura))\b',
 ]
 
 _PATTERNS_PIX = [
-    r'\b(pix|chave pix|chave do pix|pagar (no )?pix)\b',
+    r'\b(pix|chave pix|chave do pix|pagar (no )?pix|chave)\b',
+    r'\b(cade (a |o )?(chave|pix))\b',
+    r'\b(me (manda|passa|envia) (a |o )?(chave|pix))\b',
+    r'\b(quero pagar (no )?pix)\b',
+    r'\b(como pagar)\b',
 ]
 
 _PATTERNS_PAGUEI = [
-    r'\b(paguei|já paguei|ja paguei|efetuei|fiz o pix|realizei|transferi|enviei)\b',
-    r'\b(pix (enviado|feito|realizado|mandado))\b',
-    r'\b(acabei de pagar|acabei de fazer)\b',
+    r'\b(paguei|ja paguei|efetuei|fiz o pix|realizei|transferi|enviei|mandei)\b',
+    r'\b(pix (enviado|feito|realizado|mandado|efetuado))\b',
+    r'\b(acabei de pagar|acabei de fazer|acabei de transferir)\b',
+    r'\b(fiz (o )?(pagamento|pix|transferencia))\b',
+    r'\b(ja (fiz|realizei|efetuei|transferi|paguei))\b',
+    r'\b(efetuei (o )?(pagamento|pix|transferencia))\b',
+    r'\b(realizei (o )?pagamento)\b',
+    r'\b(pagamento (feito|realizado|efetuado|enviado))\b',
+]
+
+_PATTERNS_DESISTIR = [
+    r'\b(esquece|deixa pra la|deixa pra la|nao vou pagar|nao consigo pagar|nao tenho (como|dinheiro))\b',
+    r'\b(vou pagar (depois|amanha|semana que vem|outro dia))\b',
+    r'\b(pago (depois|amanha|mais tarde))\b',
+    r'\b(sem (condicao|dinheiro) agora)\b',
+    r'\b(volta(r)? (para o )?menu)\b',
+    r'\b(cancela(r)?|desistir|desisto)\b',
 ]
 
 _PATTERNS_MENU = [
-    r'\b(menu|opções|opcoes|ajuda|help|inicio|voltar)\b',
-    r'^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|e ai|eai)[\s!?.]*$',
+    r'\b(menu|opcoes|ajuda|help|inicio|voltar|comecar|recomecar)\b',
+    r'^(oi|ola|bom dia|boa tarde|boa noite|hey|e ai|eai|ola|hi)[\s!?.]*$',
+    r'^[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\s!?.]*$',  # só emojis / pontuação
 ]
 
 _PATTERNS_ENCERRAR = [
-    r'\b(obrigad[ao]|valeu|ok|tudo certo|entendido|até|ate|tchau|flw|falou)\b',
-    r'\b(nao preciso|não preciso|era isso|foi isso|sem mais)\b',
+    r'\b(obrigad[ao]|valeu|vlw|ok|tudo certo|entendido|ate|tchau|flw|falou|ate logo|ate mais|xau)\b',
+    r'\b(nao preciso|era isso|foi isso|sem mais|pode fechar|encerra|encerrar)\b',
+    r'\b(nada mais|nao tem mais|nao quero mais nada)\b',
 ]
 
 _PATTERNS_SIM = [
-    r'^(sim|s|isso|pode|certo|confirmo|ok|yes|positivo|exato)[\s!.]*$',
-    r'\b(sim|confirmo|isso mesmo)\b',
+    r'^(sim|s|isso|pode|certo|confirmo|ok|yes|positivo|exato|claro|com certeza|quero)[\s!.]*$',
+    r'\b(sim|confirmo|isso mesmo|pode ser|ta bom|beleza|tudo bem)\b',
 ]
 
 _PATTERNS_NAO = [
-    r'^(nao|não|n|negativo|errado)[\s!.]*$',
+    r'^(nao|n|negativo|errado|de jeito nenhum)[\s!.]*$',
+    r'\b(nao quero|nao preciso|nao e isso)\b',
 ]
 
 _PATTERNS_RENOVAR = [
-    r'\b(renov(ar|acao|ação)|quero renovar|renovar matricula|renovar plano)\b',
-    r'\b(como renov|preciso renov)\b',
+    r'\b(renovar|renovacao|quero renovar|renovar matricula|renovar plano)\b',
+    r'\b(como renov|preciso renov|quero continuar|quero ficar)\b',
+    r'\b(reativar|reativacao|voltar (a treinar|para academia))\b',
 ]
 
 
-def _detectar_intent(text: str) -> str:
-    t = _norm(text)
+def _detectar_intent(text: str, learned_patterns: list[dict] | None = None) -> str:
+    # Normaliza (remove acentos, lowercase) e expande abreviações
+    t = _expandir_abreviacoes(_norm(text))
+
+    # Padrões aprendidos pelo admin têm prioridade sobre os hardcoded
+    if learned_patterns:
+        for p in learned_patterns:
+            try:
+                frase_norm = _expandir_abreviacoes(_norm(p.get('frase', '')))
+                if frase_norm and re.search(re.escape(frase_norm), t):
+                    return p.get('intentAlvo', 'desconhecido')
+            except Exception:
+                pass
+
+    # Prioridade: paguei > desistir > renovar > pix > cobranca > matricula > encerrar > menu > sim/nao
     for p in _PATTERNS_PAGUEI:
         if re.search(p, t):
             return 'paguei'
+    for p in _PATTERNS_DESISTIR:
+        if re.search(p, t):
+            return 'desistir'
     for p in _PATTERNS_RENOVAR:
         if re.search(p, t):
             return 'renovar'
@@ -146,6 +239,7 @@ def _detectar_intent(text: str) -> str:
     for p in _PATTERNS_ENCERRAR:
         if re.search(p, t):
             return 'encerrar'
+    # Menu e saudações verificados por último para não sobrescrever intents mais específicos
     for p in _PATTERNS_MENU:
         if re.search(p, t):
             return 'menu'
@@ -329,15 +423,52 @@ def _msg_encerrar(nome: str) -> str:
     return f'Foi um prazer ajudar, *{primeiro}*! 💪\nQualquer coisa é só chamar. Bons treinos! 🏋️'
 
 
-def _msg_nao_entendi() -> str:
-    return (
-        'Hmm, não entendi muito bem. 😅\n\n'
-        'Posso ajudar com:\n'
-        '1️⃣ Minha matrícula\n'
-        '2️⃣ Cobranças pendentes\n'
-        '3️⃣ Chave Pix\n'
-        '4️⃣ Já fiz o pagamento'
-    )
+_NAO_ENTENDI_VARIACOES = [
+    (
+        'Hmm, não consegui entender muito bem. 😅\n\n'
+        'Me diz: você quer ver sua *matrícula*, *cobranças*, a *chave Pix* ou registrar um *pagamento*?'
+    ),
+    (
+        'Não entendi sua mensagem desta vez! 🤔\n\n'
+        'Posso te ajudar com:\n'
+        '1️⃣ Situação da matrícula\n'
+        '2️⃣ Cobranças em aberto\n'
+        '3️⃣ Chave Pix para pagamento\n'
+        '4️⃣ Já paguei — quero registrar'
+    ),
+    (
+        'Opa, essa eu não peguei bem! 😅\n'
+        'Tenta me dizer de outra forma, ou escolhe uma das opções:\n\n'
+        '*1* → Minha matrícula\n'
+        '*2* → Minhas cobranças\n'
+        '*3* → Pagar via Pix\n'
+        '*4* → Registrar pagamento feito'
+    ),
+]
+
+_NAO_ENTENDI_ESCALACAO = (
+    'Parece que estou tendo dificuldade de entender o que você precisa. 😔\n\n'
+    'Para atendimento direto com nossa equipe, entre em contato pela recepção ou aguarde '
+    'que um atendente vai assumir essa conversa em breve. 👋'
+)
+
+_DESISTIR_COMPROVANTE_VARIACOES = [
+    'Sem problema! 😊 Se quiser regularizar depois, é só me chamar por aqui.',
+    'Tudo bem! Quando quiser pagar, estou por aqui. 💪',
+    'Entendido! Qualquer coisa é só mandar mensagem. 😊',
+]
+
+
+def _msg_nao_entendi(count: int = 0) -> str:
+    if count >= 3:
+        return _NAO_ENTENDI_ESCALACAO
+    idx = count % len(_NAO_ENTENDI_VARIACOES)
+    return _NAO_ENTENDI_VARIACOES[idx]
+
+
+def _msg_desistir_comprovante() -> str:
+    import random
+    return random.choice(_DESISTIR_COMPROVANTE_VARIACOES)
 
 
 # ─── Máquina de estados ───────────────────────────────────────────────────────
@@ -351,6 +482,7 @@ def process_academia_message(
     pix_chave: str | None,
     tenant_config: dict[str, Any],
     imagem_recebida: bool = False,
+    learned_patterns: list[dict] | None = None,
 ) -> tuple[str | list[str], dict[str, Any]]:
     """
     Processa uma mensagem do aluno e retorna (resposta, session_atualizada).
@@ -388,67 +520,87 @@ def process_academia_message(
 
     # ── AGUARD_COMPROVANTE ──────────────────────────────────────────────────────
     if state == AcademiaState.AGUARD_COMPROVANTE.value:
-        intent = _detectar_intent(text)
-        if intent == 'menu':
+        intent = _detectar_intent(text, learned_patterns)
+
+        if intent in ('menu', 'matricula', 'cobranca', 'pix'):
             session['state'] = AcademiaState.MENU.value
+            session['confusion_count'] = 0
             return _msg_menu(nome, matricula, cobrancas), session
-        if intent == 'encerrar':
-            session['state'] = AcademiaState.FINALIZADO.value
-            return _msg_encerrar(nome), session
-        # Qualquer outro texto enquanto aguardamos: só reforça o pedido da foto
+
+        if intent in ('encerrar', 'desistir'):
+            session['state'] = AcademiaState.MENU.value
+            session['confusion_count'] = 0
+            return _msg_desistir_comprovante(), session
+
+        # Confirmou que pagou mas sem foto — reforça pedido uma vez
+        if intent == 'paguei':
+            return _msg_lembrar_envio_foto(), session
+
+        # Qualquer texto não reconhecido: reforça pedido da foto (não conta como confusão)
         return _msg_lembrar_envio_foto(), session
 
     # ── MENU ───────────────────────────────────────────────────────────────────
     if state == AcademiaState.MENU.value:
-        intent = _detectar_intent(text)
+        intent = _detectar_intent(text, learned_patterns)
         text_norm = _norm(text)
 
-        # Atalhos numéricos
-        # 3 e 5 são dinâmicos conforme o menu exibido (com/sem cobranças)
-        if text_norm in ('1', '1.'):
-            intent = 'matricula'
-        elif text_norm in ('2', '2.'):
-            intent = 'cobranca'
-        elif text_norm in ('3', '3.'):
-            intent = 'pix' if cobrancas else 'renovar'
-        elif text_norm in ('4', '4.'):
-            intent = 'paguei'
-        elif text_norm in ('5', '5.'):
-            intent = 'renovar'
+        # Atalhos numéricos — aceita "1", "1.", "1)", "01", "opcao 1", "opção 1"
+        _num_match = re.match(r'^(?:op[çc][aã]o\s*)?0?([1-5])[.):]?\s*$', text_norm)
+        if _num_match:
+            num = int(_num_match.group(1))
+            if num == 1:
+                intent = 'matricula'
+            elif num == 2:
+                intent = 'cobranca'
+            elif num == 3:
+                intent = 'pix' if cobrancas else 'renovar'
+            elif num == 4:
+                intent = 'paguei' if cobrancas else 'renovar'
+            elif num == 5:
+                intent = 'renovar'
 
         session['state'] = AcademiaState.MENU.value  # permanece no menu por padrão
 
         if intent == 'matricula':
+            session['confusion_count'] = 0
             return _msg_matricula(matricula), session
 
         if intent == 'cobranca':
+            session['confusion_count'] = 0
             return _msg_cobrancas(cobrancas, pix_chave), session
 
         if intent == 'pix':
+            session['confusion_count'] = 0
             if pix_chave and cobrancas:
                 session['state'] = AcademiaState.AGUARD_COMPROVANTE.value
             return _msg_pix(pix_chave, cobrancas), session
 
         if intent == 'paguei':
+            session['confusion_count'] = 0
             if not cobrancas:
                 return _msg_pedir_comprovante([]), session
             session['state'] = AcademiaState.AGUARD_COMPROVANTE.value
             return _msg_pedir_comprovante(cobrancas), session
 
         if intent == 'renovar':
+            session['confusion_count'] = 0
             if cobrancas and pix_chave:
                 session['state'] = AcademiaState.AGUARD_COMPROVANTE.value
             return _msg_renovar(matricula, cobrancas, pix_chave), session
 
         if intent == 'encerrar':
+            session['confusion_count'] = 0
             session['state'] = AcademiaState.FINALIZADO.value
             return _msg_encerrar(nome), session
 
-        if intent == 'menu':
+        if intent in ('menu', 'sim'):
+            session['confusion_count'] = 0
             return _msg_menu(nome, matricula, cobrancas), session
 
-        # Não entendeu
-        return _msg_nao_entendi(), session
+        # Não entendeu — incrementa contador e varia resposta por nível de frustração
+        count = session.get('confusion_count', 0) + 1
+        session['confusion_count'] = count
+        return _msg_nao_entendi(count - 1), session
 
     # ── FINALIZADO ─────────────────────────────────────────────────────────────
     if state == AcademiaState.FINALIZADO.value:

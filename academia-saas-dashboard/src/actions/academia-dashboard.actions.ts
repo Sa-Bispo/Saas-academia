@@ -34,6 +34,7 @@ export type AcademiaDashboardData = {
   renovacoesProximas: number;
   renovacoesValorCents: number;
   cobrancasPendentes: { count: number; totalCents: number };
+  aguardandoValidacao: number;
   taxaChurnPct: number;
   ltvMedioCents: number;
   frequenciaMediaSemanal: number;
@@ -61,7 +62,7 @@ export type AcademiaDashboardData = {
 
 const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const DIAS_PT  = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const PLANO_CORES = ["#1D9E75", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"];
+const PLANO_CORES = ["#818CF8", "#34d399", "#f59e0b", "#f87171", "#60a5fa"];
 
 function createLocalAcademiaDashboardData(): AcademiaDashboardData {
   return {
@@ -74,6 +75,7 @@ function createLocalAcademiaDashboardData(): AcademiaDashboardData {
     renovacoesProximas: 0,
     renovacoesValorCents: 0,
     cobrancasPendentes: { count: 0, totalCents: 0 },
+    aguardandoValidacao: 0,
     taxaChurnPct: 0,
     ltvMedioCents: 0,
     frequenciaMediaSemanal: 0,
@@ -116,6 +118,7 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
     renovacoesMats,
     totalGeral,
     novosEsseMes,
+    aguardandoValidacao,
   ] = await Promise.all([
     prisma.aluno.count({ where: { tenantId, status: "ATIVO" } }),
     prisma.aluno.count({ where: { tenantId, status: "INADIMPLENTE" } }),
@@ -138,6 +141,7 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
     }),
     prisma.aluno.count({ where: { tenantId } }),
     prisma.aluno.count({ where: { tenantId, status: "ATIVO", createdAt: { gte: inicioMes } } }),
+    prisma.cobrancaAluno.count({ where: { tenantId, status: "AGUARDANDO_VALIDACAO" } }),
   ]);
 
   // ── Queries com raw SQL ──────────────────────────────────────────────────────
@@ -426,6 +430,7 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
       count: cobrancasPendentesAgg._count.id ?? 0,
       totalCents: cobrancasPendentesAgg._sum.valorCents ?? 0,
     },
+    aguardandoValidacao,
     taxaChurnPct,
     ltvMedioCents,
     frequenciaMediaSemanal,

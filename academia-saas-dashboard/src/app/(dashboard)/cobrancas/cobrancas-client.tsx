@@ -15,6 +15,7 @@ import {
   Zap,
   ImageIcon,
   Bell,
+  Maximize2,
 } from "lucide-react";
 
 import {
@@ -119,11 +120,17 @@ function ModalConfirmarPagamento({
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
 
   function handleConfirmar() {
+    setErro(null);
     startTransition(async () => {
-      await confirmarPagamento(cobranca.id);
-      onClose();
+      try {
+        await confirmarPagamento(cobranca.id);
+        onClose();
+      } catch (err) {
+        setErro(err instanceof Error ? err.message : "Erro ao confirmar pagamento.");
+      }
     });
   }
 
@@ -152,11 +159,13 @@ function ModalConfirmarPagamento({
             <p className="text-xs text-muted">Ref: {cobranca.descricao}</p>
           )}
 
-          <div className="rounded-xl border border-line/50 bg-emerald-500/5 px-4 py-3 text-xs text-muted">
+          <div className="rounded-xl border border-line/50 bg-white/[0.02] px-4 py-3 text-xs text-muted">
             Ao confirmar, o status do aluno será atualizado para <strong className="text-white">Ativo</strong>{" "}
             e a matrícula será renovada automaticamente.
           </div>
         </div>
+
+        {erro && <p className="px-5 pb-2 text-xs text-red-400">{erro}</p>}
 
         <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
           <button
@@ -170,7 +179,7 @@ function ModalConfirmarPagamento({
             type="button"
             disabled={pending}
             onClick={handleConfirmar}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-strong disabled:opacity-50"
           >
             <Check size={14} />
             {pending ? "Confirmando..." : "Confirmar pagamento"}
@@ -192,6 +201,7 @@ function ModalComprovante({
 }) {
   const [pending, startTransition] = useTransition();
   const [acao, setAcao] = useState<"confirmar" | "rejeitar" | null>(null);
+  const [lightbox, setLightbox] = useState(false);
 
   function handleConfirmar() {
     setAcao("confirmar");
@@ -211,70 +221,109 @@ function ModalComprovante({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-surface shadow-2xl">
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">Validar comprovante</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-muted hover:text-foreground"
-          >
-            <X size={16} />
-          </button>
-        </div>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="w-full max-w-md rounded-2xl border border-line bg-surface shadow-2xl">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <h2 className="text-sm font-semibold text-white">Validar comprovante</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1 text-muted hover:text-foreground"
+            >
+              <X size={16} />
+            </button>
+          </div>
 
-        <div className="p-5 space-y-3">
-          <p className="text-sm text-muted">
-            <span className="font-semibold text-white">{cobranca.aluno.nome}</span> enviou um comprovante de{" "}
-            <span className="font-semibold text-white">{formatCents(cobranca.valorCents)}</span>
-            {cobranca.comprovanteEnviadoEm && (
-              <> em {new Date(cobranca.comprovanteEnviadoEm).toLocaleString("pt-BR")}</>
+          <div className="p-5 space-y-3">
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-white">{cobranca.aluno.nome}</span> enviou um comprovante de{" "}
+              <span className="font-semibold text-white">{formatCents(cobranca.valorCents)}</span>
+              {cobranca.comprovanteEnviadoEm && (
+                <> em {new Date(cobranca.comprovanteEnviadoEm).toLocaleString("pt-BR")}</>
+              )}
+              .
+            </p>
+
+            {cobranca.comprovanteUrl ? (
+              <div className="relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={cobranca.comprovanteUrl}
+                  alt="Comprovante de pagamento"
+                  onClick={() => setLightbox(true)}
+                  className="max-h-80 w-full cursor-zoom-in rounded-xl border border-line object-contain bg-black/20 transition hover:brightness-110"
+                />
+                <button
+                  type="button"
+                  onClick={() => setLightbox(true)}
+                  className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[11px] text-white opacity-0 group-hover:opacity-100 transition"
+                >
+                  <Maximize2 size={10} />
+                  Ampliar
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-line/50 bg-white/[0.02] px-4 py-6 text-center text-xs text-muted">
+                Comprovante sem imagem disponível.
+              </div>
             )}
-            .
-          </p>
 
-          {cobranca.comprovanteUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={cobranca.comprovanteUrl}
-              alt="Comprovante de pagamento"
-              className="max-h-80 w-full rounded-xl border border-line object-contain bg-black/20"
-            />
-          ) : (
-            <div className="rounded-xl border border-line/50 bg-white/[0.02] px-4 py-6 text-center text-xs text-muted">
-              Comprovante sem imagem disponível.
+            <div className="rounded-xl border border-line/50 bg-sky-500/5 px-4 py-3 text-xs text-muted">
+              Confirme apenas após checar o recebimento na conta. Ao confirmar, o aluno é marcado como{" "}
+              <strong className="text-white">Ativo</strong> e a matrícula é renovada.
             </div>
-          )}
+          </div>
 
-          <div className="rounded-xl border border-line/50 bg-sky-500/5 px-4 py-3 text-xs text-muted">
-            Confirme apenas após checar o recebimento na conta. Ao confirmar, o aluno é marcado como{" "}
-            <strong className="text-white">Ativo</strong> e a matrícula é renovada.
+          <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={handleRejeitar}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              <X size={14} />
+              {pending && acao === "rejeitar" ? "Rejeitando..." : "Rejeitar"}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={handleConfirmar}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-strong disabled:opacity-50"
+            >
+              <Check size={14} />
+              {pending && acao === "confirmar" ? "Confirmando..." : "Confirmar pagamento"}
+            </button>
           </div>
         </div>
-
-        <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={handleRejeitar}
-            className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-          >
-            <X size={14} />
-            {pending && acao === "rejeitar" ? "Rejeitando..." : "Rejeitar"}
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={handleConfirmar}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            <Check size={14} />
-            {pending && acao === "confirmar" ? "Confirmando..." : "Confirmar pagamento"}
-          </button>
-        </div>
       </div>
-    </div>
+
+      {/* Lightbox */}
+      {lightbox && cobranca.comprovanteUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+          onClick={() => setLightbox(false)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={cobranca.comprovanteUrl}
+            alt="Comprovante ampliado"
+            className="max-h-[90vh] max-w-full rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setLightbox(false)}
+            className="absolute right-5 top-5 rounded-full bg-white/10 p-2.5 text-white transition hover:bg-white/20"
+          >
+            <X size={20} />
+          </button>
+          <p className="absolute bottom-5 left-1/2 -translate-x-1/2 text-xs text-white/50">
+            Clique fora para fechar
+          </p>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -295,6 +344,8 @@ export function CobrancasPageClient({
 
   const comprovantesPendentes = cobrancas.filter((c) => c.status === "AGUARDANDO_VALIDACAO");
 
+  const BOT_URL = process.env.NEXT_PUBLIC_BOT_URL ?? "http://localhost:8000";
+
   // ── Disparo em lote ──────────────────────────────────────────────────────
   type Progresso = {
     total: number; sent: number; failed: number;
@@ -312,7 +363,7 @@ export function CobrancasPageClient({
 
   async function buscarProgresso(tenantId: string) {
     try {
-      const r = await fetch(`http://localhost:8000/api/cobrancas/progresso/${tenantId}`);
+      const r = await fetch(`${BOT_URL}/api/cobrancas/progresso/${tenantId}`);
       if (!r.ok) return;
       const d: Progresso = await r.json();
       setProgresso(d);
@@ -334,7 +385,7 @@ export function CobrancasPageClient({
     if (!confirm(`Disparar ${pendentesNaoEnviadas.length} cobranças via WhatsApp em lote?\n\nAs mensagens serão enviadas com intervalo de 45–90s entre cada uma para proteger o número.`)) return;
 
     try {
-      const r = await fetch("http://localhost:8000/api/cobrancas/enqueue", {
+      const r = await fetch(`${BOT_URL}/api/cobrancas/enqueue`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenant_id: tenantId, cobranca_ids: pendentesNaoEnviadas.map((c) => c.id) }),
@@ -360,20 +411,32 @@ export function CobrancasPageClient({
 
   function handleGerarCobrancas() {
     startTransition(async () => {
-      const result = await gerarCobrancasVencimento(diasAntecedencia);
-      alert(`${result.geradas} cobrança(s) gerada(s) automaticamente.`);
+      try {
+        const result = await gerarCobrancasVencimento(diasAntecedencia);
+        alert(`${result.geradas} cobrança(s) gerada(s) automaticamente.`);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erro ao gerar cobranças.");
+      }
     });
   }
 
   function handleCancelar(id: string) {
     startTransition(async () => {
-      await cancelarCobranca(id);
+      try {
+        await cancelarCobranca(id);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erro ao cancelar cobrança.");
+      }
     });
   }
 
   function handleMarcarVencida(id: string) {
     startTransition(async () => {
-      await marcarCobrancaVencida(id);
+      try {
+        await marcarCobrancaVencida(id);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erro ao marcar cobrança como vencida.");
+      }
     });
   }
 
@@ -412,7 +475,7 @@ export function CobrancasPageClient({
             type="button"
             onClick={handleDispararLote}
             disabled={loteAtivo}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:opacity-60"
           >
             <Zap size={14} className={loteAtivo ? "animate-pulse" : ""} />
             {loteAtivo ? "Disparando..." : "Disparar lote"}
@@ -450,7 +513,7 @@ export function CobrancasPageClient({
         <div className="rounded-2xl border border-line bg-surface/60 p-4 space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-white flex items-center gap-1.5">
-              <Zap size={12} className="text-emerald-400" />
+              <Zap size={12} className="text-brand" />
               Disparo em lote
             </span>
             <span className={`font-medium ${
@@ -465,7 +528,7 @@ export function CobrancasPageClient({
           {/* Barra */}
           <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+              className="h-full rounded-full bg-brand transition-all duration-700"
               style={{ width: progresso.total > 0 ? `${Math.round((progresso.sent / progresso.total) * 100)}%` : "0%" }}
             />
           </div>
@@ -510,7 +573,7 @@ export function CobrancasPageClient({
           label="Receita do mês"
           valor={receitaMesCents}
           count={getResumoByStatus("PAGO")._count}
-          color="text-emerald-400"
+          color="text-brand"
           icon={CheckCircle}
         />
         <ResumoCard
@@ -609,7 +672,17 @@ export function CobrancasPageClient({
                     </span>
 
                     {aguardandoValidacao && (
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2">
+                        {c.comprovanteUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={c.comprovanteUrl}
+                            alt="Comprovante"
+                            title="Clique para validar"
+                            onClick={() => setCobrancaValidando(c)}
+                            className="h-10 w-14 shrink-0 cursor-pointer rounded-lg border border-sky-500/30 object-cover transition hover:border-sky-400/60 hover:brightness-110"
+                          />
+                        )}
                         <button
                           type="button"
                           title="Ver comprovante e validar"
@@ -617,7 +690,7 @@ export function CobrancasPageClient({
                           className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600/20 px-3 py-1.5 text-xs font-medium text-sky-400 transition hover:bg-sky-600/30"
                         >
                           <ImageIcon size={12} />
-                          Ver comprovante
+                          Validar
                         </button>
                       </div>
                     )}
@@ -628,7 +701,7 @@ export function CobrancasPageClient({
                           type="button"
                           title="Confirmar pagamento Pix"
                           onClick={() => setCobrancaConfirmando(c)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-600/30"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-brand/10 px-3 py-1.5 text-xs font-medium text-brand transition hover:bg-brand/20"
                         >
                           <Check size={12} />
                           Pix recebido
@@ -641,7 +714,7 @@ export function CobrancasPageClient({
                           onClick={() => handleEnviarWhatsapp(c.id)}
                           className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
                             c.enviadaWhatsapp
-                              ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400"
+                              ? "border-brand/20 bg-brand/5 text-brand"
                               : "border-line text-muted hover:border-brand/30 hover:text-brand"
                           }`}
                         >
@@ -649,7 +722,7 @@ export function CobrancasPageClient({
                           {enviandoId === c.id && pending
                             ? "Enviando..."
                             : c.enviadaWhatsapp
-                            ? "Reenviado"
+                            ? "Reenviar"
                             : "Enviar"}
                         </button>
 

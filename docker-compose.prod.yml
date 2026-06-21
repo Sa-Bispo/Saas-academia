@@ -1,0 +1,143 @@
+# docker-compose.prod.yml — Stack completa para produção (VPS)
+#
+# Uso:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Variáveis necessárias no arquivo .env (na mesma pasta):
+#   POSTGRES_PASSWORD, EVOLUTION_API_KEY, GEMINI_API_KEY,
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+#   SUPABASE_SERVICE_ROLE_KEY, NEXTAUTH_SECRET
+
+services:
+
+  # ─── Infraestrutura ──────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    command: ["postgres", "-c", "max_connections=1000"]
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - saas_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --appendonly yes
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - saas_net
+
+  # ─── Evolution API (WhatsApp) ─────────────────────────────────────────────────
+
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api
+    restart: always
+    ports:
+      - "127.0.0.1:8080:8080"   # acessível só localmente; Nginx faz proxy se necessário
+    environment:
+      SERVER_URL: https://api.pyralabs.com.br/evolution
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      DATABASE_SAVE_DATA_HISTORIC: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/1
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - saas_net
+
+  # ─── Bot (FastAPI) ────────────────────────────────────────────────────────────
+
+  bot:
+    build:
+      context: ./academia-saas-bot
+    container_name: bot
+    restart: always
+    ports:
+      - "127.0.0.1:8000:8000"   # acessível só localmente; Nginx faz proxy
+    env_file:
+      - ./academia-saas-bot/.env
+    environment:
+      EVOLUTION_API_URL: http://evolution_api:8080
+    depends_on:
+      - evolution_api
+      - redis
+      - postgres
+    networks:
+      - saas_net
+
+  # ─── Migrator (roda uma vez e encerra) ────────────────────────────────────────
+
+  migrator:
+    build:
+      context: ./academia-saas-dashboard
+      dockerfile: Dockerfile.migrator
+    container_name: db_migrator
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
+      DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
+    restart: "no"
+    depends_on:
+      - postgres
+    networks:
+      - saas_net
+
+  # ─── Dashboard (Next.js) ──────────────────────────────────────────────────────
+
+  web:
+    build:
+      context: ./academia-saas-dashboard
+      dockerfile: Dockerfile.fast
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_BOT_URL: https://api.pyralabs.com.br
+    container_name: academia_web
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"   # acessível só localmente; Nginx faz proxy
+    env_file:
+      - ./academia-saas-dashboard/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
+      DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
+      EVOLUTION_API_URL: http://evolution_api:8080
+      BOT_WEBHOOK_URL: http://bot:8000/webhook/evolution
+    depends_on:
+      bot:
+        condition: service_started
+      migrator:
+        condition: service_completed_successfully
+    networks:
+      - saas_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_instances:
+
+networks:
+  saas_net:
+    name: saas_net

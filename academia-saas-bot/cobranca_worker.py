@@ -19,10 +19,13 @@ import asyncio
 import json
 import logging
 import random
+import re
 from datetime import date, datetime
 from typing import Any
 
 import asyncpg
+
+import os
 
 from config import BOT_DATABASE_CONNECTION_URI, EVOLUTION_API_URL, EVOLUTION_AUTHENTICATION_API_KEY
 
@@ -30,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 # ─── Configuração ─────────────────────────────────────────────────────────────
 
-DELAY_MIN = 45       # segundos mínimos entre mensagens
-DELAY_MAX = 90       # segundos máximos entre mensagens
+DELAY_MIN = int(os.getenv('COBRANCA_DELAY_MIN', '45'))
+DELAY_MAX = int(os.getenv('COBRANCA_DELAY_MAX', '90'))
 DAILY_LIMIT_DEFAULT = 50   # máximo de mensagens por dia por tenant
 QUEUE_POLL_INTERVAL = 5    # segundos entre polls quando fila está vazia
 
@@ -131,24 +134,206 @@ async def _marcar_enviada(tenant_id: str, cobranca_id: str) -> None:
 
 # ─── Montagem da mensagem ─────────────────────────────────────────────────────
 
-_SAUDACOES = ['Olá', 'Oi', 'Olá']
-_FECHAMENTOS = [
-    'Qualquer dúvida, é só chamar! 😊',
-    'Estamos à disposição! 💪',
-    'Fique à vontade para entrar em contato. 😊',
+_TEMPLATE_KEY_PREFIX = 'cobranca_last_tpl'
+
+
+def _fmt_valor(cents: int) -> str:
+    valor = cents / 100
+    return f'R$ {valor:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def _fmt_data(d) -> str:
+    if hasattr(d, 'strftime'):
+        return d.strftime('%d/%m/%Y')
+    return str(d)[:10]
+
+
+def _contexto_vencimento(data_vencimento) -> tuple[str, str]:
+    """Retorna (status, descricao_humana) baseado em quantos dias faltam/passaram."""
+    try:
+        if hasattr(data_vencimento, 'date'):
+            dv = data_vencimento.date()
+        elif hasattr(data_vencimento, 'year'):
+            dv = data_vencimento
+        else:
+            from datetime import date as _date
+            dv = _date.fromisoformat(str(data_vencimento)[:10])
+        delta = (dv - date.today()).days
+    except Exception:
+        return 'pendente', 'em aberto'
+
+    if delta > 1:
+        return 'futuro', f'vence em {delta} dias ({_fmt_data(data_vencimento)})'
+    if delta == 1:
+        return 'amanha', f'vence amanhã, dia {_fmt_data(data_vencimento)}'
+    if delta == 0:
+        return 'hoje', f'vence *hoje*, {_fmt_data(data_vencimento)}'
+    if delta == -1:
+        return 'vencido', f'venceu *ontem*, {_fmt_data(data_vencimento)}'
+    return 'vencido', f'venceu há {abs(delta)} dias ({_fmt_data(data_vencimento)})'
+
+
+# Cada template é uma função que recebe os dados já resolvidos e retorna a string final.
+# Estruturas, tons e ordens de informação completamente diferentes entre si.
+
+def _tpl_direto(nome, negocio, valor, venc_ctx, venc_data, descricao, pix_chave):
+    linhas = [
+        f'Oi, *{nome}*! Tudo bem?',
+        '',
+        f'Passando rapidinho aqui da *{negocio}* para avisar que identificamos uma mensalidade pendente no seu cadastro.',
+        '',
+        f'• Valor: *{valor}*',
+        f'• Vencimento: *{venc_data}*',
+    ]
+    if descricao:
+        linhas.append(f'• Referência: {descricao}')
+    if pix_chave:
+        linhas += ['', f'Para facilitar, nossa chave Pix é:', f'`{pix_chave}`']
+    linhas += ['', 'Qualquer dúvida é só falar aqui! 😊']
+    return '\n'.join(linhas)
+
+
+def _tpl_amigavel(nome, negocio, valor, venc_ctx, venc_data, descricao, pix_chave):
+    abertura = {
+        'hoje': f'⚠️ *{nome}*, sua mensalidade vence *hoje*!',
+        'amanha': f'👋 *{nome}*, sua mensalidade vence amanhã!',
+        'vencido': f'👋 Olá, *{nome}*! Sua mensalidade está em atraso.',
+        'futuro': f'👋 Olá, *{nome}*! Tudo bem?',
+    }.get(venc_ctx, f'👋 Olá, *{nome}*!')
+
+    linhas = [abertura, '', f'🏋️ *{negocio}*', '']
+
+    if venc_ctx == 'vencido':
+        linhas.append(f'Identificamos que sua mensalidade de *{valor}* ainda está em aberto.')
+        linhas.append(f'Data de vencimento: {venc_data}')
+    elif venc_ctx in ('hoje', 'amanha'):
+        linhas.append(f'Valor: *{valor}*')
+        linhas.append(f'Vencimento: {venc_data}')
+    else:
+        linhas.append(f'Sua próxima mensalidade no valor de *{valor}* {venc_ctx}.')
+
+    if descricao:
+        linhas += ['', f'📋 {descricao}']
+    if pix_chave:
+        linhas += ['', f'🔑 Chave Pix: `{pix_chave}`']
+    linhas += ['', 'Estamos à disposição! 💪']
+    return '\n'.join(linhas)
+
+
+def _tpl_conciso(nome, negocio, valor, venc_ctx, venc_data, descricao, pix_chave):
+    linha_status = {
+        'hoje': 'vence hoje',
+        'amanha': 'vence amanhã',
+        'vencido': 'em atraso',
+        'futuro': f'vence em {venc_data}',
+    }.get(venc_ctx, f'vence em {venc_data}')
+
+    linhas = [
+        f'*{negocio}* — aviso de mensalidade',
+        '',
+        f'Olá, {nome}!',
+        f'Mensalidade de *{valor}* — {linha_status}.',
+    ]
+    if pix_chave:
+        linhas += ['', f'Pix: `{pix_chave}`']
+    if descricao:
+        linhas.append(f'Ref: {descricao}')
+    linhas += ['', 'Dúvidas? Responda aqui. 😊']
+    return '\n'.join(linhas)
+
+
+def _tpl_pix_destaque(nome, negocio, valor, venc_ctx, venc_data, descricao, pix_chave):
+    linhas = [f'Olá, {nome}! 👋', '', f'A *{negocio}* informa:']
+
+    if venc_ctx == 'vencido':
+        linhas.append(f'Sua mensalidade de *{valor}* está pendente desde {venc_data}.')
+    else:
+        linhas.append(f'Sua mensalidade de *{valor}* {venc_ctx}.')
+
+    if descricao:
+        linhas.append(f'({descricao})')
+
+    if pix_chave:
+        linhas += [
+            '',
+            '💳 *Pagamento via Pix:*',
+            f'Chave: `{pix_chave}`',
+            '',
+            'É só copiar a chave e fazer a transferência no seu banco. ✅',
+        ]
+    else:
+        linhas += ['', 'Entre em contato para mais informações sobre o pagamento.']
+
+    linhas += ['', 'Qualquer dúvida, estamos aqui! 🏋️']
+    return '\n'.join(linhas)
+
+
+def _tpl_formal(nome, negocio, valor, venc_ctx, venc_data, descricao, pix_chave):
+    linhas = [
+        f'Prezado(a) *{nome}*,',
+        '',
+        f'Entramos em contato em nome da *{negocio}* para informar sobre uma pendência financeira em seu cadastro.',
+        '',
+        f'*Valor em aberto:* {valor}',
+        f'*Vencimento:* {venc_data}',
+    ]
+    if descricao:
+        linhas.append(f'*Descrição:* {descricao}')
+    if pix_chave:
+        linhas += ['', f'Para regularização, utilize nossa chave Pix: `{pix_chave}`']
+    linhas += [
+        '',
+        'Caso o pagamento já tenha sido efetuado, desconsidere esta mensagem.',
+        '',
+        'Agradecemos a atenção. 🙏',
+    ]
+    return '\n'.join(linhas)
+
+
+def _tpl_motivacional(nome, negocio, valor, venc_ctx, venc_data, descricao, pix_chave):
+    linhas = [
+        f'💪 Oi, *{nome}*!',
+        '',
+        f'Aqui é a equipe da *{negocio}*.',
+        'Você é parte importante da nossa família e queremos continuar te apoiando nos seus treinos!',
+        '',
+        f'Sua mensalidade de *{valor}* está pendente.',
+    ]
+    if venc_ctx != 'futuro':
+        linhas.append(f'Data: {venc_data}')
+    if pix_chave:
+        linhas += ['', f'🔑 Nossa chave Pix: `{pix_chave}`']
+    if descricao:
+        linhas.append(f'Ref: {descricao}')
+    linhas += ['', 'Regularize e continue treinando! 🏃‍♂️', 'Qualquer dúvida, é só chamar.']
+    return '\n'.join(linhas)
+
+
+_TEMPLATES = [
+    _tpl_direto,
+    _tpl_amigavel,
+    _tpl_conciso,
+    _tpl_pix_destaque,
+    _tpl_formal,
+    _tpl_motivacional,
 ]
 
+_N_TEMPLATES = len(_TEMPLATES)
 
-def _montar_mensagem(c: dict) -> str:
-    saudacao = random.choice(_SAUDACOES)
-    fechamento = random.choice(_FECHAMENTOS)
 
-    valor = (c['valorCents'] / 100)
-    valor_fmt = f'R$ {valor:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-    venc_fmt = c['dataVencimento'].strftime('%d/%m/%Y') if hasattr(c['dataVencimento'], 'strftime') else str(c['dataVencimento'])[:10]
+def _montar_mensagem(c: dict, ultimo_template: int | None = None) -> tuple[str, int]:
+    """
+    Monta a mensagem de cobrança com variação estrutural real.
+    Retorna (texto, indice_template_usado) para persistência.
+    Garante que o template escolhido seja diferente do último enviado ao mesmo aluno.
+    """
+    valor = _fmt_valor(c['valorCents'])
+    venc_ctx, venc_human = _contexto_vencimento(c['dataVencimento'])
+    venc_data = _fmt_data(c['dataVencimento'])
     negocio = c.get('negocio_nome') or 'Academia'
+    nome = c.get('aluno_nome') or 'aluno(a)'
 
-    config_nicho = c.get('config_nicho') or {}
+    config_nicho = c.get('_config_nicho_parsed') or c.get('config_nicho') or {}
     if isinstance(config_nicho, str):
         try:
             config_nicho = json.loads(config_nicho)
@@ -156,25 +341,16 @@ def _montar_mensagem(c: dict) -> str:
             config_nicho = {}
 
     pix_chave = c.get('pixChave') or config_nicho.get('pixChave') or config_nicho.get('pix_chave')
+    descricao = c.get('descricao') or ''
 
-    linhas = [
-        f'{saudacao}, {c["aluno_nome"]}! 👋',
-        '',
-        f'🏋️ *{negocio}*',
-        '',
-        'Identificamos uma mensalidade em aberto:',
-        f'💰 *Valor:* {valor_fmt}',
-        f'📅 *Vencimento:* {venc_fmt}',
-    ]
+    # Escolhe template diferente do último (garante variação entre disparos)
+    candidatos = list(range(_N_TEMPLATES))
+    if ultimo_template is not None and _N_TEMPLATES > 1:
+        candidatos = [i for i in candidatos if i != ultimo_template]
+    idx = random.choice(candidatos)
 
-    if c.get('descricao'):
-        linhas.append(f'📋 *Ref:* {c["descricao"]}')
-
-    if pix_chave:
-        linhas += ['', f'🔑 *Chave Pix:* `{pix_chave}`']
-
-    linhas += ['', fechamento]
-    return '\n'.join(linhas)
+    texto = _TEMPLATES[idx](nome, negocio, valor, venc_ctx, venc_data, descricao, pix_chave)
+    return texto, idx
 
 
 # ─── Envio via Evolution API ──────────────────────────────────────────────────
@@ -196,15 +372,26 @@ async def _enviar_whatsapp(instance: str, api_key: str | None, telefone: str, te
 
 async def _processar_uma(redis, tenant_id: str, cobranca_id: str, daily_limit: int) -> bool:
     """Processa uma cobrança. Retorna True se enviou, False se pulou/falhou."""
-    daily = await _get_daily_count(redis, tenant_id)
-    if daily >= daily_limit:
-        logger.warning('[WORKER] limite diário atingido para tenant=%s (%d/%d)', tenant_id, daily, daily_limit)
-        return False
-
     cobranca = await _get_cobranca(tenant_id, cobranca_id)
     if not cobranca:
         logger.warning('[WORKER] cobrança não encontrada: %s', cobranca_id)
         return False
+
+    # Limite diário: usa o do config_nicho do tenant se disponível
+    config_nicho = cobranca.get('config_nicho') or {}
+    if isinstance(config_nicho, str):
+        try:
+            config_nicho = json.loads(config_nicho)
+        except Exception:
+            config_nicho = {}
+    tenant_limit = int(config_nicho.get('limite_diario_cobrancas', daily_limit))
+
+    daily = await _get_daily_count(redis, tenant_id)
+    if daily >= tenant_limit:
+        logger.warning('[WORKER] limite diário atingido para tenant=%s (%d/%d)', tenant_id, daily, tenant_limit)
+        return False
+
+    cobranca['_config_nicho_parsed'] = config_nicho
 
     if cobranca.get('enviadaWhatsapp') or cobranca.get('status') in (
         'PAGO', 'CANCELADA', 'AGUARDANDO_VALIDACAO',
@@ -217,14 +404,33 @@ async def _processar_uma(redis, tenant_id: str, cobranca_id: str, daily_limit: i
         logger.warning('[WORKER] tenant sem Evolution configurado: %s', tenant_id)
         return False
 
-    mensagem = _montar_mensagem(cobranca)
-    telefone = cobranca['aluno_telefone']
+    aluno_id = str(cobranca.get('alunoId') or '')
+    tpl_redis_key = f'{_TEMPLATE_KEY_PREFIX}:{tenant_id}:{aluno_id}'
+    ultimo_template: int | None = None
+    try:
+        val = await redis.get(tpl_redis_key)
+        if val is not None:
+            ultimo_template = int(val)
+    except Exception:
+        pass
+
+    mensagem, tpl_idx = _montar_mensagem(cobranca, ultimo_template)
+
+    telefone_raw = re.sub(r'\D', '', cobranca['aluno_telefone'] or '')
+    if telefone_raw and not telefone_raw.startswith('55'):
+        telefone_raw = '55' + telefone_raw
+    telefone = telefone_raw
 
     try:
         await _enviar_whatsapp(instance, cobranca.get('api_key'), telefone, mensagem)
         await _marcar_enviada(tenant_id, cobranca_id)
         await _increment_daily(redis, tenant_id)
-        logger.info('[WORKER] enviada cobrança=%s para %s', cobranca_id, telefone)
+        # Persiste qual template foi usado para este aluno (TTL 60 dias)
+        try:
+            await redis.set(tpl_redis_key, str(tpl_idx), ex=60 * 86400)
+        except Exception:
+            pass
+        logger.info('[WORKER] enviada cobrança=%s para %s (template=%d)', cobranca_id, telefone, tpl_idx)
         return True
     except Exception as exc:
         logger.error('[WORKER] erro ao enviar cobrança=%s: %s', cobranca_id, exc)

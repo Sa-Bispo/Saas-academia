@@ -219,6 +219,11 @@ export class EvolutionService {
   /**
    * Envia uma mensagem de texto para um número via instância da Evolution.
    */
+  private _normalizePhone(phone: string): string {
+    const digits = (phone || "").replace(/\D/g, "");
+    return digits.startsWith("55") ? digits : "55" + digits;
+  }
+
   async sendTextMessage(
     instanceName: string,
     number: string,
@@ -226,7 +231,7 @@ export class EvolutionService {
     apiKeyOverride?: string | null,
   ): Promise<void> {
     const normalizedInstance = (instanceName || "").trim();
-    const normalizedNumber = (number || "").trim();
+    const normalizedNumber = this._normalizePhone(number);
     const normalizedText = (text || "").trim();
 
     if (!normalizedInstance || !normalizedNumber || !normalizedText) {

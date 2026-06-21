@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  Check,
   Phone,
   Mail,
   Calendar,
@@ -26,11 +27,13 @@ import {
   MessageCircle,
   UserPlus,
   Clock,
+  ImageIcon,
 } from "lucide-react";
 import FloatingActionMenu from "@/components/ui/floating-action-menu";
 
 import { criarAluno, atualizarAluno, excluirAluno, buscarAluno } from "@/actions/alunos.actions";
-import { matricularAluno, criarPlanoAcademia } from "@/actions/planos-academia.actions";
+import { matricularAluno, criarPlanoAcademia, listarPlanosAcademia } from "@/actions/planos-academia.actions";
+import { validarComprovante, rejeitarComprovante } from "@/actions/cobrancas.actions";
 
 type Plano = {
   id: string;
@@ -93,7 +96,7 @@ const COBRANCA_STATUS_LABEL: Record<string, string> = {
 
 const COBRANCA_STATUS_COLOR: Record<string, string> = {
   PENDENTE: "bg-amber-500/15 text-amber-400",
-  AGUARDANDO_VALIDACAO: "bg-amber-500/15 text-amber-400",
+  AGUARDANDO_VALIDACAO: "bg-sky-500/15 text-sky-400",
   PAGO: "bg-emerald-500/15 text-emerald-400",
   VENCIDO: "bg-red-500/15 text-red-400",
   CANCELADA: "bg-slate-500/15 text-slate-400",
@@ -148,7 +151,7 @@ function calcVencimento(inicio: string, periodicidade: string): string {
 
 function ModalNovoAluno({
   onClose,
-  planos,
+  planos: planosProp,
 }: {
   onClose: () => void;
   planos: Plano[];
@@ -156,6 +159,7 @@ function ModalNovoAluno({
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState<"aluno" | "matricula">("aluno");
   const [alunoId, setAlunoId] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
 
   // Form aluno
   const [nome, setNome] = useState("");
@@ -166,8 +170,11 @@ function ModalNovoAluno({
   const [observacoes, setObservacoes] = useState("");
   const [maisDetalhes, setMaisDetalhes] = useState(false);
 
+  // Lista de planos — começa com a prop do servidor, atualiza quando um novo plano é criado
+  const [planos, setPlanos] = useState<Plano[]>(planosProp);
+
   // Form matrícula
-  const [planoId, setPlanoId] = useState(planos[0]?.id ?? "");
+  const [planoId, setPlanoId] = useState(planosProp[0]?.id ?? "");
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().split("T")[0]);
   const [dataVencimento, setDataVencimento] = useState(() => {
     const d = new Date();
@@ -185,42 +192,68 @@ function ModalNovoAluno({
 
   async function handleSalvarAluno() {
     if (!nome.trim() || !telefone.trim()) return;
+    setErro(null);
     startTransition(async () => {
-      const aluno = await criarAluno({
-        nome,
-        telefone,
-        email: email || undefined,
-        cpf: cpf || undefined,
-        dataNascimento: dataNascimento || undefined,
-        observacoes: observacoes || undefined,
-      });
-      setAlunoId(aluno.id);
-      setStep("matricula");
+      try {
+        const aluno = await criarAluno({
+          nome,
+          telefone,
+          email: email || undefined,
+          cpf: cpf || undefined,
+          dataNascimento: dataNascimento || undefined,
+          observacoes: observacoes || undefined,
+        });
+        setAlunoId(aluno.id);
+        setStep("matricula");
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao cadastrar aluno.");
+      }
     });
   }
 
   async function handleMatricular() {
     if (!alunoId || !planoId) return;
+    setErro(null);
     startTransition(async () => {
-      await matricularAluno({
-        alunoId,
-        planoId,
-        dataInicio,
-        dataVencimento,
-      });
-      onClose();
+      try {
+        await matricularAluno({
+          alunoId,
+          planoId,
+          dataInicio,
+          dataVencimento,
+        });
+        onClose();
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao matricular aluno.");
+      }
     });
   }
 
   async function handleCriarPlano() {
     if (!novoPlanoNome || !novoPlanoValor) return;
+    setErro(null);
     startTransition(async () => {
-      await criarPlanoAcademia({
-        nome: novoPlanoNome,
-        valorCents: Math.round(parseFloat(novoPlanoValor.replace(",", ".")) * 100),
-        periodicidade: novoPlanoPeriodicidade,
-      });
-      setNovoPlanoCriando(false);
+      try {
+        await criarPlanoAcademia({
+          nome: novoPlanoNome,
+          valorCents: Math.round(parseFloat(novoPlanoValor.replace(",", ".")) * 100),
+          periodicidade: novoPlanoPeriodicidade,
+        });
+        const planosAtualizados = await listarPlanosAcademia() as Plano[];
+        setPlanos(planosAtualizados);
+        const novo = planosAtualizados.find((p) => p.nome === novoPlanoNome);
+        if (novo) {
+          setPlanoId(novo.id);
+          setDataVencimento(calcVencimento(dataInicio, novo.periodicidade));
+        } else if (planosAtualizados.length > 0 && !planoId) {
+          setPlanoId(planosAtualizados[0].id);
+        }
+        setNovoPlanoCriando(false);
+        setNovoPlanoNome("");
+        setNovoPlanoValor("");
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : "Erro ao criar plano.");
+      }
     });
   }
 
@@ -419,6 +452,11 @@ function ModalNovoAluno({
           )}
         </div>
 
+        {/* Erro */}
+        {erro && (
+          <p className="px-5 pb-2 text-xs text-red-400">{erro}</p>
+        )}
+
         {/* Footer */}
         <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
           {step === "aluno" && (
@@ -490,6 +528,8 @@ type AlunoDetalhe = {
     valorCents: number;
     dataVencimento: Date | string;
     dataPagamento: Date | string | null;
+    comprovanteUrl: string | null;
+    comprovanteEnviadoEm: Date | string | null;
   }[];
   frequencias: {
     id: string;
@@ -527,6 +567,9 @@ function ModalDetalheAluno({
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [comprovantePending, startComprovanteTransition] = useTransition();
+  const [comprovantePendingId, setComprovantePendingId] = useState<string | null>(null);
+  const [comprovanteAmpliado, setComprovanteAmpliado] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [aluno, setAluno] = useState<AlunoDetalhe | null>(null);
   const [editando, setEditando] = useState(false);
@@ -540,6 +583,27 @@ function ModalDetalheAluno({
   const [dataNascimento, setDataNascimento] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [status, setStatus] = useState<"ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO">("ATIVO");
+
+  function handleValidarComprovante(cobrancaId: string) {
+    setComprovantePendingId(cobrancaId);
+    startComprovanteTransition(async () => {
+      await validarComprovante(cobrancaId);
+      const data = await buscarAluno(alunoId);
+      if (data) setAluno(data as unknown as AlunoDetalhe);
+      setComprovantePendingId(null);
+    });
+  }
+
+  function handleRejeitarComprovante(cobrancaId: string) {
+    if (!confirm("Rejeitar o comprovante? O aluno será avisado pelo WhatsApp para reenviar.")) return;
+    setComprovantePendingId(cobrancaId);
+    startComprovanteTransition(async () => {
+      await rejeitarComprovante(cobrancaId);
+      const data = await buscarAluno(alunoId);
+      if (data) setAluno(data as unknown as AlunoDetalhe);
+      setComprovantePendingId(null);
+    });
+  }
 
   function carregarFormDeAluno(a: AlunoDetalhe) {
     setNome(a.nome);
@@ -774,25 +838,73 @@ function ModalDetalheAluno({
                 {aluno.cobrancas.length === 0 ? (
                   <p className="text-sm text-muted">Nenhuma cobrança registrada.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {aluno.cobrancas.map((c) => (
-                      <div key={c.id} className="flex items-center justify-between text-sm">
-                        <div>
-                          <p className="text-foreground">{formatCents(c.valorCents)}</p>
-                          <p className="text-xs text-muted">
-                            Venc. {formatData(c.dataVencimento)}
-                            {c.dataPagamento && ` · Pago em ${formatData(c.dataPagamento)}`}
-                          </p>
+                  <div className="space-y-3">
+                    {aluno.cobrancas.map((c) => {
+                      const aguardando = c.status === "AGUARDANDO_VALIDACAO";
+                      const isPending = comprovantePendingId === c.id && comprovantePending;
+                      return (
+                        <div key={c.id} className="flex flex-col gap-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-foreground">{formatCents(c.valorCents)}</p>
+                              <p className="text-xs text-muted">
+                                Venc. {formatData(c.dataVencimento)}
+                                {c.dataPagamento && ` · Pago em ${formatData(c.dataPagamento)}`}
+                                {aguardando && c.comprovanteEnviadoEm && (
+                                  <> · Comprovante em {formatData(c.comprovanteEnviadoEm)}</>
+                                )}
+                              </p>
+                            </div>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                COBRANCA_STATUS_COLOR[c.status] ?? "bg-slate-500/15 text-slate-400"
+                              }`}
+                            >
+                              {aguardando && <ImageIcon size={9} className="inline mr-1" />}
+                              {COBRANCA_STATUS_LABEL[c.status] ?? c.status}
+                            </span>
+                          </div>
+
+                          {aguardando && (
+                            <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 space-y-2">
+                              {c.comprovanteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={c.comprovanteUrl}
+                                  alt="Comprovante de pagamento"
+                                  onClick={() => setComprovanteAmpliado(c.comprovanteUrl)}
+                                  className="h-32 w-full rounded-lg border border-line/50 object-contain bg-black/20 cursor-zoom-in"
+                                />
+                              ) : (
+                                <p className="text-xs text-muted text-center py-2">
+                                  Comprovante sem imagem disponível.
+                                </p>
+                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => handleValidarComprovante(c.id)}
+                                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand py-1.5 text-xs font-semibold text-white hover:bg-brand-strong disabled:opacity-50"
+                                >
+                                  <Check size={11} />
+                                  {isPending ? "Confirmando..." : "Confirmar"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => handleRejeitarComprovante(c.id)}
+                                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/30 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                                >
+                                  <X size={11} />
+                                  {isPending ? "Rejeitando..." : "Rejeitar"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                            COBRANCA_STATUS_COLOR[c.status] ?? "bg-slate-500/15 text-slate-400"
-                          }`}
-                        >
-                          {COBRANCA_STATUS_LABEL[c.status] ?? c.status}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </SecaoCard>
@@ -870,6 +982,29 @@ function ModalDetalheAluno({
           </div>
         )}
       </div>
+
+      {/* Lightbox comprovante */}
+      {comprovanteAmpliado && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setComprovanteAmpliado(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={comprovanteAmpliado}
+            alt="Comprovante ampliado"
+            className="max-h-[90vh] max-w-full rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setComprovanteAmpliado(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1081,7 +1216,7 @@ export function AlunosPageClient({ alunos, planos }: Props) {
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       title="Abrir WhatsApp"
-                      className="rounded-lg p-1.5 text-muted/40 transition hover:bg-emerald-500/10 hover:text-emerald-400"
+                      className="rounded-lg p-1.5 text-muted/40 transition hover:bg-brand/10 hover:text-brand"
                     >
                       <MessageCircle size={14} />
                     </a>

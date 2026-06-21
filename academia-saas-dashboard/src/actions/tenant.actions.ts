@@ -417,7 +417,7 @@ export async function signupDirect(
 
     return {
       success: true,
-      redirectTo: `/setup/nicho?niche=${onboardingNiche}`,
+      redirectTo: `/setup`,
     };
   } catch (err) {
     console.error("[signupDirect]", err);

@@ -60,6 +60,7 @@ export default async function DashboardLayout({
       companyName: true,
       whatsappStatus: true,
       plano: true,
+      configNicho: true,
       subscription: {
         select: {
           status: true,
@@ -90,6 +91,7 @@ export default async function DashboardLayout({
           suporteNaoLidas={suporteNaoLidas}
           userEmail={user.email}
           userName={(user.user_metadata?.nome as string | undefined) ?? user.email ?? undefined}
+          subNicho={(tenant.configNicho as Record<string, unknown> | null)?.sub_nicho as string | undefined}
         />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 sm:py-9">{children}</div>

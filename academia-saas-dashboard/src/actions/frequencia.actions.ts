@@ -85,22 +85,10 @@ export async function listarFrequenciaHoje() {
 export async function listarAlunosParaCheckin() {
   const tenantId = await getAuthenticatedTenantId();
 
-  const hoje = new Date();
-  const dataHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-
-  // Busca alunos ativos e já indica quais estão presentes hoje
-  const alunos = await prisma.aluno.findMany({
+  return prisma.aluno.findMany({
     where: { tenantId, status: "ATIVO" },
     orderBy: { nome: "asc" },
-    include: {
-      frequencias: {
-        where: { data: dataHoje },
-        take: 1,
-      },
-    },
   });
-
-  return alunos;
 }
 
 // ─── Histórico de um aluno ────────────────────────────────────────────────────

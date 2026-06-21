@@ -58,11 +58,12 @@ model Tenant {
   subscription    Subscription?
   appointments    Appointment[]
   chamados        Chamado[]
-  alunos           Aluno[]
-  planosAcademia   PlanoAcademia[]
-  matriculasAlunos MatriculaAluno[]
-  cobrancasAlunos  CobrancaAluno[]
-  frequenciasAlunos FrequenciaAluno[]
+  alunos              Aluno[]
+  planosAcademia      PlanoAcademia[]
+  matriculasAlunos    MatriculaAluno[]
+  cobrancasAlunos     CobrancaAluno[]
+  frequenciasAlunos   FrequenciaAluno[]
+  botConfusionEvents  BotConfusionEvent[]
 
   @@index([userId])
   @@map("tenants")
@@ -631,6 +632,44 @@ model CobrancaAluno {
   @@index([tenantId, status])
   @@index([tenantId, dataVencimento])
   @@map("cobrancas_alunos")
+}
+
+// ─── Bot Feedback System ──────────────────────────────────────────────────────
+
+model BotConfusionEvent {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String?   @map("tenant_id") @db.Uuid
+  nicho          String    @db.VarChar(50)
+  phone          String?   @db.VarChar(50)
+  messagesJson   Json      @map("messages_json") @default("[]")
+  textoProblema  String    @map("texto_problema") @db.Text
+  status         String    @default("pendente") @db.VarChar(20)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  resolvedAt     DateTime? @map("resolved_at")
+
+  tenant          Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  learnedPatterns BotLearnedPattern[]
+
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([tenantId])
+  @@map("bot_confusion_events")
+}
+
+model BotLearnedPattern {
+  id         String    @id @default(uuid()) @db.Uuid
+  nicho      String    @db.VarChar(50)
+  frase      String    @db.Text
+  intentAlvo String    @map("intent_alvo") @db.VarChar(50)
+  eventoId   String?   @map("evento_id") @db.Uuid
+  ativo      Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  evento BotConfusionEvent? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+
+  @@index([nicho, ativo])
+  @@index([createdAt(sort: Desc)])
+  @@map("bot_learned_patterns")
 }
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────

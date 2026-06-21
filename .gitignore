@@ -46,3 +46,6 @@ token.json
 # Arquivos acidentais na raiz
 /components/
 /package-lock.json
+
+# Graphify (grafo gerado localmente)
+graphify-out/

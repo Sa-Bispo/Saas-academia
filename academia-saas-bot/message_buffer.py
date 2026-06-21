@@ -27,7 +27,14 @@ from database_api import (
     get_ultimo_pedido,
     list_estoque,
     save_order,
+    get_tenant_configs,
+    get_aluno_by_phone,
+    get_matricula_ativa,
+    get_cobrancas_pendentes,
+    get_pix_chave_tenant,
+    salvar_comprovante_pagamento,
 )
+from academia_flow import process_academia_message
 from chains import generate_persona_response, invoke_rag_chain
 try:
     _gemini_parser = importlib.import_module('gemini_parser')
@@ -784,6 +791,114 @@ async def _move_to_upsell_with_message(
     )
 
 
+async def _handle_academia_message(
+    chat_id: str,
+    tenant_id: str,
+    full_message: str,
+    configs: dict,
+    imagem_recebida: bool = False,
+) -> str | list[str]:
+    from confusion_tracker import (
+        save_confusion_event,
+        publish_confusion_notification,
+        load_learned_patterns,
+    )
+
+    session_key = f'academia_session:{tenant_id}:{chat_id}'
+    try:
+        session_raw = await redis_client.get(session_key)
+        session = json.loads(session_raw) if session_raw else {}
+    except Exception:
+        session = {}
+
+    aluno = None
+    matricula = None
+    cobrancas: list = []
+    pix_chave = None
+
+    try:
+        aluno = await get_aluno_by_phone(tenant_id, chat_id)
+        if aluno:
+            aluno_id = session.get('aluno_id') or str(aluno.get('id') or '')
+            matricula = await get_matricula_ativa(tenant_id, aluno_id)
+            cobrancas = await get_cobrancas_pendentes(tenant_id, aluno_id)
+        pix_chave = await get_pix_chave_tenant(tenant_id)
+    except Exception as e:
+        log(f'[ACADEMIA] erro ao buscar dados do aluno para {chat_id}: {e}')
+
+    # Carrega padrões aprendidos pelo admin para este nicho
+    learned_patterns: list[dict] = []
+    try:
+        learned_patterns = await load_learned_patterns('academia', redis_client)
+    except Exception as e:
+        log(f'[ACADEMIA] erro ao carregar learned_patterns: {e}')
+
+    # Mantém histórico de conversa na sessão (últimos 20 turnos)
+    history: list[dict] = session.get('history', [])
+    history.append({'role': 'user', 'text': full_message, 'ts': __import__('datetime').datetime.now().isoformat(timespec='seconds')})
+
+    confusion_antes = session.get('confusion_count', 0)
+
+    try:
+        reply, session_nova = process_academia_message(
+            text=full_message,
+            session=session,
+            aluno=aluno,
+            matricula=matricula,
+            cobrancas=cobrancas,
+            pix_chave=pix_chave,
+            tenant_config=configs,
+            imagem_recebida=imagem_recebida and aluno is not None,
+            learned_patterns=learned_patterns,
+        )
+
+        # Persiste histórico na sessão
+        reply_text = reply if isinstance(reply, str) else ' | '.join(reply)
+        history.append({'role': 'bot', 'text': reply_text, 'ts': __import__('datetime').datetime.now().isoformat(timespec='seconds')})
+        session_nova['history'] = history[-20:]
+
+        await redis_client.set(session_key, json.dumps(session_nova, ensure_ascii=False), ex=3600)
+
+        # Detecta aumento no contador de confusão — grava evento e notifica admin
+        confusion_depois = session_nova.get('confusion_count', 0)
+        if confusion_depois > confusion_antes and confusion_depois >= 2:
+            try:
+                event_id = await save_confusion_event(
+                    tenant_id=tenant_id,
+                    nicho='academia',
+                    phone=chat_id,
+                    messages=session_nova.get('history', []),
+                    texto_problema=full_message,
+                )
+                if event_id:
+                    await publish_confusion_notification(redis_client, event_id, 'academia', tenant_id)
+                    log(f'[ACADEMIA] confusion event registrado: {event_id}')
+            except Exception as exc:
+                log(f'[ACADEMIA] erro ao registrar confusion event: {exc}')
+
+        # Salva comprovante se acabou de ser enviado
+        if session_nova.get('comprovante_enviado') and not session.get('comprovante_enviado'):
+            try:
+                aid = session_nova.get('aluno_id') or (aluno or {}).get('id')
+                if aid:
+                    comprovante_url = ''
+                    try:
+                        cached = await redis_client.get(f'media:{chat_id}:{tenant_id}')
+                        if cached:
+                            comprovante_url = cached
+                    except Exception:
+                        pass
+                    await salvar_comprovante_pagamento(tenant_id, str(aid), comprovante_url)
+                    log(f'[ACADEMIA] comprovante salvo para aluno {aid} (url: {bool(comprovante_url)})')
+            except Exception as exc:
+                log(f'[ACADEMIA] erro ao salvar comprovante de {chat_id}: {exc}')
+    except Exception as e:
+        log(f'[ACADEMIA] erro ao processar mensagem de {chat_id}: {e}')
+        reply = '⚠️ Não consegui processar sua mensagem agora. Tente novamente em instantes.'
+
+    return reply
+
+
 async def route_sales_flow(chat_id: str, user_message: str) -> str:
     normalized_message = _normalize_text(user_message)
 
@@ -1354,10 +1469,27 @@ async def handle_debounce(chat_id: str):
 
         messages = await redis_client.lrange(buffer_key, 0, -1)
 
+        imagem_recebida = any(m.startswith('📷') for m in messages)
         full_message = ' '.join(messages).strip()
         if full_message:
             log(f'Enviando mensagem agrupada para {chat_id}: {full_message}')
-            reply_message = await route_sales_flow(chat_id, full_message)
+
+            tenant_id_ctx = await _get_tenant_id(chat_id)
+            sub_nicho = ''
+            configs_ctx: dict = {}
+            if tenant_id_ctx:
+                try:
+                    configs_ctx = await get_tenant_configs(tenant_id_ctx)
+                    sub_nicho = str(configs_ctx.get('sub_nicho') or '').strip().lower()
+                except Exception as e:
+                    log(f'[DEBOUNCE] erro ao carregar configs do tenant {tenant_id_ctx}: {e}')
+
+            if sub_nicho == 'academia':
+                reply_message = await _handle_academia_message(
+                    chat_id, tenant_id_ctx, full_message, configs_ctx, imagem_recebida
+                )
+            else:
+                reply_message = await route_sales_flow(chat_id, full_message)
 
             if not reply_message:
                 await redis_client.delete(buffer_key)

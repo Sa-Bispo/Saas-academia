@@ -43,10 +43,35 @@ function compilePromptIa(data: {
   strictRules?: string | null;
   botObjective?: string | null;
   operationContext?: string | null;
+  subNicho?: string | null;
 }): string {
   const name = (data.botName || "").trim() || "Assistente";
-  const company = (data.companyName || "").trim() || "nossa empresa";
+  const company = (data.companyName || "").trim() || (data.subNicho === "academia" ? "nossa academia" : "nossa empresa");
   const tone = TONE_LABELS[data.toneOfVoice || ""] || "amigável e prestativo";
+
+  if (data.subNicho === "academia") {
+    let prompt =
+      `Você é ${name}, atendente virtual da ${company}.\n` +
+      `Tom de voz: ${tone}.\n\n` +
+      `OBJETIVO: atender alunos e interessados, responder dúvidas sobre modalidades, horários, planos e pagamentos.\n\n` +
+      `REGRAS ABSOLUTAS:\n` +
+      `- Seja objetivo e prestativo. Respostas curtas (máx. 3 linhas), exceto ao listar planos/modalidades.\n` +
+      `- Quando o aluno mencionar pagamento de mensalidade, oriente-o a enviar o comprovante via WhatsApp.\n` +
+      `- Não tome decisões que dependam do responsável — encaminhe ao dono quando necessário.\n` +
+      `- Nunca confirme horários de aula ou disponibilidade sem que estejam nas informações abaixo.\n` +
+      `- Foco total em: modalidades, horários, planos, matrículas e dúvidas gerais sobre a academia.`;
+
+    if (data.operationContext && data.operationContext.trim()) {
+      prompt += `\n\n--- INFORMAÇÕES DA ACADEMIA ---\n${data.operationContext.trim()}`;
+    }
+
+    if (data.strictRules && data.strictRules.trim()) {
+      prompt += `\n\n--- REGRAS ESPECÍFICAS DO DONO (nunca quebre) ---\n${data.strictRules.trim()}`;
+    }
+
+    return prompt;
+  }
+
   const objective = OBJECTIVE_LABELS[data.botObjective || ""] || "fechar pedidos e atender clientes com eficiência";
 
   let prompt =
@@ -79,6 +104,10 @@ const updateTenantConfigSchema = z.object({
     .regex(/^\+?[0-9]{8,20}$/, "Número inválido. Use apenas dígitos e opcional +")
     .optional()
     .or(z.literal("")),
+  // Academia
+  pixChave: z.string().trim().max(200).optional().or(z.literal("")),
+  diasAntecedenciaCobranca: z.coerce.number().int().min(1).max(30).optional(),
+  limiteDiarioCobrancas: z.coerce.number().int().min(1).max(500).optional(),
 });
 
 export type TenantConfigDTO = {
@@ -93,6 +122,11 @@ export type TenantConfigDTO = {
   strictRules: string | null;
   botObjective: string | null;
   operationContext: string | null;
+  // Academia
+  subNicho: string | null;
+  pixChave: string | null;
+  diasAntecedenciaCobranca: number;
+  limiteDiarioCobrancas: number;
 };
 
 export type UpdateTenantConfigInput = z.infer<typeof updateTenantConfigSchema>;
@@ -142,6 +176,7 @@ export async function getTenantConfig(): Promise<TenantConfigDTO> {
       strictRules: true,
       botObjective: true,
       operationContext: true,
+      configNicho: true,
     },
   });
 
@@ -149,9 +184,24 @@ export async function getTenantConfig(): Promise<TenantConfigDTO> {
     throw new Error("Tenant não encontrado para este usuário.");
   }
 
+  const cfg = (tenant.configNicho as Record<string, unknown> | null) ?? {};
+
   return {
-    ...tenant,
+    id: tenant.id,
+    nome: tenant.nome,
     niche: tenant.subscription?.plan?.niche ?? null,
+    promptIa: tenant.promptIa,
+    whatsappAdmin: tenant.whatsappAdmin,
+    botName: tenant.botName,
+    companyName: tenant.companyName,
+    toneOfVoice: tenant.toneOfVoice,
+    strictRules: tenant.strictRules,
+    botObjective: tenant.botObjective,
+    operationContext: tenant.operationContext,
+    subNicho: typeof cfg.sub_nicho === "string" ? cfg.sub_nicho : null,
+    pixChave: typeof cfg.pixChave === "string" ? cfg.pixChave : null,
+    diasAntecedenciaCobranca: typeof cfg.dias_antecedencia_cobranca === "number" ? cfg.dias_antecedencia_cobranca : 5,
+    limiteDiarioCobrancas: typeof cfg.limite_diario_cobrancas === "number" ? cfg.limite_diario_cobrancas : 50,
   };
 }
 
@@ -164,12 +214,14 @@ export async function updateTenantConfig(input: UpdateTenantConfigInput) {
       id: tenantData.tenant.id,
       userId: tenantData.user.id,
     },
-    select: { id: true },
+    select: { id: true, configNicho: true },
   });
 
   if (!tenant) {
     throw new Error("Tenant não encontrado para este usuário.");
   }
+
+  const currentCfg = (tenant.configNicho as Record<string, unknown> | null) ?? {};
 
   const compiledPrompt = compilePromptIa({
     botName: payload.botName,
@@ -178,7 +230,14 @@ export async function updateTenantConfig(input: UpdateTenantConfigInput) {
     strictRules: payload.strictRules,
     botObjective: payload.botObjective,
     operationContext: payload.operationContext,
+    subNicho: typeof currentCfg.sub_nicho === "string" ? currentCfg.sub_nicho : null,
   });
+  const updatedCfg: Record<string, unknown> = {
+    ...currentCfg,
+    ...(payload.pixChave !== undefined && { pixChave: payload.pixChave || null }),
+    ...(payload.diasAntecedenciaCobranca !== undefined && { dias_antecedencia_cobranca: payload.diasAntecedenciaCobranca }),
+    ...(payload.limiteDiarioCobrancas !== undefined && { limite_diario_cobrancas: payload.limiteDiarioCobrancas }),
+  };
 
   const updated = await prisma.tenant.update({
     where: { id: tenant.id },
@@ -191,6 +250,7 @@ export async function updateTenantConfig(input: UpdateTenantConfigInput) {
       operationContext: payload.operationContext || null,
       whatsappAdmin: payload.whatsappAdmin || null,
       promptIa: compiledPrompt,
+      configNicho: updatedCfg,
     },
     select: {
       id: true,
