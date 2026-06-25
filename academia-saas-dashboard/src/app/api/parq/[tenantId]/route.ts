@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
-import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+// Fonte da verdade para assinatura: assinatura_base64 no banco (coluna da tabela
+// fichas_parq). O campo assinatura_url existe no schema mas não é preenchido —
+// foi removido em favor do base64 para eliminar dependência do Supabase Storage
+// na leitura (PDF usa o base64 diretamente, sem roundtrip de rede).
 
 function getIp(req: NextRequest): string | null {
   return (
@@ -40,7 +37,6 @@ async function handlePost(
 ) {
   const { tenantId } = await params;
 
-  // Validar tenant
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) {
     return NextResponse.json({ error: "Academia não encontrada." }, { status: 404 });
@@ -84,7 +80,6 @@ async function handlePost(
   const ip = getIp(req);
   const userAgent = req.headers.get("user-agent") ?? null;
 
-  // Dedup por CPF no tenant
   let aluno = await prisma.aluno.findFirst({
     where: { tenantId, cpf: cpfLimpo },
   });
@@ -107,35 +102,12 @@ async function handlePost(
     });
   }
 
-  // Upload da assinatura
-  let assinaturaUrl: string | null = null;
-  if (assinatura) {
-    try {
-      const base64 = assinatura.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64, "base64");
-      const supabase = getSupabaseAdmin();
-      const path = `${tenantId}/${aluno.id}_${Date.now()}.png`;
-      const { error: uploadError } = await supabase.storage
-        .from("parq-assinaturas")
-        .upload(path, buffer, { contentType: "image/png", upsert: false });
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from("parq-assinaturas")
-          .getPublicUrl(path);
-        assinaturaUrl = urlData.publicUrl;
-      }
-    } catch {
-      // Falha no upload não bloqueia o cadastro; continua sem URL
-    }
-  }
-
   await prisma.fichaParq.create({
     data: {
       tenantId,
       alunoId: aluno.id,
       respostas,
       precisaLiberacaoMedica: precisaLiberacao,
-      assinaturaUrl,
       assinaturaBase64: assinatura,
       termoHash,
       assinanteNome: nome.trim(),
