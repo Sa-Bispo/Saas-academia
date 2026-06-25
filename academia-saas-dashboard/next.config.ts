@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   },
   transpilePackages: [
     "@supabase/supabase-js",
+    "@supabase/ssr",
     "react-hook-form",
     "@hookform/resolvers",
     "recharts",

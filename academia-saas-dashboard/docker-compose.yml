@@ -1,3 +1,13 @@
+# DESENVOLVIMENTO STANDALONE APENAS
+# Em produção, use o docker-compose.yml da raiz do projeto (projeto-wpp-samuel/).
+# Este arquivo existe para testar o build da imagem isoladamente, sem o resto da infra.
+#
+# Uso:
+#   docker compose up --build
+#
+# Banco: aponte DATABASE_URL no .env para um Postgres acessível (ex: localhost:5432
+# se o compose raiz estiver rodando).
+
 services:
   web:
     build:
@@ -6,17 +16,12 @@ services:
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-    container_name: whatsapp_saas_web
+    container_name: dashboard_web_dev
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3001:3000"
     env_file:
       - .env
-    restart: always
-    networks:
-      - default
-      - saas_network
+    restart: "no"
 
 networks:
   default:
-  saas_network:
-    external: true

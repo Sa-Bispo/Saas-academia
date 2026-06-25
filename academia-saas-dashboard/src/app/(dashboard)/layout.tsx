@@ -45,6 +45,7 @@ export default async function DashboardLayout({
           botAtivo={false}
           userEmail={user.email}
           userName={(user.user_metadata?.nome as string | undefined) ?? user.email ?? undefined}
+          subNicho="academia"
         />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 sm:py-9">{children}</div>
