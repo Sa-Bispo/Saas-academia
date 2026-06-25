@@ -69,6 +69,9 @@ async function handlePost(
   if (!consentimentoLgpd) {
     return NextResponse.json({ error: "É necessário aceitar o termo LGPD." }, { status: 422 });
   }
+  if (!assinatura || typeof assinatura !== "string" || !assinatura.startsWith("data:image/")) {
+    return NextResponse.json({ error: "Assinatura obrigatória.", detail: "O documento não pode ser salvo sem assinatura." }, { status: 422 });
+  }
   if (!respostas || typeof respostas !== "object") {
     return NextResponse.json({ error: "Respostas inválidas." }, { status: 422 });
   }
@@ -126,47 +129,22 @@ async function handlePost(
     }
   }
 
-  try {
-    await prisma.fichaParq.create({
-      data: {
-        tenantId,
-        alunoId: aluno.id,
-        respostas,
-        precisaLiberacaoMedica: precisaLiberacao,
-        assinaturaUrl,
-        assinaturaBase64: assinatura ?? null,
-        termoHash,
-        assinanteNome: nome.trim(),
-        assinanteCpf: cpfLimpo,
-        ip,
-        userAgent,
-        consentimentoLgpd: true,
-      },
-    });
-  } catch (err) {
-    // Fallback: se a coluna assinatura_base64 ainda não existe (migration pendente),
-    // salva sem ela para não bloquear o cadastro
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("assinatura_base64") || msg.includes("column")) {
-      await prisma.fichaParq.create({
-        data: {
-          tenantId,
-          alunoId: aluno.id,
-          respostas,
-          precisaLiberacaoMedica: precisaLiberacao,
-          assinaturaUrl,
-          termoHash,
-          assinanteNome: nome.trim(),
-          assinanteCpf: cpfLimpo,
-          ip,
-          userAgent,
-          consentimentoLgpd: true,
-        },
-      });
-    } else {
-      throw err;
-    }
-  }
+  await prisma.fichaParq.create({
+    data: {
+      tenantId,
+      alunoId: aluno.id,
+      respostas,
+      precisaLiberacaoMedica: precisaLiberacao,
+      assinaturaUrl,
+      assinaturaBase64: assinatura,
+      termoHash,
+      assinanteNome: nome.trim(),
+      assinanteCpf: cpfLimpo,
+      ip,
+      userAgent,
+      consentimentoLgpd: true,
+    },
+  });
 
   return NextResponse.json({ ok: true, alunoId: aluno.id });
 }

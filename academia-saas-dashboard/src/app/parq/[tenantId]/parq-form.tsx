@@ -74,8 +74,12 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
       setErro("É necessário aceitar o termo de consentimento LGPD.");
       return;
     }
+    if (!sigRef.current || sigRef.current.isEmpty()) {
+      setErro("A assinatura é obrigatória. Assine no campo acima antes de enviar.");
+      return;
+    }
 
-    const assinatura = sigRef.current?.toDataURL() ?? null;
+    const assinatura = sigRef.current.toDataURL();
 
     startTransition(async () => {
       try {
