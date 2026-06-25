@@ -29,12 +29,14 @@ import {
   Clock,
   ImageIcon,
   Stethoscope,
+  Upload,
 } from "lucide-react";
 import FloatingActionMenu from "@/components/ui/floating-action-menu";
 
-import { criarAluno, atualizarAluno, excluirAluno, buscarAluno } from "@/actions/alunos.actions";
+import { criarAluno, atualizarAluno, excluirAluno, buscarAluno, enviarLembrete } from "@/actions/alunos.actions";
 import { matricularAluno, criarPlanoAcademia, listarPlanosAcademia } from "@/actions/planos-academia.actions";
 import { validarComprovante, rejeitarComprovante } from "@/actions/cobrancas.actions";
+import { ModalImportar } from "@/components/alunos/modal-importar";
 
 type Plano = {
   id: string;
@@ -68,12 +70,20 @@ type Aluno = {
   createdAt: Date;
   matriculas: Matricula[];
   cobrancas: Cobranca[];
+  frequencias: { data: Date }[];
+};
+
+type Stats = {
+  vencendo7d: number;
+  inadimplentes: number;
+  semFrequencia7d: number;
 };
 
 type Props = {
   alunos: Aluno[];
   planos: Plano[];
   tenantId: string;
+  stats: Stats;
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -542,6 +552,11 @@ type AlunoDetalhe = {
     horaEntrada: string | null;
     horaSaida: string | null;
   }[];
+  fichasParq: {
+    id: string;
+    assinadoEm: Date | string;
+    precisaLiberacaoMedica: boolean;
+  }[];
 };
 
 function SecaoCard({
@@ -829,6 +844,33 @@ function ModalDetalheAluno({
                 </SecaoCard>
               )}
 
+              <SecaoCard icon={ClipboardList} titulo="PAR-Q">
+                {aluno.fichasParq.length > 0 ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
+                        <Check size={10} />
+                        Respondido
+                      </span>
+                      <span className="text-xs text-muted">
+                        em {formatData(aluno.fichasParq[0].assinadoEm)}
+                      </span>
+                    </div>
+                    {aluno.fichasParq[0].precisaLiberacaoMedica && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                        <AlertTriangle size={9} />
+                        Avaliação médica
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/15 px-2 py-0.5 text-[11px] font-semibold text-slate-400">
+                    <X size={10} />
+                    Não respondido
+                  </span>
+                )}
+              </SecaoCard>
+
               <SecaoCard icon={Dumbbell} titulo="Matrículas">
                 {aluno.matriculas.length === 0 ? (
                   <p className="text-sm text-muted">Nenhuma matrícula registrada.</p>
@@ -1030,28 +1072,79 @@ function ModalDetalheAluno({
   );
 }
 
+// ─── Helpers de urgência ─────────────────────────────────────────────────────
+
+function diasSemFrequencia(frequencias: { data: Date }[]): number | null {
+  if (!frequencias.length) return null;
+  const ultima = new Date(frequencias[0].data);
+  return Math.floor((Date.now() - ultima.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function urgencyScore(aluno: Aluno): number {
+  if (aluno.status === "INADIMPLENTE") return 3;
+  if (aluno.matriculas[0] && isVencendo(aluno.matriculas[0].dataVencimento)) return 2;
+  const dias = diasSemFrequencia(aluno.frequencias);
+  if (dias !== null && dias >= 7) return 1;
+  return 0;
+}
+
+function diasParaVencer(dataVencimento: Date): number {
+  return Math.ceil((new Date(dataVencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function avatarInitials(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  "bg-indigo-500/30 text-indigo-300",
+  "bg-violet-500/30 text-violet-300",
+  "bg-sky-500/30 text-sky-300",
+  "bg-emerald-500/30 text-emerald-300",
+  "bg-amber-500/30 text-amber-300",
+  "bg-rose-500/30 text-rose-300",
+];
+
+function avatarColor(nome: string): string {
+  const sum = nome.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function AlunosPageClient({ alunos, planos, tenantId }: Props) {
+export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [ordenacao, setOrdenacao] = useState<"urgencia" | "nome">("urgencia");
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [modalAberto, setModalAberto] = useState(false);
+  const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [alunoSelecionadoId, setAlunoSelecionadoId] = useState<string | null>(null);
+  const [lembreteEnviado, setLembreteEnviado] = useState<Set<string>>(new Set());
+  const [filtrosAberto, setFiltrosAberto] = useState(false);
   const [, startTransition] = useTransition();
 
-  const alunosFiltrados = alunos.filter((a) => {
-    const matchBusca =
-      !busca ||
-      a.nome.toLowerCase().includes(busca.toLowerCase()) ||
-      a.telefone.includes(busca);
-    let matchStatus = true;
-    if (filtroStatus === "VENCENDO") {
-      matchStatus = !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
-    } else if (filtroStatus !== "todos") {
-      matchStatus = a.status === filtroStatus;
-    }
-    return matchBusca && matchStatus;
-  });
+  const alunosFiltrados = alunos
+    .filter((a) => {
+      const matchBusca =
+        !busca ||
+        a.nome.toLowerCase().includes(busca.toLowerCase()) ||
+        a.telefone.includes(busca) ||
+        (a.email ?? "").toLowerCase().includes(busca.toLowerCase());
+      let matchStatus = true;
+      if (filtroStatus === "VENCENDO") {
+        matchStatus = !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
+      } else if (filtroStatus !== "todos") {
+        matchStatus = a.status === filtroStatus;
+      }
+      return matchBusca && matchStatus;
+    })
+    .sort((a, b) => {
+      if (ordenacao === "urgencia") return urgencyScore(b) - urgencyScore(a);
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
 
   const totais = {
     todos: alunos.length,
@@ -1061,8 +1154,35 @@ export function AlunosPageClient({ alunos, planos, tenantId }: Props) {
     VENCENDO: alunos.filter((a) => !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento)).length,
   };
 
+  const todosSelecionados =
+    alunosFiltrados.length > 0 && alunosFiltrados.every((a) => selecionados.has(a.id));
+
+  function toggleSelecionarTodos() {
+    if (todosSelecionados) {
+      setSelecionados(new Set());
+    } else {
+      setSelecionados(new Set(alunosFiltrados.map((a) => a.id)));
+    }
+  }
+
+  function toggleSelecionado(id: string) {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function handleLembrete(e: React.MouseEvent, alunoId: string) {
+    e.stopPropagation();
+    startTransition(async () => {
+      await enviarLembrete(alunoId);
+      setLembreteEnviado((prev) => new Set(prev).add(alunoId));
+    });
+  }
+
   return (
-    <section className="space-y-6">
+    <section className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1070,6 +1190,14 @@ export function AlunosPageClient({ alunos, planos, tenantId }: Props) {
           <h1 className="mt-1 text-2xl font-semibold text-white">Alunos</h1>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setModalImportarAberto(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-medium text-muted transition hover:text-foreground"
+          >
+            <Upload size={14} />
+            Importar CSV
+          </button>
           <button
             type="button"
             onClick={() => setModalAberto(true)}
@@ -1081,46 +1209,107 @@ export function AlunosPageClient({ alunos, planos, tenantId }: Props) {
         </div>
       </div>
 
-      {/* Filtros por status */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { key: "todos", label: "Todos", count: totais.todos },
-          { key: "ATIVO", label: "Ativos", count: totais.ATIVO },
-          { key: "INADIMPLENTE", label: "Inadimplentes", count: totais.INADIMPLENTE },
-          { key: "INATIVO", label: "Inativos", count: totais.INATIVO },
-          { key: "VENCENDO", label: "Vencendo", count: totais.VENCENDO },
-        ].map(({ key, label, count }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setFiltroStatus(key)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              filtroStatus === key
-                ? "bg-brand text-white"
-                : "border border-line bg-surface/60 text-muted hover:text-foreground"
-            }`}
-          >
-            {label}
-            <span
-              className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${
-                filtroStatus === key ? "bg-white/20 text-white" : "bg-white/10 text-muted"
-              }`}
-            >
-              {count}
-            </span>
-          </button>
-        ))}
+      {/* Cards de stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => setFiltroStatus(filtroStatus === "VENCENDO" ? "todos" : "VENCENDO")}
+          className={`rounded-2xl border p-4 text-left transition ${
+            filtroStatus === "VENCENDO"
+              ? "border-amber-500/50 bg-amber-500/10"
+              : "border-amber-500/20 bg-surface/60 hover:border-amber-500/40"
+          }`}
+        >
+          <div className="flex items-center gap-2 text-amber-400">
+            <Clock size={14} />
+            <span className="text-xs font-medium">Vencendo em 7 dias</span>
+          </div>
+          <p className="mt-2 text-3xl font-bold text-white">{stats.vencendo7d}</p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFiltroStatus(filtroStatus === "INADIMPLENTE" ? "todos" : "INADIMPLENTE")}
+          className={`rounded-2xl border p-4 text-left transition ${
+            filtroStatus === "INADIMPLENTE"
+              ? "border-red-500/50 bg-red-500/10"
+              : "border-red-500/20 bg-surface/60 hover:border-red-500/40"
+          }`}
+        >
+          <div className="flex items-center gap-2 text-red-400">
+            <AlertTriangle size={14} />
+            <span className="text-xs font-medium">Inadimplentes</span>
+          </div>
+          <p className="mt-2 text-3xl font-bold text-white">{stats.inadimplentes}</p>
+        </button>
       </div>
 
-      {/* Busca */}
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-        <input
-          className="w-full rounded-xl border border-line bg-surface/60 py-2.5 pl-9 pr-4 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
-          placeholder="Buscar por nome ou telefone..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-        />
+      {/* Busca + ordenação */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            className="w-full rounded-xl border border-line bg-surface/60 py-2.5 pl-9 pr-4 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+            placeholder="Buscar por nome, telefone ou e-mail..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setOrdenacao(ordenacao === "urgencia" ? "nome" : "urgencia")}
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+            ordenacao === "urgencia"
+              ? "border-brand/50 bg-brand/10 text-brand"
+              : "border-line bg-surface/60 text-muted hover:text-foreground"
+          }`}
+        >
+          <AlertTriangle size={13} />
+          Urgência
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setFiltrosAberto((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+              filtroStatus !== "todos"
+                ? "border-brand/50 bg-brand/10 text-brand"
+                : "border-line bg-surface/60 text-muted hover:text-foreground"
+            }`}
+          >
+            <ChevronDown size={13} />
+            Filtros
+            {filtroStatus !== "todos" && (
+              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[9px] font-bold text-white">
+                1
+              </span>
+            )}
+          </button>
+
+          {filtrosAberto && (
+            <div className="absolute right-0 top-full z-50 mt-1.5 w-48 overflow-hidden rounded-xl border border-line bg-surface shadow-xl">
+              {[
+                { key: "todos", label: "Todos", count: totais.todos },
+                { key: "ATIVO", label: "Ativos", count: totais.ATIVO },
+                { key: "INADIMPLENTE", label: "Inadimplentes", count: totais.INADIMPLENTE },
+                { key: "INATIVO", label: "Inativos", count: totais.INATIVO },
+                { key: "VENCENDO", label: "Vencendo", count: totais.VENCENDO },
+              ].map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => { setFiltroStatus(key); setFiltrosAberto(false); }}
+                  className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition hover:bg-white/5 ${
+                    filtroStatus === key ? "text-brand" : "text-foreground"
+                  }`}
+                >
+                  <span>{label}</span>
+                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-muted">{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Lista de alunos */}
@@ -1135,131 +1324,124 @@ export function AlunosPageClient({ alunos, planos, tenantId }: Props) {
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-surface/60">
-          {/* Header da tabela — desktop */}
-          <div className="hidden grid-cols-[2fr_1fr_1.5fr_1fr_1fr_auto] gap-4 border-b border-line/50 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted lg:grid">
-            <span>Aluno</span>
-            <span>Status</span>
-            <span>Plano ativo</span>
-            <span>Vencimento</span>
-            <span>Pendência</span>
-            <span></span>
+          {/* Header da tabela */}
+          <div className="flex items-center gap-4 border-b border-line/50 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
+            <input
+              type="checkbox"
+              checked={todosSelecionados}
+              onChange={toggleSelecionarTodos}
+              className="h-3.5 w-3.5 rounded border-line accent-brand"
+            />
+            <span className="flex-1">Aluno</span>
+            <span className="hidden w-40 lg:block">Vencimento</span>
+            <span className="hidden w-28 lg:block">Ações</span>
           </div>
 
           <div className="divide-y divide-line/30">
             {alunosFiltrados.map((aluno) => {
               const matriculaAtiva = aluno.matriculas[0];
-              const cobrancaPendente = aluno.cobrancas[0];
-              const statusCfg = STATUS_CONFIG[aluno.status] ?? STATUS_CONFIG.INATIVO;
-              const vencendo = matriculaAtiva ? isVencendo(matriculaAtiva.dataVencimento) : false;
 
               return (
                 <div
                   key={aluno.id}
                   onClick={() => setAlunoSelecionadoId(aluno.id)}
-                  className="grid cursor-pointer grid-cols-1 gap-3 px-5 py-4 transition hover:bg-white/[0.02] lg:grid-cols-[2fr_1fr_1.5fr_1fr_1fr_auto] lg:items-center lg:gap-4"
+                  className="flex cursor-pointer items-center gap-4 px-5 py-3.5 transition hover:bg-white/[0.02]"
                 >
-                  {/* Nome + contato */}
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-white">{aluno.nome}</p>
-                    <div className="mt-0.5 flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-xs text-muted">
-                        <Phone size={10} />
-                        {aluno.telefone}
-                      </span>
-                      {aluno.email && (
-                        <span className="flex items-center gap-1 text-xs text-muted">
-                          <Mail size={10} />
-                          {aluno.email}
+                  {/* Checkbox */}
+                  <input
+                    type="checkbox"
+                    checked={selecionados.has(aluno.id)}
+                    onChange={() => toggleSelecionado(aluno.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3.5 w-3.5 rounded border-line accent-brand"
+                  />
+
+                  {/* Avatar */}
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarColor(aluno.nome)}`}
+                  >
+                    {avatarInitials(aluno.nome)}
+                  </div>
+
+                  {/* Nome + info */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-medium text-white">{aluno.nome}</span>
+                      {aluno.precisaLiberacaoMedica && (
+                        <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
+                          av. médica
                         </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+                      <span>{aluno.telefone}</span>
+                      {matriculaAtiva && (
+                        <>
+                          <span className="text-line">·</span>
+                          <span>{matriculaAtiva.plano.periodicidade.charAt(0) + matriculaAtiva.plano.periodicidade.slice(1).toLowerCase()}</span>
+                        </>
                       )}
                     </div>
                   </div>
 
-                  {/* Status */}
-                  <div className="flex flex-col gap-1">
-                    <span
-                      className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusCfg.color}`}
-                    >
-                      <statusCfg.icon size={10} />
-                      {statusCfg.label}
-                    </span>
-                    {aluno.precisaLiberacaoMedica && (
-                      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
-                        <Stethoscope size={9} />
-                        Av. médica
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Plano */}
-                  <div>
-                    {matriculaAtiva ? (
-                      <span className="flex items-center gap-1 text-xs text-foreground">
-                        <Dumbbell size={11} className="text-brand" />
-                        {matriculaAtiva.plano.nome}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted">Sem matrícula</span>
-                    )}
-                  </div>
-
                   {/* Vencimento */}
-                  <div>
+                  <div className="hidden w-36 lg:block">
                     {matriculaAtiva ? (
-                      <span
-                        className={`flex items-center gap-1 text-xs ${
-                          vencendo ? "text-amber-400" : "text-muted"
-                        }`}
-                      >
-                        <Calendar size={10} />
-                        {new Date(matriculaAtiva.dataVencimento).toLocaleDateString("pt-BR")}
-                        {vencendo && <span className="text-[10px]">⚠</span>}
+                      <span className="text-xs text-muted">
+                        {formatData(matriculaAtiva.dataVencimento)}
                       </span>
                     ) : (
                       <span className="text-xs text-muted">—</span>
                     )}
                   </div>
 
-                  {/* Pendência */}
-                  <div>
-                    {cobrancaPendente ? (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          cobrancaPendente.status === "VENCIDO"
-                            ? "bg-red-500/15 text-red-400"
-                            : "bg-amber-500/15 text-amber-400"
-                        }`}
-                      >
-                        {formatCents(cobrancaPendente.valorCents)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-emerald-400">Em dia ✓</span>
-                    )}
-                  </div>
-
-                  {/* Ações rápidas */}
-                  <div className="hidden items-center justify-end gap-1 lg:flex">
+                  {/* Ações */}
+                  <div
+                    className="flex items-center gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <a
-                      href={`https://wa.me/55${aluno.telefone.replace(/\D/g, "")}`}
+                      href={`https://wa.me/${aluno.telefone.replace(/\D/g, "")}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
                       title="Abrir WhatsApp"
-                      className="rounded-lg p-1.5 text-muted/40 transition hover:bg-brand/10 hover:text-brand"
+                      className="rounded-lg border border-line p-1.5 text-muted/60 transition hover:border-brand/50 hover:text-brand"
                     >
                       <MessageCircle size={14} />
                     </a>
-                    <ChevronRight size={16} className="text-muted/50" />
+                    <button
+                      type="button"
+                      onClick={() => setAlunoSelecionadoId(aluno.id)}
+                      className="rounded-lg border border-line p-1.5 text-muted/60 transition hover:border-line/80 hover:text-foreground"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
                 </div>
               );
             })}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-line/30 px-5 py-2.5 text-xs text-muted">
+            Mostrando {alunosFiltrados.length} de {alunos.length} alunos
+            {ordenacao === "urgencia" && " · ordenado por urgência"}
+            {selecionados.size > 0 && (
+              <span className="ml-2 text-brand">· {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}</span>
+            )}
           </div>
         </div>
       )}
 
       {modalAberto && (
         <ModalNovoAluno onClose={() => setModalAberto(false)} planos={planos} />
+      )}
+
+      {modalImportarAberto && (
+        <ModalImportar
+          onClose={() => setModalImportarAberto(false)}
+          planos={planos}
+        />
       )}
 
       {alunoSelecionadoId && (
@@ -1275,6 +1457,11 @@ export function AlunosPageClient({ alunos, planos, tenantId }: Props) {
             label: "Novo aluno",
             Icon: <UserPlus size={14} />,
             onClick: () => setModalAberto(true),
+          },
+          {
+            label: "Importar CSV/Excel",
+            Icon: <Upload size={14} />,
+            onClick: () => setModalImportarAberto(true),
           },
           {
             label: `Inadimplentes (${totais.INADIMPLENTE})`,

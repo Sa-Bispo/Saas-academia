@@ -76,6 +76,15 @@ export async function buscarAluno(alunoId: string) {
         orderBy: { data: "desc" },
         take: 10,
       },
+      fichasParq: {
+        orderBy: { assinadoEm: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          assinadoEm: true,
+          precisaLiberacaoMedica: true,
+        },
+      },
     },
   });
 }
@@ -147,6 +156,83 @@ export async function excluirAluno(alunoId: string) {
   });
 
   revalidatePath("/alunos");
+}
+
+// ─── Stats da página de alunos ────────────────────────────────────────────────
+
+export async function getStatsAlunos() {
+  const tenantId = await getAuthenticatedTenantId();
+
+  const hoje = new Date();
+  const em7dias = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const ha7dias = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [vencendo7d, inadimplentes, semFrequencia7d] = await Promise.all([
+    prisma.matriculaAluno.count({
+      where: {
+        tenantId,
+        status: "ATIVA",
+        dataVencimento: { gte: hoje, lte: em7dias },
+      },
+    }),
+    prisma.aluno.count({ where: { tenantId, status: "INADIMPLENTE" } }),
+    prisma.aluno.count({
+      where: {
+        tenantId,
+        status: { in: ["ATIVO", "INADIMPLENTE"] },
+        NOT: {
+          frequencias: {
+            some: { data: { gte: ha7dias } },
+          },
+        },
+      },
+    }),
+  ]);
+
+  return { vencendo7d, inadimplentes, semFrequencia7d };
+}
+
+// ─── Lembrete WhatsApp ────────────────────────────────────────────────────────
+
+export async function enviarLembrete(alunoId: string) {
+  const tenantId = await getAuthenticatedTenantId();
+
+  const aluno = await prisma.aluno.findFirst({
+    where: { id: alunoId, tenantId },
+    include: {
+      matriculas: {
+        where: { status: "ATIVA" },
+        orderBy: { dataVencimento: "desc" },
+        take: 1,
+        include: { plano: true },
+      },
+    },
+  });
+
+  if (!aluno) throw new Error("Aluno não encontrado");
+
+  const { evolutionService } = await import("@/services/evolution.service");
+  const matricula = aluno.matriculas[0];
+
+  let mensagem: string;
+  if (matricula) {
+    const vencimento = new Date(matricula.dataVencimento).toLocaleDateString("pt-BR");
+    const diasRestantes = Math.ceil(
+      (new Date(matricula.dataVencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    mensagem =
+      diasRestantes <= 0
+        ? `Olá, ${aluno.nome.split(" ")[0]}! 👋\n\nSua matrícula no plano *${matricula.plano.nome}* venceu em ${vencimento}.\n\nEntre em contato para renovar e continuar treinando! 💪`
+        : `Olá, ${aluno.nome.split(" ")[0]}! 👋\n\nSua matrícula no plano *${matricula.plano.nome}* vence em *${diasRestantes} dia${diasRestantes > 1 ? "s" : ""}* (${vencimento}).\n\nRenove em breve para não perder o acesso! 💪`;
+  } else {
+    mensagem = `Olá, ${aluno.nome.split(" ")[0]}! 👋\n\nPassando para ver se tudo bem e se você tem interesse em retomar os treinos. Entre em contato com a gente! 😊`;
+  }
+
+  try {
+    await evolutionService.sendTextMessage(aluno.telefone, mensagem);
+  } catch {
+    // falha no WhatsApp não bloqueia a operação
+  }
 }
 
 // ─── Métricas para o dashboard ────────────────────────────────────────────────

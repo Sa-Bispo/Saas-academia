@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
 import { AlunosPageClient } from "./alunos-client";
+import { getStatsAlunos } from "@/actions/alunos.actions";
 import { prisma } from "@/lib/prisma";
 
 export default async function AlunosPage() {
@@ -21,7 +22,7 @@ export default async function AlunosPage() {
   const tenantId = tenant.id;
 
   try {
-    const [alunos, planos] = await Promise.all([
+    const [alunos, planos, stats] = await Promise.all([
       prisma.aluno.findMany({
         where: { tenantId, status: { not: "SEM_MATRICULA" } },
         orderBy: { nome: "asc" },
@@ -37,16 +38,29 @@ export default async function AlunosPage() {
             orderBy: { dataVencimento: "asc" },
             take: 1,
           },
+          frequencias: {
+            orderBy: { data: "desc" },
+            take: 1,
+            select: { data: true },
+          },
         },
       }),
       prisma.planoAcademia.findMany({
         where: { tenantId, ativo: true },
         orderBy: { valorCents: "asc" },
       }),
+      getStatsAlunos(),
     ]);
 
-    return <AlunosPageClient alunos={alunos} planos={planos} tenantId={tenantId} />;
+    return <AlunosPageClient alunos={alunos} planos={planos} tenantId={tenantId} stats={stats} />;
   } catch {
-    return <AlunosPageClient alunos={[]} planos={[]} tenantId={tenantId} />;
+    return (
+      <AlunosPageClient
+        alunos={[]}
+        planos={[]}
+        tenantId={tenantId}
+        stats={{ vencendo7d: 0, inadimplentes: 0, semFrequencia7d: 0 }}
+      />
+    );
   }
 }

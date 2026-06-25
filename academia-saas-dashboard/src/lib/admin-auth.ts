@@ -5,7 +5,9 @@ const COOKIE = "pyra_admin";
 const TTL = 8 * 60 * 60; // 8 horas em segundos
 
 function secret() {
-  return process.env.ADMIN_SECRET ?? process.env.ADMIN_PASSWORD ?? "dev-secret-change-me";
+  const s = process.env.ADMIN_SECRET ?? process.env.ADMIN_PASSWORD;
+  if (!s) throw new Error("ADMIN_SECRET ou ADMIN_PASSWORD não configurado.");
+  return s;
 }
 
 export function createAdminToken(): string {
