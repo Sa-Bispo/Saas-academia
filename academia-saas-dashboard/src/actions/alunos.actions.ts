@@ -32,7 +32,14 @@ export async function listarAlunos(filtroStatus?: string) {
     where: {
       tenantId,
       ...(filtroStatus && filtroStatus !== "todos"
-        ? { status: filtroStatus as "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO" }
+        ? {
+            status: filtroStatus as
+              | "ATIVO"
+              | "INADIMPLENTE"
+              | "INATIVO"
+              | "SUSPENSO"
+              | "SEM_MATRICULA",
+          }
         : {}),
     },
     orderBy: { nome: "asc" },
@@ -108,7 +115,7 @@ export async function atualizarAluno(
     cpf?: string;
     dataNascimento?: string;
     observacoes?: string;
-    status?: "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO";
+    status?: "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO" | "SEM_MATRICULA";
   }
 ) {
   const tenantId = await getAuthenticatedTenantId();
@@ -124,7 +131,7 @@ export async function atualizarAluno(
         dataNascimento: data.dataNascimento ? new Date(data.dataNascimento) : null,
       }),
       ...(data.observacoes !== undefined && { observacoes: data.observacoes?.trim() || null }),
-      ...(data.status && { status: data.status }),
+      ...(data.status !== undefined && { status: data.status }),
     },
   });
 

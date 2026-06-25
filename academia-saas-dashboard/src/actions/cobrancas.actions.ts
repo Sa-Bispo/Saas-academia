@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
 import { prisma } from "@/lib/prisma";
 import { EvolutionService } from "@/services/evolution.service";
+import { gerarReciboImagemBase64 } from "@/lib/recibo-image";
 
 async function getAuthenticatedTenantId(): Promise<string> {
   const supabase = await createClient();
@@ -200,6 +201,117 @@ export async function confirmarPagamento(cobrancaId: string) {
     }
   } catch {
     // Não bloqueia a confirmação se o WhatsApp falhar
+  }
+
+  revalidatePath("/cobrancas");
+  revalidatePath("/alunos");
+  revalidatePath("/dashboard/academia");
+}
+
+// ─── Registrar pagamento em dinheiro + enviar recibo via WhatsApp ─────────────
+
+export async function registrarPagamentoDinheiro(cobrancaId: string) {
+  const tenantId = await getAuthenticatedTenantId();
+
+  const cobranca = await prisma.cobrancaAluno.findFirst({
+    where: { id: cobrancaId, tenantId },
+    include: {
+      matricula: true,
+      aluno: { select: { id: true, nome: true, telefone: true } },
+    },
+  });
+
+  if (!cobranca) throw new Error("Cobrança não encontrada");
+
+  const dataPagamento = new Date();
+
+  await prisma.cobrancaAluno.update({
+    where: { id: cobrancaId },
+    data: { status: "PAGO", dataPagamento },
+  });
+
+  if (cobranca.matriculaId && cobranca.matricula) {
+    const plano = await prisma.planoAcademia.findUnique({
+      where: { id: cobranca.matricula.planoId },
+    });
+    if (plano) {
+      const novoVencimento = new Date(cobranca.matricula.dataVencimento);
+      const meses =
+        plano.periodicidade === "MENSAL" ? 1
+        : plano.periodicidade === "TRIMESTRAL" ? 3
+        : plano.periodicidade === "SEMESTRAL" ? 6
+        : 12;
+      novoVencimento.setMonth(novoVencimento.getMonth() + meses);
+      await prisma.matriculaAluno.update({
+        where: { id: cobranca.matriculaId },
+        data: { dataVencimento: novoVencimento, status: "ATIVA" },
+      });
+    }
+  }
+
+  await prisma.aluno.update({
+    where: { id: cobranca.alunoId },
+    data: { status: "ATIVO" },
+  });
+
+  // Gera recibo como imagem e envia via WhatsApp
+  try {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { evolutionInstanceName: true, evolutionApiKey: true, companyName: true },
+    });
+
+    if (tenant?.evolutionInstanceName && cobranca.aluno.telefone) {
+      const academiaName = tenant.companyName ?? "Academia";
+      const evolution = new EvolutionService();
+
+      try {
+        const imageBase64 = await gerarReciboImagemBase64({
+          cobrancaId,
+          alunoNome: cobranca.aluno.nome,
+          valorCents: cobranca.valorCents,
+          descricao: cobranca.descricao,
+          dataPagamento,
+          academiaName,
+        });
+
+        await evolution.sendImageMessage(
+          tenant.evolutionInstanceName,
+          cobranca.aluno.telefone,
+          imageBase64,
+          `Recibo de Pagamento — ${academiaName}`,
+          tenant.evolutionApiKey,
+        );
+      } catch {
+        // Fallback: texto simples se a geração de imagem falhar
+        const valorFmt = (cobranca.valorCents / 100).toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        });
+        const texto = [
+          `Ola, ${cobranca.aluno.nome}!`,
+          ``,
+          `*Recibo de Pagamento em Dinheiro*`,
+          `Valor: *${valorFmt}*`,
+          `${cobranca.descricao ? `Referencia: ${cobranca.descricao}` : ""}`,
+          `Data: ${dataPagamento.toLocaleDateString("pt-BR")}`,
+          `No. ${cobrancaId.slice(0, 8).toUpperCase()}`,
+          ``,
+          `Sua matricula esta ativa. Bora treinar! 💪`,
+        ]
+          .filter(Boolean)
+          .join("\n");
+
+        await evolution.sendTextMessage(
+          tenant.evolutionInstanceName,
+          cobranca.aluno.telefone,
+          texto,
+          tenant.evolutionApiKey,
+        );
+      }
+    }
+  } catch {
+    // Não bloqueia o registro se o WhatsApp falhar
   }
 
   revalidatePath("/cobrancas");

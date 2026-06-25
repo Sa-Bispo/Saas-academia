@@ -26,6 +26,7 @@ import {
   enviarCobrancaWhatsapp,
   validarComprovante,
   rejeitarComprovante,
+  registrarPagamentoDinheiro,
 } from "@/actions/cobrancas.actions";
 
 type Aluno = { id: string; nome: string; telefone: string };
@@ -190,6 +191,80 @@ function ModalConfirmarPagamento({
   );
 }
 
+// ─── Modal pagamento em dinheiro ─────────────────────────────────────────────
+
+function ModalPagamentoDinheiro({
+  cobranca,
+  onClose,
+}: {
+  cobranca: Cobranca;
+  onClose: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+
+  function handleConfirmar() {
+    setErro(null);
+    startTransition(async () => {
+      try {
+        await registrarPagamentoDinheiro(cobranca.id);
+        onClose();
+      } catch (err) {
+        setErro(err instanceof Error ? err.message : "Erro ao registrar pagamento.");
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h2 className="text-sm font-semibold text-white">Pagamento em dinheiro</h2>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted hover:text-foreground">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <p className="text-sm text-muted">
+            Registrar recebimento em dinheiro de{" "}
+            <span className="font-semibold text-white">{formatCents(cobranca.valorCents)}</span> do aluno{" "}
+            <span className="font-semibold text-white">{cobranca.aluno.nome}</span>?
+          </p>
+
+          {cobranca.descricao && <p className="text-xs text-muted">Ref: {cobranca.descricao}</p>}
+
+          <div className="rounded-xl border border-line/50 bg-white/[0.02] px-4 py-3 text-xs text-muted">
+            Um <strong className="text-white">recibo</strong> será gerado e enviado automaticamente
+            ao aluno via <strong className="text-white">WhatsApp</strong>. A matrícula será renovada.
+          </div>
+        </div>
+
+        {erro && <p className="px-5 pb-2 text-xs text-red-400">{erro}</p>}
+
+        <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-line px-4 py-2 text-sm text-muted hover:text-foreground"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={handleConfirmar}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            <Check size={14} />
+            {pending ? "Registrando..." : "Confirmar e enviar recibo"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal validar comprovante ────────────────────────────────────────────────
 
 function ModalComprovante({
@@ -339,6 +414,7 @@ export function CobrancasPageClient({
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [cobrancaConfirmando, setCobrancaConfirmando] = useState<Cobranca | null>(null);
   const [cobrancaValidando, setCobrancaValidando] = useState<Cobranca | null>(null);
+  const [cobrancaDinheiro, setCobrancaDinheiro] = useState<Cobranca | null>(null);
   const [pending, startTransition] = useTransition();
   const [enviandoId, setEnviandoId] = useState<string | null>(null);
 
@@ -709,6 +785,16 @@ export function CobrancasPageClient({
 
                         <button
                           type="button"
+                          title="Registrar pagamento em dinheiro e enviar recibo"
+                          onClick={() => setCobrancaDinheiro(c)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-600/20"
+                        >
+                          <Wallet size={12} />
+                          Dinheiro
+                        </button>
+
+                        <button
+                          type="button"
                           title="Enviar cobrança via WhatsApp"
                           disabled={enviandoId === c.id && pending}
                           onClick={() => handleEnviarWhatsapp(c.id)}
@@ -757,6 +843,13 @@ export function CobrancasPageClient({
         <ModalComprovante
           cobranca={cobrancaValidando}
           onClose={() => setCobrancaValidando(null)}
+        />
+      )}
+
+      {cobrancaDinheiro && (
+        <ModalPagamentoDinheiro
+          cobranca={cobrancaDinheiro}
+          onClose={() => setCobrancaDinheiro(null)}
         />
       )}
     </section>

@@ -224,6 +224,35 @@ export class EvolutionService {
     return digits.startsWith("55") ? digits : "55" + digits;
   }
 
+  async sendImageMessage(
+    instanceName: string,
+    number: string,
+    base64: string,
+    caption: string,
+    apiKeyOverride?: string | null,
+  ): Promise<void> {
+    const normalizedInstance = (instanceName || "").trim();
+    const normalizedNumber = this._normalizePhone(number);
+
+    if (!normalizedInstance || !normalizedNumber) {
+      throw new EvolutionAPIError(400, "sendImageMessage requer instanceName e number válidos.");
+    }
+
+    await this.request(
+      "POST",
+      `/message/sendMedia/${normalizedInstance}`,
+      {
+        number: normalizedNumber,
+        mediatype: "image",
+        mimetype: "image/png",
+        caption: caption.trim(),
+        media: base64,
+        fileName: "recibo.png",
+      },
+      apiKeyOverride,
+    );
+  }
+
   async sendTextMessage(
     instanceName: string,
     number: string,

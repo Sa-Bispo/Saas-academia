@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
   Bot,
+  ClipboardList,
   CreditCard,
   Dumbbell,
   LayoutDashboard,
@@ -40,7 +41,7 @@ type LinkItem = {
   icon?: React.ElementType;
 };
 
-const OPERATIONAL_LINKS: LinkItem[] = [
+const BASE_OPERATIONAL_LINKS: LinkItem[] = [
   { href: "/dashboard/academia", label: "Visão geral", icon: LayoutDashboard },
   { href: "/alunos", label: "Alunos", icon: Users },
   { href: "/frequencia", label: "Frequência", icon: Activity },
@@ -68,6 +69,12 @@ export function SidebarNicho({
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const isAcademia = subNicho === "academia";
+  const operationalLinks: LinkItem[] = [
+    ...BASE_OPERATIONAL_LINKS,
+    ...(isAcademia
+      ? [{ href: "/parq-config", label: "PAR-Q", icon: ClipboardList }]
+      : []),
+  ];
   const settingsLinks = isAcademia
     ? SETTINGS_LINKS.filter((l) => l.href !== "/bot")
     : SETTINGS_LINKS;
@@ -128,7 +135,7 @@ export function SidebarNicho({
       {/* ── Navigation ── */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <NavGroup label="Principal">
-          {OPERATIONAL_LINKS.map((item) => (
+          {operationalLinks.map((item) => (
             <NavItem
               key={item.href}
               href={item.href}

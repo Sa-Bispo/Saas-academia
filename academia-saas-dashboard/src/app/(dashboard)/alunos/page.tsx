@@ -23,7 +23,7 @@ export default async function AlunosPage() {
   try {
     const [alunos, planos] = await Promise.all([
       prisma.aluno.findMany({
-        where: { tenantId },
+        where: { tenantId, status: { not: "SEM_MATRICULA" } },
         orderBy: { nome: "asc" },
         include: {
           matriculas: {
@@ -45,8 +45,8 @@ export default async function AlunosPage() {
       }),
     ]);
 
-    return <AlunosPageClient alunos={alunos} planos={planos} />;
+    return <AlunosPageClient alunos={alunos} planos={planos} tenantId={tenantId} />;
   } catch {
-    return <AlunosPageClient alunos={[]} planos={[]} />;
+    return <AlunosPageClient alunos={[]} planos={[]} tenantId={tenantId} />;
   }
 }

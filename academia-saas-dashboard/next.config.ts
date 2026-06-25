@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
     "reselect",
     "immer",
   ],
+  serverExternalPackages: ["@resvg/resvg-js", "satori"],
   experimental: {
     serverActions: {
       bodySizeLimit: "12mb",

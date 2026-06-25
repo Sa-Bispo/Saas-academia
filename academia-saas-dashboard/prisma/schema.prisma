@@ -63,6 +63,8 @@ model Tenant {
   matriculasAlunos    MatriculaAluno[]
   cobrancasAlunos     CobrancaAluno[]
   frequenciasAlunos   FrequenciaAluno[]
+  fichasParq          FichaParq[]
+  perguntasParq       ParqPergunta[]
   botConfusionEvents  BotConfusionEvent[]
 
   @@index([userId])
@@ -498,6 +500,7 @@ enum AlunoStatus {
   INADIMPLENTE
   INATIVO
   SUSPENSO
+  SEM_MATRICULA
 }
 
 enum MatriculaStatus {
@@ -530,14 +533,16 @@ model Aluno {
   cpf             String?     @db.VarChar(14)
   dataNascimento  DateTime?   @map("data_nascimento")
   observacoes     String?     @db.Text
-  status          AlunoStatus @default(ATIVO)
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  status                 AlunoStatus @default(ATIVO)
+  precisaLiberacaoMedica Boolean     @default(false) @map("precisa_liberacao_medica")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
 
   tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   matriculas  MatriculaAluno[]
   cobrancas   CobrancaAluno[]
   frequencias FrequenciaAluno[]
+  fichasParq  FichaParq[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -670,6 +675,46 @@ model BotLearnedPattern {
   @@index([nicho, ativo])
   @@index([createdAt(sort: Desc)])
   @@map("bot_learned_patterns")
+}
+
+// ─── PAR-Q ────────────────────────────────────────────────────────────────────
+
+model ParqPergunta {
+  id        Int      @id @default(autoincrement())
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  ordem     Int
+  texto     String   @db.Text
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("parq_perguntas")
+}
+
+model FichaParq {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  alunoId                String   @map("aluno_id") @db.Uuid
+  respostas              Json     @db.JsonB
+  precisaLiberacaoMedica Boolean  @default(false) @map("precisa_liberacao_medica")
+  assinaturaUrl          String?  @map("assinatura_url") @db.Text
+  assinaturaBase64       String?  @map("assinatura_base64") @db.Text
+  termoHash              String   @map("termo_hash") @db.VarChar(64)
+  assinanteNome          String   @map("assinante_nome") @db.VarChar(120)
+  assinanteCpf           String   @map("assinante_cpf") @db.VarChar(14)
+  ip                     String?  @db.VarChar(50)
+  userAgent              String?  @map("user_agent") @db.Text
+  consentimentoLgpd      Boolean  @default(false) @map("consentimento_lgpd")
+  assinadoEm             DateTime @default(now()) @map("assinado_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aluno  Aluno  @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([alunoId])
+  @@map("fichas_parq")
 }
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────

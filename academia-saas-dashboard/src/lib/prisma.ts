@@ -21,9 +21,13 @@ function createPrismaClient() {
 }
 
 function hasOrderDelegate(client: PrismaClient | undefined) {
-  // Em dev, HMR pode manter client antigo sem os delegates novos
-  // (ex.: prisma.order) após alterar o schema e gerar novamente.
-  return Boolean(client && (client as unknown as { order?: unknown }).order);
+  // Em dev, HMR pode manter client antigo sem os delegates novos após gerar o schema.
+  return Boolean(
+    client &&
+      (client as unknown as { order?: unknown }).order &&
+      (client as unknown as { fichaParq?: unknown }).fichaParq &&
+      (client as unknown as { parqPergunta?: unknown }).parqPergunta
+  );
 }
 
 const prismaClient = hasOrderDelegate(globalThis.__prisma)

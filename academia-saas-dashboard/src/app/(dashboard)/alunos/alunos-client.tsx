@@ -28,6 +28,7 @@ import {
   UserPlus,
   Clock,
   ImageIcon,
+  Stethoscope,
 } from "lucide-react";
 import FloatingActionMenu from "@/components/ui/floating-action-menu";
 
@@ -63,6 +64,7 @@ type Aluno = {
   telefone: string;
   email: string | null;
   status: string;
+  precisaLiberacaoMedica: boolean;
   createdAt: Date;
   matriculas: Matricula[];
   cobrancas: Cobranca[];
@@ -71,6 +73,7 @@ type Aluno = {
 type Props = {
   alunos: Aluno[];
   planos: Plano[];
+  tenantId: string;
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -78,6 +81,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   INADIMPLENTE: { label: "Inadimplente", color: "bg-red-500/15 text-red-400", icon: UserX },
   INATIVO: { label: "Inativo", color: "bg-slate-500/15 text-slate-400", icon: UserX },
   SUSPENSO: { label: "Suspenso", color: "bg-amber-500/15 text-amber-400", icon: AlertTriangle },
+  SEM_MATRICULA: { label: "Lead", color: "bg-indigo-500/15 text-indigo-400", icon: UserPlus },
 };
 
 const MATRICULA_STATUS_COLOR: Record<string, string> = {
@@ -514,6 +518,7 @@ type AlunoDetalhe = {
   dataNascimento: Date | string | null;
   observacoes: string | null;
   status: string;
+  precisaLiberacaoMedica: boolean;
   createdAt: Date | string;
   matriculas: {
     id: string;
@@ -582,7 +587,7 @@ function ModalDetalheAluno({
   const [cpf, setCpf] = useState("");
   const [dataNascimento, setDataNascimento] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  const [status, setStatus] = useState<"ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO">("ATIVO");
+  const [status, setStatus] = useState<"ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO" | "SEM_MATRICULA">("ATIVO");
 
   function handleValidarComprovante(cobrancaId: string) {
     setComprovantePendingId(cobrancaId);
@@ -612,7 +617,7 @@ function ModalDetalheAluno({
     setCpf(a.cpf ?? "");
     setDataNascimento(toDateInputValue(a.dataNascimento));
     setObservacoes(a.observacoes ?? "");
-    setStatus(a.status as "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO");
+    setStatus(a.status as "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO" | "SEM_MATRICULA");
   }
 
   useEffect(() => {
@@ -676,12 +681,20 @@ function ModalDetalheAluno({
               {carregando ? "Carregando..." : aluno?.nome ?? "Aluno"}
             </h2>
             {statusCfg && !editando && (
-              <span
-                className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusCfg.color}`}
-              >
-                <statusCfg.icon size={10} />
-                {statusCfg.label}
-              </span>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusCfg.color}`}
+                >
+                  <statusCfg.icon size={10} />
+                  {statusCfg.label}
+                </span>
+                {aluno?.precisaLiberacaoMedica && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
+                    <Stethoscope size={9} />
+                    Avaliação médica recomendada
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <button
@@ -756,9 +769,17 @@ function ModalDetalheAluno({
                   className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-white focus:border-brand/50 focus:outline-none"
                   value={status}
                   onChange={(e) =>
-                    setStatus(e.target.value as "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO")
+                    setStatus(
+                      e.target.value as
+                        | "ATIVO"
+                        | "INADIMPLENTE"
+                        | "INATIVO"
+                        | "SUSPENSO"
+                        | "SEM_MATRICULA"
+                    )
                   }
                 >
+                  <option value="SEM_MATRICULA">Lead (sem matrícula)</option>
                   <option value="ATIVO">Ativo</option>
                   <option value="INADIMPLENTE">Inadimplente</option>
                   <option value="INATIVO">Inativo</option>
@@ -1011,7 +1032,7 @@ function ModalDetalheAluno({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function AlunosPageClient({ alunos, planos }: Props) {
+export function AlunosPageClient({ alunos, planos, tenantId }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [modalAberto, setModalAberto] = useState(false);
@@ -1048,14 +1069,16 @@ export function AlunosPageClient({ alunos, planos }: Props) {
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Academia</p>
           <h1 className="mt-1 text-2xl font-semibold text-white">Alunos</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => setModalAberto(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
-        >
-          <Plus size={15} />
-          Novo aluno
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setModalAberto(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand/90"
+          >
+            <Plus size={15} />
+            Novo aluno
+          </button>
+        </div>
       </div>
 
       {/* Filtros por status */}
@@ -1153,13 +1176,19 @@ export function AlunosPageClient({ alunos, planos }: Props) {
                   </div>
 
                   {/* Status */}
-                  <div>
+                  <div className="flex flex-col gap-1">
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusCfg.color}`}
+                      className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusCfg.color}`}
                     >
                       <statusCfg.icon size={10} />
                       {statusCfg.label}
                     </span>
+                    {aluno.precisaLiberacaoMedica && (
+                      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
+                        <Stethoscope size={9} />
+                        Av. médica
+                      </span>
+                    )}
                   </div>
 
                   {/* Plano */}
