@@ -24,6 +24,7 @@ import {
 
 import { createClient } from "@/lib/supabase/client";
 import { ProfilePopover } from "@/components/ui/profile-popover";
+import { useNotificacoes } from "@/hooks/use-notificacoes";
 
 type SidebarNichoProps = {
   tenantName: string;
@@ -39,6 +40,7 @@ type LinkItem = {
   href: string;
   label: string;
   icon?: React.ElementType;
+  badge?: number;
 };
 
 const BASE_OPERATIONAL_LINKS: LinkItem[] = [
@@ -53,7 +55,6 @@ const SETTINGS_LINKS: LinkItem[] = [
   { href: "/configuracoes", label: "Configurações", icon: Settings },
   { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/bot", label: "Bot", icon: Bot },
-  { href: "/plano-e-uso", label: "Plano e Uso", icon: CreditCard },
 ];
 
 export function SidebarNicho({
@@ -67,12 +68,24 @@ export function SidebarNicho({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const notificacoes = useNotificacoes();
 
   const isAcademia = subNicho === "academia";
   const operationalLinks: LinkItem[] = [
-    ...BASE_OPERATIONAL_LINKS,
+    ...BASE_OPERATIONAL_LINKS.map((l) =>
+      l.href === "/cobrancas" && notificacoes.comprovantes > 0
+        ? { ...l, badge: notificacoes.comprovantes }
+        : l,
+    ),
     ...(isAcademia
-      ? [{ href: "/parq-config", label: "PAR-Q", icon: ClipboardList }]
+      ? [
+          {
+            href: "/parq-config",
+            label: "PAR-Q",
+            icon: ClipboardList,
+            ...(notificacoes.parqNovas > 0 ? { badge: notificacoes.parqNovas } : {}),
+          },
+        ]
       : []),
   ];
   const settingsLinks = isAcademia
@@ -141,6 +154,7 @@ export function SidebarNicho({
               href={item.href}
               label={item.label}
               icon={item.icon}
+              badge={item.badge}
               active={isLinkActive(item)}
               onNavigate={() => setMobileOpen(false)}
             />
@@ -154,6 +168,7 @@ export function SidebarNicho({
               href={item.href}
               label={item.label}
               icon={item.icon}
+              badge={item.badge}
               active={isLinkActive(item)}
               onNavigate={() => setMobileOpen(false)}
             />
@@ -331,12 +346,14 @@ function NavItem({
   href,
   label,
   icon: Icon,
+  badge,
   active,
   onNavigate,
 }: {
   href: string;
   label: string;
   icon?: React.ElementType;
+  badge?: number;
   active: boolean;
   onNavigate?: () => void;
 }) {
@@ -346,7 +363,6 @@ function NavItem({
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
       className="relative"
     >
-      {/* active left accent bar */}
       {active && (
         <span
           className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
@@ -380,12 +396,19 @@ function NavItem({
           />
         )}
         <span className="flex-1 truncate">{label}</span>
-        {active && (
+        {badge && badge > 0 ? (
+          <span
+            className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none text-white"
+            style={{ background: "#ef4444" }}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : active ? (
           <ChevronRight
             size={11}
             style={{ color: "var(--sidebar-active-text)", opacity: 0.5 }}
           />
-        )}
+        ) : null}
       </Link>
     </motion.div>
   );

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Toaster } from "sonner";
 
 import { getNaoLidas } from "@/actions/suporte.actions";
 import { NoPlanState } from "@/components/no-plan-state";
@@ -83,6 +84,7 @@ export default async function DashboardLayout({
 
   return (
     <PlanoProvider plano={planoAtual}>
+      <Toaster position="bottom-right" theme="dark" richColors />
       <div className="dashboard-layout bg-background text-foreground">
         <SidebarNicho
           tenantName={tenant.companyName || tenant.nome}

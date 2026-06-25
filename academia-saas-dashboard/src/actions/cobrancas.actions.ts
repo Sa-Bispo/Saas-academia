@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
 import { prisma } from "@/lib/prisma";
-import { EvolutionService } from "@/services/evolution.service";
+import { evolutionService } from "@/services/evolution.service";
 import { gerarReciboImagemBase64 } from "@/lib/recibo-image";
 
 async function getAuthenticatedTenantId(): Promise<string> {
@@ -191,8 +191,7 @@ export async function confirmarPagamento(cobrancaId: string) {
         ``,
         `Sua matrícula está ativa. Bora treinar! 💪`,
       ].join("\n");
-      const evolution = new EvolutionService();
-      await evolution.sendTextMessage(
+      await evolutionService.sendTextMessage(
         tenant.evolutionInstanceName,
         cobranca.aluno.telefone,
         texto,
@@ -263,8 +262,6 @@ export async function registrarPagamentoDinheiro(cobrancaId: string) {
 
     if (tenant?.evolutionInstanceName && cobranca.aluno.telefone) {
       const academiaName = tenant.companyName ?? "Academia";
-      const evolution = new EvolutionService();
-
       try {
         const imageBase64 = await gerarReciboImagemBase64({
           cobrancaId,
@@ -275,7 +272,7 @@ export async function registrarPagamentoDinheiro(cobrancaId: string) {
           academiaName,
         });
 
-        await evolution.sendImageMessage(
+        await evolutionService.sendImageMessage(
           tenant.evolutionInstanceName,
           cobranca.aluno.telefone,
           imageBase64,
@@ -302,7 +299,7 @@ export async function registrarPagamentoDinheiro(cobrancaId: string) {
           .filter(Boolean)
           .join("\n");
 
-        await evolution.sendTextMessage(
+        await evolutionService.sendTextMessage(
           tenant.evolutionInstanceName,
           cobranca.aluno.telefone,
           texto,
@@ -448,14 +445,13 @@ export async function rejeitarComprovante(cobrancaId: string, motivo?: string) {
       select: { evolutionInstanceName: true, evolutionApiKey: true },
     });
     if (tenant?.evolutionInstanceName) {
-      const evolution = new EvolutionService();
       const texto = [
         `Olá, ${cobranca.aluno.nome}! 👋`,
         ``,
         `Não conseguimos confirmar o comprovante enviado${motivo ? `: ${motivo}` : "."}`,
         `Pode reenviar a foto do Pix ou entrar em contato com a recepção? 🙏`,
       ].join("\n");
-      await evolution.sendTextMessage(
+      await evolutionService.sendTextMessage(
         tenant.evolutionInstanceName,
         cobranca.aluno.telefone,
         texto,
@@ -526,9 +522,7 @@ export async function enviarCobrancaWhatsapp(cobrancaId: string) {
     .filter((l) => l !== null)
     .join("\n");
 
-  const evolution = new EvolutionService();
-
-  await evolution.sendTextMessage(
+  await evolutionService.sendTextMessage(
     tenant.evolutionInstanceName,
     cobranca.aluno.telefone,
     linhas,

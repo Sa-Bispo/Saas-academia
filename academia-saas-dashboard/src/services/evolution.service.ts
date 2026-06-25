@@ -42,7 +42,9 @@ interface EvolutionSendTextResponse {
   };
 }
 
-export class EvolutionService {
+import type { IMessagingService } from "./messaging.interface";
+
+export class EvolutionService implements IMessagingService {
   private baseUrl: string;
   private apiKey: string;
 
@@ -282,4 +284,4 @@ export class EvolutionService {
   }
 }
 
-export const evolutionService = new EvolutionService();
+export const evolutionService: IMessagingService = new EvolutionService();
