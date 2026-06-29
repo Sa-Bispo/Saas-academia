@@ -46,6 +46,7 @@ async function handlePost(
     nome: string;
     cpf: string;
     telefone: string;
+    dataNascimento?: string;
     respostas: Record<string, "S" | "N">;
     assinatura: string | null;
     consentimentoLgpd: boolean;
@@ -57,7 +58,7 @@ async function handlePost(
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
   }
 
-  const { nome, cpf, telefone, respostas, assinatura, consentimentoLgpd } = body;
+  const { nome, cpf, telefone, dataNascimento, respostas, assinatura, consentimentoLgpd } = body;
 
   if (!nome?.trim() || !cpf?.trim() || !telefone?.trim()) {
     return NextResponse.json({ error: "Nome, CPF e telefone são obrigatórios." }, { status: 422 });
@@ -91,15 +92,18 @@ async function handlePost(
         nome: nome.trim(),
         telefone: telefoneLimpo,
         cpf: cpfLimpo,
+        dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
         status: "SEM_MATRICULA",
         precisaLiberacaoMedica: precisaLiberacao,
       },
     });
-  } else if (precisaLiberacao && !aluno.precisaLiberacaoMedica) {
-    await prisma.aluno.update({
-      where: { id: aluno.id },
-      data: { precisaLiberacaoMedica: true },
-    });
+  } else {
+    const updates: Record<string, unknown> = {};
+    if (precisaLiberacao && !aluno.precisaLiberacaoMedica) updates.precisaLiberacaoMedica = true;
+    if (dataNascimento && !aluno.dataNascimento) updates.dataNascimento = new Date(dataNascimento);
+    if (Object.keys(updates).length > 0) {
+      await prisma.aluno.update({ where: { id: aluno.id }, data: updates });
+    }
   }
 
   await prisma.fichaParq.create({

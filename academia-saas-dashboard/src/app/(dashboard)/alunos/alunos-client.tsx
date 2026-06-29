@@ -145,6 +145,16 @@ function toDateInputValue(d: Date | string | null | undefined) {
   return new Date(d).toISOString().split("T")[0];
 }
 
+function calcularIdade(dataNascimento: Date | string | null | undefined): number | null {
+  if (!dataNascimento) return null;
+  const nasc = new Date(dataNascimento);
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade;
+}
+
 function isVencendo(dataVencimento: Date) {
   const diff = new Date(dataVencimento).getTime() - Date.now();
   return diff > 0 && diff < 7 * 24 * 60 * 60 * 1000;
@@ -830,7 +840,10 @@ function ModalDetalheAluno({
                     <IdCard size={12} className="text-muted" /> {formatCpf(aluno.cpf) ?? "—"}
                   </p>
                   <p className="flex items-center gap-1.5">
-                    <Cake size={12} className="text-muted" /> {formatData(aluno.dataNascimento)}
+                    <Cake size={12} className="text-muted" />
+                    {aluno.dataNascimento
+                      ? `${formatData(aluno.dataNascimento)} · ${calcularIdade(aluno.dataNascimento)} anos`
+                      : "—"}
                   </p>
                 </div>
                 <p className="mt-2 text-xs text-muted">Aluno desde {formatData(aluno.createdAt)}</p>

@@ -35,6 +35,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
   const [respostas, setRespostas] = useState<Record<number, "S" | "N">>({});
   const [aceitaResponsabilidade, setAceitaResponsabilidade] = useState(false);
   const [lgpd, setLgpd] = useState(false);
@@ -86,7 +87,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
         const res = await fetch(`/api/parq/${tenantId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nome, cpf, telefone, respostas, assinatura, consentimentoLgpd: lgpd }),
+          body: JSON.stringify({ nome, cpf, telefone, dataNascimento: dataNascimento || undefined, respostas, assinatura, consentimentoLgpd: lgpd }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({})) as { error?: string; detail?: string };
@@ -174,6 +175,17 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
                 inputMode="tel"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-white/60">Data de nascimento</label>
+            <input
+              type="date"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white focus:border-indigo-500/50 focus:outline-none [color-scheme:dark]"
+              value={dataNascimento}
+              onChange={(e) => setDataNascimento(e.target.value)}
+              max={new Date().toISOString().split("T")[0]}
+            />
           </div>
         </div>
 
