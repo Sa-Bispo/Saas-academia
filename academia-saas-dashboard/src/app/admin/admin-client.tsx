@@ -82,6 +82,7 @@ function isRecent(date: Date | string | null) {
 function nichePalette(niche: string) {
   if (niche === "adega") return "bg-amber-500/15 text-amber-300 ring-amber-400/30";
   if (niche === "pizzaria") return "bg-red-500/15 text-red-300 ring-red-400/30";
+  if (niche === "academia") return "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30";
   return "bg-sky-500/15 text-sky-300 ring-sky-400/30";
 }
 
@@ -159,7 +160,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
   const [editingTenant, setEditingTenant] = useState<{
     id: string;
     nome: string;
-    subNicho: "adega" | "lanchonete" | "pizzaria";
+    subNicho: "adega" | "lanchonete" | "pizzaria" | "academia";
     plano: string;
     vencimento: string;
   } | null>(null);
@@ -178,7 +179,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
   const [formData, setFormData] = useState({
     nome: "",
     email: "",
-    sub_nicho: "adega" as "adega" | "lanchonete" | "pizzaria",
+    sub_nicho: "adega" as "adega" | "lanchonete" | "pizzaria" | "academia",
     plano: plans[0]?.code ?? "",
     senha: "",
     vencimento: "",
@@ -268,7 +269,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
         setOpenModal(false);
         setModalError(null);
         setCredenciais({ email: result.email, senha: result.senhaTemp, url: result.url });
-        setFormData({ nome: "", email: "", sub_nicho: "adega", plano: plans[0]?.code ?? "", senha: "", vencimento: "" });
+        setFormData({ nome: "", email: "", sub_nicho: "academia", plano: plans[0]?.code ?? "", senha: "", vencimento: "" });
         showFeedback("✓ Cliente criado com sucesso.");
       } catch (error) {
         setModalError(error instanceof Error ? error.message : "Erro ao criar cliente. Tente novamente.");
@@ -322,7 +323,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
     setEditingTenant({
       id: tenant.id,
       nome: tenant.nome,
-      subNicho: (tenant.subNicho as "adega" | "lanchonete" | "pizzaria") ?? "adega",
+      subNicho: (tenant.subNicho as "adega" | "lanchonete" | "pizzaria" | "academia") ?? "academia",
       plano: tenant.planCode ?? plans[0]?.code ?? "",
       vencimento: toInputDate(tenant.dueDate),
     });
@@ -495,6 +496,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
             className="h-11 rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition focus:border-brand/45"
           >
             <option value="todos">Todos os nichos</option>
+            <option value="academia">Academia</option>
             <option value="adega">Adega</option>
             <option value="lanchonete">Lanchonete</option>
             <option value="pizzaria">Pizzaria</option>
@@ -711,9 +713,10 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 <Field label="Sub-nicho">
                   <select
                     value={formData.sub_nicho}
-                    onChange={(e) => updateFormData({ sub_nicho: e.target.value as "adega" | "lanchonete" | "pizzaria" })}
+                    onChange={(e) => updateFormData({ sub_nicho: e.target.value as "adega" | "lanchonete" | "pizzaria" | "academia" })}
                     className="h-10 w-full rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition focus:border-brand/45"
                   >
+                    <option value="academia">Academia</option>
                     <option value="adega">Adega</option>
                     <option value="lanchonete">Lanchonete</option>
                     <option value="pizzaria">Pizzaria</option>
@@ -821,10 +824,11 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                   <select
                     value={editingTenant.subNicho}
                     onChange={(e) =>
-                      setEditingTenant((p) => p ? { ...p, subNicho: e.target.value as "adega" | "lanchonete" | "pizzaria" } : p)
+                      setEditingTenant((p) => p ? { ...p, subNicho: e.target.value as "adega" | "lanchonete" | "pizzaria" | "academia" } : p)
                     }
                     className="h-10 w-full rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition focus:border-brand/45"
                   >
+                    <option value="academia">Academia</option>
                     <option value="adega">Adega</option>
                     <option value="lanchonete">Lanchonete</option>
                     <option value="pizzaria">Pizzaria</option>

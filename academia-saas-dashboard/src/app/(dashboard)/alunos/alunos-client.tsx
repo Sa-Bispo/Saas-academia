@@ -590,8 +590,8 @@ function ModalDetalheAluno({
   const [comprovantePending, startComprovanteTransition] = useTransition();
   const [comprovantePendingId, setComprovantePendingId] = useState<string | null>(null);
   const [comprovanteAmpliado, setComprovanteAmpliado] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(true);
-  const [aluno, setAluno] = useState<AlunoDetalhe | null>(null);
+  // undefined = ainda carregando | null = não encontrado | AlunoDetalhe = carregado
+  const [aluno, setAluno] = useState<AlunoDetalhe | null | undefined>(undefined);
   const [editando, setEditando] = useState(false);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
 
@@ -636,19 +636,17 @@ function ModalDetalheAluno({
   }
 
   useEffect(() => {
-    let ativo = true;
-    (async () => {
-      const data = await buscarAluno(alunoId);
-      if (!ativo) return;
-      if (data) {
-        setAluno(data as unknown as AlunoDetalhe);
-        carregarFormDeAluno(data as unknown as AlunoDetalhe);
-      }
-      setCarregando(false);
-    })();
-    return () => {
-      ativo = false;
-    };
+    setAluno(undefined);
+    buscarAluno(alunoId)
+      .then((data) => {
+        const resultado = (data as unknown as AlunoDetalhe) ?? null;
+        setAluno(resultado);
+        if (resultado) carregarFormDeAluno(resultado);
+      })
+      .catch((err) => {
+        console.error("[ModalDetalheAluno] erro ao buscar aluno:", err);
+        setAluno(null);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alunoId]);
 
@@ -693,7 +691,7 @@ function ModalDetalheAluno({
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold text-white">
-              {carregando ? "Carregando..." : aluno?.nome ?? "Aluno"}
+              {aluno === undefined ? "Carregando..." : aluno?.nome ?? "Aluno"}
             </h2>
             {statusCfg && !editando && (
               <div className="mt-1 flex items-center gap-1.5">
@@ -723,11 +721,11 @@ function ModalDetalheAluno({
 
         {/* Body */}
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
-          {carregando ? (
+          {aluno === undefined ? (
             <div className="flex items-center justify-center py-10 text-muted">
               <Loader2 size={20} className="animate-spin" />
             </div>
-          ) : !aluno ? (
+          ) : aluno === null ? (
             <p className="py-10 text-center text-sm text-muted">Aluno não encontrado.</p>
           ) : editando ? (
             <>

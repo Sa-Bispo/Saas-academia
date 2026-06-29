@@ -14,7 +14,7 @@ const EXPIRING_IN_DAYS = 7;
 const createTenantSchema = z.object({
   nome: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(255),
-  sub_nicho: z.enum(["adega", "lanchonete", "pizzaria"]),
+  sub_nicho: z.enum(["adega", "lanchonete", "pizzaria", "academia"]),
   plano: z.string().trim().min(1),
   senha: z.preprocess(
     (value) => {
@@ -238,7 +238,7 @@ export async function getAdminStats(): Promise<AdminStats> {
 export async function createTenant(input: {
   nome: string;
   email: string;
-  sub_nicho: "adega" | "lanchonete" | "pizzaria";
+  sub_nicho: "adega" | "lanchonete" | "pizzaria" | "academia";
   plano: string;
   senha?: string;
   vencimento: Date | string;
@@ -275,14 +275,33 @@ export async function createTenant(input: {
   const senhaTemp = parsed.senha ?? generateSecurePassword(12);
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const supabaseAdmin = createAdminClient();
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+  let { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email: parsed.email,
     password: senhaTemp,
     email_confirm: true,
-    user_metadata: {
-      nome: parsed.nome,
-    },
+    user_metadata: { nome: parsed.nome },
   });
+
+  // Usuário existe no Auth mas pode ser órfão (DB apagado manualmente)
+  if (authError?.message?.toLowerCase().includes("already")) {
+    const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+    const orphan = listData?.users?.find((u) => u.email === parsed.email);
+    if (orphan) {
+      const dbUser = await prisma.user.findUnique({ where: { email: parsed.email }, select: { id: true } });
+      if (!dbUser) {
+        // Apaga o órfão do Auth e tenta criar novamente
+        await supabaseAdmin.auth.admin.deleteUser(orphan.id);
+        const retry = await supabaseAdmin.auth.admin.createUser({
+          email: parsed.email,
+          password: senhaTemp,
+          email_confirm: true,
+          user_metadata: { nome: parsed.nome },
+        });
+        authData = retry.data;
+        authError = retry.error;
+      }
+    }
+  }
 
   if (authError || !authData.user?.id) {
     const message = authError?.message?.toLowerCase().includes("already")
@@ -494,7 +513,7 @@ export async function updateTenantPlan(input: { tenantId: string; plano: string 
 export async function updateTenantFull(input: {
   tenantId: string;
   nome: string;
-  sub_nicho: "adega" | "lanchonete" | "pizzaria";
+  sub_nicho: "adega" | "lanchonete" | "pizzaria" | "academia";
   plano: string;
   vencimento: string | Date;
 }) {
@@ -504,7 +523,7 @@ export async function updateTenantFull(input: {
     .object({
       tenantId: z.string().trim().uuid(),
       nome: z.string().trim().min(2).max(120),
-      sub_nicho: z.enum(["adega", "lanchonete", "pizzaria"]),
+      sub_nicho: z.enum(["adega", "lanchonete", "pizzaria", "academia"]),
       plano: z.string().trim().min(1),
       vencimento: z.union([z.string(), z.date()]),
     })
