@@ -1203,18 +1203,26 @@ async def get_aluno_by_phone(tenant_id: str, phone: str) -> dict[str, Any] | Non
 
     conn = await asyncpg.connect(BOT_DATABASE_CONNECTION_URI)
     try:
-        row = await conn.fetchrow(
+        rows = await conn.fetch(
             f"""
             SELECT id, nome, telefone, status
             FROM alunos
             WHERE tenant_id = $1
               AND regexp_replace(telefone, '[^0-9]', '', 'g') IN ({placeholders})
-            ORDER BY id ASC
-            LIMIT 1
+            ORDER BY created_at DESC
+            LIMIT 5
             """,
             tenant_id,
             *variants,
         )
+        if not rows:
+            return None
+        if len(rows) > 1:
+            logger.warning(
+                '[DB] get_aluno_by_phone: %d alunos com o mesmo telefone (tenant=%s, phone=%s) — usando o mais recente: %s',
+                len(rows), tenant_id, phone, rows[0]['nome'],
+            )
+        row = rows[0]
         return dict(row) if row else None
     finally:
         await conn.close()

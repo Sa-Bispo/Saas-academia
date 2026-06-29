@@ -203,7 +203,7 @@ _PATTERNS_RENOVAR = [
 ]
 
 
-def _detectar_intent(text: str, learned_patterns: list[dict] | None = None) -> str:
+def detectar_intent(text: str, learned_patterns: list[dict] | None = None) -> str:
     # Normaliza (remove acentos, lowercase) e expande abreviações
     t = _expandir_abreviacoes(_norm(text))
 
@@ -423,35 +423,6 @@ def _msg_encerrar(nome: str) -> str:
     return f'Foi um prazer ajudar, *{primeiro}*! 💪\nQualquer coisa é só chamar. Bons treinos! 🏋️'
 
 
-_NAO_ENTENDI_VARIACOES = [
-    (
-        'Hmm, não consegui entender muito bem. 😅\n\n'
-        'Me diz: você quer ver sua *matrícula*, *cobranças*, a *chave Pix* ou registrar um *pagamento*?'
-    ),
-    (
-        'Não entendi sua mensagem desta vez! 🤔\n\n'
-        'Posso te ajudar com:\n'
-        '1️⃣ Situação da matrícula\n'
-        '2️⃣ Cobranças em aberto\n'
-        '3️⃣ Chave Pix para pagamento\n'
-        '4️⃣ Já paguei — quero registrar'
-    ),
-    (
-        'Opa, essa eu não peguei bem! 😅\n'
-        'Tenta me dizer de outra forma, ou escolhe uma das opções:\n\n'
-        '*1* → Minha matrícula\n'
-        '*2* → Minhas cobranças\n'
-        '*3* → Pagar via Pix\n'
-        '*4* → Registrar pagamento feito'
-    ),
-]
-
-_NAO_ENTENDI_ESCALACAO = (
-    'Parece que estou tendo dificuldade de entender o que você precisa. 😔\n\n'
-    'Para atendimento direto com nossa equipe, entre em contato pela recepção ou aguarde '
-    'que um atendente vai assumir essa conversa em breve. 👋'
-)
-
 _DESISTIR_COMPROVANTE_VARIACOES = [
     'Sem problema! 😊 Se quiser regularizar depois, é só me chamar por aqui.',
     'Tudo bem! Quando quiser pagar, estou por aqui. 💪',
@@ -459,11 +430,42 @@ _DESISTIR_COMPROVANTE_VARIACOES = [
 ]
 
 
-def _msg_nao_entendi(count: int = 0) -> str:
-    if count >= 3:
-        return _NAO_ENTENDI_ESCALACAO
-    idx = count % len(_NAO_ENTENDI_VARIACOES)
-    return _NAO_ENTENDI_VARIACOES[idx]
+def _msg_nao_entendi(count: int, cobrancas: list | None = None, matricula: dict | None = None) -> str:
+    """
+    Recuperação em 3 níveis progressivos:
+      0 → pede reformulação simples
+      1 → menu contextual (só as opções relevantes pro estado do aluno)
+      2+ → escalação para atendente com saída fácil pelo menu
+    """
+    if count == 0:
+        return (
+            'Hmm, não entendi muito bem essa. 😅\n\n'
+            'Pode tentar me dizer de outra forma? '
+            'Ou é só digitar *menu* que eu mostro as opções.'
+        )
+
+    if count == 1:
+        # Menu contextual — só mostra o que faz sentido pro estado atual do aluno
+        tem_cobranca = bool(cobrancas)
+        tem_matricula = bool(matricula)
+        linhas = ['Não consegui entender de novo. 🤔 Vou simplificar:\n']
+        if tem_cobranca:
+            linhas.append('💳 *Pix* — ver chave para pagar')
+            linhas.append('✅ *Paguei* — já fiz o pagamento')
+        if tem_matricula:
+            linhas.append('📋 *Matrícula* — ver minha situação')
+        if not tem_cobranca:
+            linhas.append('🔄 *Renovar* — renovar minha matrícula')
+        linhas.append('📋 *Cobrança* — ver o que devo')
+        linhas.append('\nDigita uma dessas palavras ou o número do menu. 😊')
+        return '\n'.join(linhas)
+
+    # count >= 2 → escalação com saída fácil
+    return (
+        'Parece que estou com dificuldade de te ajudar nesse ponto. 😔\n\n'
+        'Vou chamar nossa equipe para te atender diretamente. '
+        'Se quiser continuar pelo bot enquanto isso, é só digitar *menu*. 👋'
+    )
 
 
 def _msg_desistir_comprovante() -> str:
@@ -483,6 +485,7 @@ def process_academia_message(
     tenant_config: dict[str, Any],
     imagem_recebida: bool = False,
     learned_patterns: list[dict] | None = None,
+    ai_result: dict | None = None,
 ) -> tuple[str | list[str], dict[str, Any]]:
     """
     Processa uma mensagem do aluno e retorna (resposta, session_atualizada).
@@ -520,7 +523,7 @@ def process_academia_message(
 
     # ── AGUARD_COMPROVANTE ──────────────────────────────────────────────────────
     if state == AcademiaState.AGUARD_COMPROVANTE.value:
-        intent = _detectar_intent(text, learned_patterns)
+        intent = detectar_intent(text, learned_patterns)
 
         if intent in ('menu', 'matricula', 'cobranca', 'pix'):
             session['state'] = AcademiaState.MENU.value
@@ -541,7 +544,7 @@ def process_academia_message(
 
     # ── MENU ───────────────────────────────────────────────────────────────────
     if state == AcademiaState.MENU.value:
-        intent = _detectar_intent(text, learned_patterns)
+        intent = detectar_intent(text, learned_patterns)
         text_norm = _norm(text)
 
         # Atalhos numéricos — aceita "1", "1.", "1)", "01", "opcao 1", "opção 1"
@@ -597,10 +600,34 @@ def process_academia_message(
             session['confusion_count'] = 0
             return _msg_menu(nome, matricula, cobrancas), session
 
-        # Não entendeu — incrementa contador e varia resposta por nível de frustração
+        # Regex não reconheceu — tenta fallback de IA antes de contar confusão
+        if intent == 'desconhecido' and ai_result:
+            ai_intent = str(ai_result.get('intent') or 'desconhecido')
+            if ai_intent != 'desconhecido':
+                # IA classificou: redireciona para o mesmo bloco de intents acima
+                # (chamada recursiva enxuta — sem risco de loop, pois ai_result=None)
+                return process_academia_message(
+                    text=ai_intent,          # texto sintético que casa com o padrão numérico
+                    session=session,
+                    aluno=aluno,
+                    matricula=matricula,
+                    cobrancas=cobrancas,
+                    pix_chave=pix_chave,
+                    tenant_config=tenant_config,
+                    imagem_recebida=False,
+                    learned_patterns=None,
+                    ai_result=None,          # evita loop
+                )
+            resposta_livre = (ai_result.get('resposta') or '').strip()
+            if resposta_livre:
+                # IA respondeu livremente (ex.: pergunta geral sobre a academia)
+                session['confusion_count'] = 0
+                return resposta_livre, session
+
+        # Nenhuma estratégia funcionou — incrementa contador de confusão
         count = session.get('confusion_count', 0) + 1
         session['confusion_count'] = count
-        return _msg_nao_entendi(count - 1), session
+        return _msg_nao_entendi(count - 1, cobrancas=cobrancas, matricula=matricula), session
 
     # ── FINALIZADO ─────────────────────────────────────────────────────────────
     if state == AcademiaState.FINALIZADO.value:

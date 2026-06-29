@@ -89,8 +89,8 @@ async def _gerar_cobrancas_vencimento(conn, tenant_id: str, dias_antecedencia: i
                 '''
                 INSERT INTO cobrancas_alunos
                     (id, tenant_id, aluno_id, matricula_id, valor_cents,
-                     data_vencimento, descricao, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDENTE')
+                     data_vencimento, descricao, status, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDENTE', NOW())
                 ''',
                 str(uuid.uuid4()),
                 tenant_id,

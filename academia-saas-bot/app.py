@@ -23,9 +23,10 @@ from database_api import (
     get_pix_chave_tenant,
     salvar_comprovante_pagamento,
 )
-from academia_flow import process_academia_message, AcademiaState
+from academia_flow import process_academia_message, AcademiaState, detectar_intent
+from ai_intent_classifier import classify_intent as _ai_classify_intent
 from message_buffer import buffer_message
-from config import GEMINI_API_KEY, REDIS_URL as _REDIS_URL
+from config import GEMINI_API_KEY, GEMINI_MODEL_NAME, REDIS_URL as _REDIS_URL
 
 _REDIS_URI = _REDIS_URL or 'redis://redis:6379/6'
 from admin_api import router as admin_router
@@ -126,8 +127,14 @@ gemini_client = genai.Client(api_key=(GEMINI_API_KEY or '').strip()) if GEMINI_A
 
 
 def extract_chat_id(payload: dict) -> str | None:
-    raw_chat_id = payload.get('data', {}).get('key', {}).get('remoteJid')
+    key = payload.get('data', {}).get('key', {})
 
+    # Ignora mensagens enviadas pelo próprio bot — evita processar
+    # o echo do outgoing e contaminar sessões de outros alunos.
+    if key.get('fromMe'):
+        return None
+
+    raw_chat_id = key.get('remoteJid')
     if not raw_chat_id or raw_chat_id.endswith('@g.us'):
         return None
 
@@ -321,6 +328,47 @@ async def _process_chat_message(
                     evolution_data=evolution_raw_data or {},
                 )
 
+            # Fallback de IA: só chama quando o regex não reconhece a mensagem
+            # e o aluno já está no menu (após identificado). Custo zero no caminho feliz.
+            ai_result = None
+            state_atual = session.get('state', AcademiaState.IDENTIFICANDO.value)
+            if (
+                state_atual == AcademiaState.MENU.value
+                and not imagem_recebida
+                and GEMINI_API_KEY
+                and detectar_intent(message) == 'desconhecido'
+            ):
+                # Monta status da matrícula para contexto da IA
+                _mat_status = ''
+                if matricula:
+                    from academia_flow import _dias_ate, _fmt_data
+                    dias = _dias_ate(matricula.get('data_vencimento'))
+                    if dias is None:
+                        _mat_status = 'ATIVA'
+                    elif dias < 0:
+                        _mat_status = f'VENCIDA há {abs(dias)} dias'
+                    elif dias == 0:
+                        _mat_status = 'vence HOJE'
+                    elif dias <= 7:
+                        _mat_status = f'vence em {dias} dias'
+                    else:
+                        _mat_status = f'ATIVA até {_fmt_data(matricula.get("data_vencimento"))}'
+
+                try:
+                    ai_result = await _ai_classify_intent(
+                        message,
+                        nome=session.get('aluno_nome', ''),
+                        estado=state_atual,
+                        num_cobrancas=len(cobrancas),
+                        matricula_status=_mat_status,
+                        historico=session.get('historico', []),
+                        ultima_msg_bot=session.get('ultima_msg_bot', ''),
+                        api_key=GEMINI_API_KEY,
+                        model=GEMINI_MODEL_NAME or 'gemini-2.5-flash',
+                    )
+                except Exception:
+                    ai_result = None
+
             reply_academia, session_atualizada = process_academia_message(
                 text=message,
                 session=session,
@@ -330,7 +378,16 @@ async def _process_chat_message(
                 pix_chave=pix_chave,
                 tenant_config=configs,
                 imagem_recebida=bool(imagem_recebida and aluno is not None),
+                ai_result=ai_result,
             )
+
+            # Persiste histórico e última msg do bot para enriquecer contexto da próxima chamada
+            historico = list(session_atualizada.get('historico', session.get('historico', [])))
+            historico.append({'r': 'a', 't': (message or '')[:200]})
+            resp_text = reply_academia if isinstance(reply_academia, str) else (reply_academia[-1] if reply_academia else '')
+            historico.append({'r': 'b', 't': resp_text[:300]})
+            session_atualizada['historico'] = historico[-10:]  # últimas 5 trocas
+            session_atualizada['ultima_msg_bot'] = resp_text[:400]
 
             # Se o aluno acabou de enviar o comprovante, registra no banco
             # (cobranças PENDENTE/VENCIDO → AGUARDANDO_VALIDACAO + anexa a foto).
