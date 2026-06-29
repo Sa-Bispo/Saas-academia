@@ -84,6 +84,9 @@ app.include_router(admin_router)
 logger = logging.getLogger(__name__)
 
 
+_startup_time = time.time()
+
+
 @app.get('/')
 async def root():
     return {
@@ -92,6 +95,29 @@ async def root():
         'docs': 'http://localhost:8000/docs',
         'landing_page': 'http://localhost:3000',
     }
+
+
+@app.get('/health')
+async def health():
+    redis_ok = False
+    try:
+        r = await _get_redis_async()
+        await r.ping()
+        await r.aclose()
+        redis_ok = True
+    except Exception:
+        pass
+
+    uptime_seconds = int(time.time() - _startup_time)
+    status = 'ok' if redis_ok else 'degraded'
+    return JSONResponse(
+        status_code=200 if redis_ok else 503,
+        content={
+            'status': status,
+            'uptime_seconds': uptime_seconds,
+            'redis': 'ok' if redis_ok else 'unavailable',
+        },
+    )
 
 
 app.add_middleware(

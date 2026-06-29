@@ -3,10 +3,10 @@
 # Uso:
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
-# Variáveis necessárias no arquivo .env (na mesma pasta):
+# Variáveis necessárias no .env da raiz:
 #   POSTGRES_PASSWORD, EVOLUTION_API_KEY, GEMINI_API_KEY,
 #   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-#   SUPABASE_SERVICE_ROLE_KEY, NEXTAUTH_SECRET
+#   SUPABASE_SERVICE_ROLE_KEY
 
 services:
 
@@ -15,22 +15,33 @@ services:
   postgres:
     image: postgres:15
     container_name: postgres
-    command: ["postgres", "-c", "max_connections=1000"]
-    restart: always
+    command: ["postgres", "-c", "max_connections=200"]
+    restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Mapeado para o host — garante que o backup da Hostinger cobre os dados
+      - /opt/pyra/dados/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - saas_net
 
   redis:
     image: redis:7-alpine
     container_name: redis
-    command: redis-server --appendonly yes
-    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
     volumes:
-      - redis_data:/data
+      - /opt/pyra/dados/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - saas_net
 
@@ -39,9 +50,9 @@ services:
   evolution_api:
     image: evoapicloud/evolution-api:latest
     container_name: evolution_api
-    restart: always
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"   # acessível só localmente; Nginx faz proxy se necessário
+      - "127.0.0.1:8080:8080"
     environment:
       SERVER_URL: https://api.pyralabs.com.br/evolution
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
@@ -61,10 +72,12 @@ services:
       CACHE_REDIS_SAVE_INSTANCES: "false"
       CACHE_LOCAL_ENABLED: "false"
     volumes:
-      - evolution_instances:/evolution/instances
+      - /opt/pyra/dados/evolution:/evolution/instances
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - saas_net
 
@@ -74,17 +87,26 @@ services:
     build:
       context: ./academia-saas-bot
     container_name: bot
-    restart: always
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:8000:8000"   # acessível só localmente; Nginx faz proxy
+      - "127.0.0.1:8000:8000"
     env_file:
       - ./academia-saas-bot/.env
     environment:
       EVOLUTION_API_URL: http://evolution_api:8080
     depends_on:
-      - evolution_api
-      - redis
-      - postgres
+      evolution_api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - saas_net
 
@@ -100,7 +122,8 @@ services:
       DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
     restart: "no"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - saas_net
 
@@ -115,9 +138,9 @@ services:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_BOT_URL: https://api.pyralabs.com.br
     container_name: academia_web
-    restart: always
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"   # acessível só localmente; Nginx faz proxy
+      - "127.0.0.1:3000:3000"
     env_file:
       - ./academia-saas-dashboard/.env
     environment:
@@ -127,16 +150,21 @@ services:
       BOT_WEBHOOK_URL: http://bot:8000/webhook/evolution
     depends_on:
       bot:
-        condition: service_started
+        condition: service_healthy
       migrator:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - saas_net
 
 volumes:
-  postgres_data:
-  redis_data:
-  evolution_instances:
+  # Volumes nomeados removidos — dados agora em paths explícitos no host (/opt/pyra/dados/)
+  # para garantir cobertura pelo backup semanal da Hostinger
 
 networks:
   saas_net:
