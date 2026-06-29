@@ -99,20 +99,31 @@ export async function criarAluno(data: {
 }) {
   const tenantId = await getAuthenticatedTenantId();
 
-  const aluno = await prisma.aluno.create({
-    data: {
-      tenantId,
-      nome: data.nome.trim(),
-      telefone: data.telefone.replace(/\D/g, ""),
-      email: data.email?.trim() || null,
-      cpf: data.cpf?.replace(/\D/g, "") || null,
-      dataNascimento: data.dataNascimento ? new Date(data.dataNascimento) : null,
-      observacoes: data.observacoes?.trim() || null,
-    },
-  });
-
-  revalidatePath("/alunos");
-  return aluno;
+  try {
+    const aluno = await prisma.aluno.create({
+      data: {
+        tenantId,
+        nome: data.nome.trim(),
+        telefone: data.telefone.replace(/\D/g, ""),
+        email: data.email?.trim() || null,
+        cpf: data.cpf?.replace(/\D/g, "") || null,
+        dataNascimento: data.dataNascimento ? new Date(data.dataNascimento) : null,
+        observacoes: data.observacoes?.trim() || null,
+      },
+    });
+    revalidatePath("/alunos");
+    return aluno;
+  } catch (err) {
+    console.error("[criarAluno] erro:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("foreign key") || msg.includes("violates")) {
+      throw new Error("Tenant não encontrado. Tente recarregar a página.");
+    }
+    if (msg.includes("connect") || msg.includes("ECONNREFUSED")) {
+      throw new Error("Erro de conexão com o banco. Tente novamente em instantes.");
+    }
+    throw new Error("Erro ao cadastrar aluno. Tente novamente.");
+  }
 }
 
 export async function atualizarAluno(
