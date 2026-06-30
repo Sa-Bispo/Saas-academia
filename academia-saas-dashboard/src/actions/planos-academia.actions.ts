@@ -32,6 +32,8 @@ export async function criarPlanoAcademia(data: {
   nome: string;
   descricao?: string;
   valorCents: number;
+  valorCentsDinheiro?: number | null;
+  valorCentsPix?: number | null;
   periodicidade: "MENSAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL";
 }) {
   const tenantId = await getAuthenticatedTenantId();
@@ -42,6 +44,8 @@ export async function criarPlanoAcademia(data: {
       nome: data.nome.trim(),
       descricao: data.descricao?.trim() || null,
       valorCents: data.valorCents,
+      valorCentsDinheiro: data.valorCentsDinheiro ?? null,
+      valorCentsPix: data.valorCentsPix ?? null,
       periodicidade: data.periodicidade,
     },
   });
@@ -56,6 +60,8 @@ export async function atualizarPlanoAcademia(
     nome?: string;
     descricao?: string;
     valorCents?: number;
+    valorCentsDinheiro?: number | null;
+    valorCentsPix?: number | null;
     periodicidade?: "MENSAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL";
     ativo?: boolean;
   }
@@ -68,6 +74,8 @@ export async function atualizarPlanoAcademia(
       ...(data.nome && { nome: data.nome.trim() }),
       ...(data.descricao !== undefined && { descricao: data.descricao?.trim() || null }),
       ...(data.valorCents !== undefined && { valorCents: data.valorCents }),
+      ...(data.valorCentsDinheiro !== undefined && { valorCentsDinheiro: data.valorCentsDinheiro }),
+      ...(data.valorCentsPix !== undefined && { valorCentsPix: data.valorCentsPix }),
       ...(data.periodicidade && { periodicidade: data.periodicidade }),
       ...(data.ativo !== undefined && { ativo: data.ativo }),
     },

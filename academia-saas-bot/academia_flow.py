@@ -33,10 +33,11 @@ logger = logging.getLogger(__name__)
 # ─── Estados ──────────────────────────────────────────────────────────────────
 
 class AcademiaState(Enum):
-    IDENTIFICANDO      = 'identificando'
-    MENU               = 'menu'
-    AGUARD_COMPROVANTE = 'aguard_comprovante'
-    FINALIZADO         = 'finalizado'
+    IDENTIFICANDO           = 'identificando'
+    MENU                    = 'menu'
+    AGUARD_COMPROVANTE      = 'aguard_comprovante'
+    AGUARD_CONFIRM_CODIGO   = 'aguard_confirm_codigo'  # funcionário confirmando código
+    FINALIZADO              = 'finalizado'
 
 
 # ─── Helpers de formatação ────────────────────────────────────────────────────
@@ -154,6 +155,13 @@ _PATTERNS_PIX = [
     r'\b(como pagar)\b',
 ]
 
+_PATTERNS_DINHEIRO = [
+    r'\b(dinheiro|especie|em dinheiro|pagar em dinheiro|quero pagar em dinheiro)\b',
+    r'\b(pagamento em dinheiro|pago em dinheiro)\b',
+    r'\b(vou pagar em dinheiro|prefiro dinheiro)\b',
+    r'\b(na recep[cç][aã]o|presencialmente)\b',
+]
+
 _PATTERNS_PAGUEI = [
     r'\b(paguei|ja paguei|efetuei|fiz o pix|realizei|transferi|enviei|mandei)\b',
     r'\b(pix (enviado|feito|realizado|mandado|efetuado))\b',
@@ -217,7 +225,7 @@ def detectar_intent(text: str, learned_patterns: list[dict] | None = None) -> st
             except Exception:
                 pass
 
-    # Prioridade: paguei > desistir > renovar > pix > cobranca > matricula > encerrar > menu > sim/nao
+    # Prioridade: paguei > desistir > renovar > dinheiro > pix > cobranca > matricula > encerrar > menu > sim/nao
     for p in _PATTERNS_PAGUEI:
         if re.search(p, t):
             return 'paguei'
@@ -227,6 +235,9 @@ def detectar_intent(text: str, learned_patterns: list[dict] | None = None) -> st
     for p in _PATTERNS_RENOVAR:
         if re.search(p, t):
             return 'renovar'
+    for p in _PATTERNS_DINHEIRO:
+        if re.search(p, t):
+            return 'dinheiro'
     for p in _PATTERNS_PIX:
         if re.search(p, t):
             return 'pix'
@@ -261,7 +272,7 @@ def _msg_nao_encontrado() -> str:
     )
 
 
-def _msg_menu(nome: str, matricula: dict | None, cobrancas: list[dict]) -> str:
+def _msg_menu(nome: str, matricula: dict | None, cobrancas: list[dict], tem_dinheiro: bool = False) -> str:
     primeiro_nome = (nome or '').split()[0]
     dias = _dias_ate(matricula.get('data_vencimento')) if matricula else None
     vencendo = dias is not None and dias <= 7
@@ -270,9 +281,13 @@ def _msg_menu(nome: str, matricula: dict | None, cobrancas: list[dict]) -> str:
     linhas.append('1️⃣ Minha matrícula')
     linhas.append('2️⃣ Cobranças pendentes')
     if cobrancas:
-        linhas.append('3️⃣ Ver chave Pix para pagamento')
-        linhas.append('4️⃣ Já fiz o pagamento')
-        linhas.append('5️⃣ Quero renovar minha matrícula')
+        linhas.append('3️⃣ Pagar via Pix')
+        if tem_dinheiro:
+            linhas.append('4️⃣ Pagar em dinheiro (código para recepção)')
+            linhas.append('5️⃣ Já fiz o pagamento')
+        else:
+            linhas.append('4️⃣ Já fiz o pagamento')
+        linhas.append('5️⃣ Quero renovar minha matrícula' if not tem_dinheiro else '6️⃣ Quero renovar minha matrícula')
     elif vencendo or not matricula:
         linhas.append('3️⃣ Quero renovar minha matrícula')
     linhas.append('\nDigite o número ou descreva o que precisa 😊')
@@ -310,7 +325,7 @@ def _msg_matricula(matricula: dict | None) -> str:
     )
 
 
-def _msg_cobrancas(cobrancas: list[dict], pix_chave: str | None) -> str:
+def _msg_cobrancas(cobrancas: list[dict], pix_chave: str | None, tem_dinheiro: bool = False) -> str:
     if not cobrancas:
         return '✅ Você não possui cobranças pendentes. Tudo em dia! 🎉'
 
@@ -323,12 +338,62 @@ def _msg_cobrancas(cobrancas: list[dict], pix_chave: str | None) -> str:
         valor = _fmt_brl(c.get('valor_cents') or 0)
         linhas.append(f'{emoji} {descr} — *{valor}* (venc. {venc})')
 
+    opcoes = []
     if pix_chave:
-        linhas.append('\nQuer pagar agora? Digite *Pix* que eu te mando a chave! 😊')
+        opcoes.append('Digite *PIX* para ver a chave')
+    if tem_dinheiro:
+        opcoes.append('Digite *DINHEIRO* para receber seu código de pagamento')
+
+    if opcoes:
+        linhas.append('\n' + ' · '.join(opcoes) + ' 😊')
     else:
         linhas.append('\nEntre em contato com a recepção para realizar o pagamento.')
 
     return '\n'.join(linhas)
+
+
+def _msg_dinheiro_codigo(codigo: str, valor_cents: int, aluno_nome: str) -> str:
+    primeiro = (aluno_nome or '').split()[0]
+    valor = _fmt_brl(valor_cents)
+    return (
+        f'✅ *{primeiro}*, seu código de pagamento em dinheiro é:\n\n'
+        f'🎟️ *{codigo}*\n\n'
+        f'💰 Valor: *{valor}*\n\n'
+        f'Apresente esse código na recepção quando for pagar. '
+        f'O código é válido por *48 horas*. '
+        f'Assim que o pagamento for confirmado, você receberá o recibo aqui! 😊'
+    )
+
+
+def _msg_dinheiro_sem_config() -> str:
+    return (
+        '💵 Para pagar em dinheiro, dirija-se à recepção da academia.\n\n'
+        'Se preferir pagar via *Pix*, é só digitar *PIX* que eu te mando a chave! 😊'
+    )
+
+
+def _msg_funcionario_codigo_detalhes(aluno_nome: str, valor_cents: int, descricao: str | None) -> str:
+    valor = _fmt_brl(valor_cents)
+    desc = descricao or 'Mensalidade'
+    return (
+        f'💰 *Confirmar pagamento em dinheiro?*\n\n'
+        f'👤 *Aluno:* {aluno_nome}\n'
+        f'💵 *Valor:* {valor}\n'
+        f'📋 *Ref:* {desc}\n\n'
+        f'Responda *SIM* para confirmar o recebimento.'
+    )
+
+
+def _msg_funcionario_confirmado(aluno_nome: str) -> str:
+    primeiro = (aluno_nome or '').split()[0]
+    return (
+        f'✅ *Pagamento confirmado!*\n\n'
+        f'{primeiro} receberá o recibo automaticamente no WhatsApp. 💪'
+    )
+
+
+def _msg_funcionario_codigo_invalido() -> str:
+    return '❌ Código inválido ou já utilizado. Verifique e tente novamente.'
 
 
 def _msg_pix(pix_chave: str | None, cobrancas: list[dict]) -> str:
@@ -486,6 +551,13 @@ def process_academia_message(
     imagem_recebida: bool = False,
     learned_patterns: list[dict] | None = None,
     ai_result: dict | None = None,
+    # Campos extras para fluxo de funcionário
+    is_funcionario: bool = False,
+    funcionario_id: str | None = None,
+    codigo_info: dict[str, Any] | None = None,
+    confirmar_codigo_fn: Any | None = None,
+    gerar_codigo_fn: Any | None = None,
+    plano_valor_dinheiro: int | None = None,
 ) -> tuple[str | list[str], dict[str, Any]]:
     """
     Processa uma mensagem do aluno e retorna (resposta, session_atualizada).
@@ -493,9 +565,74 @@ def process_academia_message(
     `imagem_recebida` indica que a mensagem do WhatsApp trouxe uma imagem
     (possível comprovante de pagamento) — quem decide se há mídia real
     a salvar é a camada de cima (app.py); aqui só tratamos a intenção.
+
+    Fluxo de funcionário: quando `is_funcionario=True`, o bot espera um código
+    #XXXXXX e confirma o pagamento em dinheiro chamando `confirmar_codigo_fn`.
     """
     session = dict(session)
     state = session.get('state', AcademiaState.IDENTIFICANDO.value)
+
+    # ── Fluxo exclusivo de funcionário ────────────────────────────────────────
+    if is_funcionario:
+        text_norm = _norm(text)
+        # Detecta código no formato #XXXXXX (ou sem o #)
+        codigo_match = re.search(r'#?([A-Z0-9]{6})', text.upper())
+
+        if state == AcademiaState.AGUARD_CONFIRM_CODIGO.value:
+            intent = detectar_intent(text, learned_patterns)
+            pending_codigo = session.get('pending_codigo')
+            pending_aluno = session.get('pending_aluno_nome', '')
+            pending_valor = session.get('pending_valor_cents', 0)
+            pending_descricao = session.get('pending_descricao')
+            pending_cp_id = session.get('pending_cp_id')
+
+            if intent in ('sim', 'nao') or _norm(text) in ('sim', 's', 'confirmo'):
+                if intent == 'nao' or _norm(text) in ('nao', 'n', 'negativo'):
+                    session['state'] = AcademiaState.MENU.value
+                    return 'Ok, pagamento não confirmado.', session
+
+                # Confirma via callback (injetado pelo app.py)
+                if confirmar_codigo_fn and pending_codigo:
+                    try:
+                        confirmar_codigo_fn(pending_codigo, funcionario_id or '')
+                        session['state'] = AcademiaState.MENU.value
+                        session.pop('pending_codigo', None)
+                        session.pop('pending_aluno_nome', None)
+                        session.pop('pending_valor_cents', None)
+                        session.pop('pending_descricao', None)
+                        session.pop('pending_cp_id', None)
+                        return _msg_funcionario_confirmado(pending_aluno), session
+                    except Exception as e:
+                        session['state'] = AcademiaState.MENU.value
+                        return f'Erro ao confirmar: {e}', session
+                session['state'] = AcademiaState.MENU.value
+                return 'Confirmação não pôde ser processada.', session
+
+            # Outro código digitado enquanto aguardava
+            if codigo_match:
+                session['state'] = AcademiaState.MENU.value
+                # Cai no fluxo normal de código abaixo
+            else:
+                return 'Responda *SIM* para confirmar ou *NÃO* para cancelar.', session
+
+        # Detecta código #XXXXXX em qualquer mensagem do funcionário
+        if codigo_match:
+            codigo = '#' + codigo_match.group(1)
+            if codigo_info:
+                # codigo_info já foi resolvido pelo app.py antes de chamar esta função
+                aluno_nome = str(codigo_info.get('aluno_nome') or '')
+                valor_cents = int(codigo_info.get('valor_display_cents') or 0)
+                descricao = codigo_info.get('descricao')
+                session['state'] = AcademiaState.AGUARD_CONFIRM_CODIGO.value
+                session['pending_codigo'] = codigo
+                session['pending_aluno_nome'] = aluno_nome
+                session['pending_valor_cents'] = valor_cents
+                session['pending_descricao'] = descricao
+                return _msg_funcionario_codigo_detalhes(aluno_nome, valor_cents, descricao), session
+            else:
+                return _msg_funcionario_codigo_invalido(), session
+
+        return 'Olá! Para registrar um pagamento, envie o código do aluno (ex: *#A3K7B2*). 😊', session
 
     # ── IDENTIFICANDO ──────────────────────────────────────────────────────────
     if state == AcademiaState.IDENTIFICANDO.value:
@@ -571,6 +708,20 @@ def process_academia_message(
         if intent == 'cobranca':
             session['confusion_count'] = 0
             return _msg_cobrancas(cobrancas, pix_chave), session
+
+        if intent == 'dinheiro':
+            session['confusion_count'] = 0
+            if not cobrancas:
+                return '✅ Você não possui cobranças pendentes no momento!', session
+            if gerar_codigo_fn:
+                try:
+                    resultado = gerar_codigo_fn()
+                    codigo = resultado.get('codigo', '')
+                    valor = plano_valor_dinheiro or (cobrancas[0].get('valor_cents') or 0)
+                    return _msg_dinheiro_codigo(codigo, valor, nome), session
+                except Exception:
+                    pass
+            return _msg_dinheiro_sem_config(), session
 
         if intent == 'pix':
             session['confusion_count'] = 0

@@ -55,6 +55,31 @@ pyralabs.com.br  ←→  Nginx (VPS Hostinger)  ←→  Docker Compose
 - `getAuthenticatedTenantId()` em cada Server Action: busca user do Supabase → resolve tenant no Postgres
 - Admin (`ADMIN_EMAIL=samuel.bispon01@gmail.com`) é redirecionado para `/admin` pelo layout
 
+### Pagamento em dinheiro via bot (Códigos #XXXXXX)
+
+**Fluxo aluno:**
+1. Bot envia cobrança com opções: Pix ou Dinheiro
+2. Aluno responde "DINHEIRO" → bot chama `POST /api/bot/gerar-codigo` → retorna código `#A3K7B2`
+3. Aluno apresenta o código na recepção
+
+**Fluxo funcionário:**
+1. Funcionário envia `#A3K7B2` para o bot via WhatsApp
+2. Bot verifica se o número é um `Funcionario` ativo no banco
+3. Bot busca o código em `codigos_pagamento` e mostra detalhes
+4. Funcionário responde SIM → bot chama `POST /api/bot/confirmar-codigo`
+5. Sistema registra pagamento, renova matrícula, envia recibo (imagem PNG) ao aluno
+
+**Modelos:**
+- `Funcionario`: id, tenantId, nome, telefone, ativo
+- `CodigoPagamento`: id, tenantId, cobrancaId, codigo (único), expiresAt (48h), usadoEm, funcionarioId
+- `PlanoAcademia` novos campos: `valorCentsDinheiro`, `valorCentsPix`
+- `CobrancaAluno` novos campos: `formaPagamento` (DINHEIRO/PIX), `confirmadoPorFuncionarioId`
+
+**Telas:**
+- `/funcionarios` — CRUD de funcionários
+- `/cobrancas` — mostra código ativo por cobrança (badge copiável), botão "Código bot" para gerar
+- `/planos-academia` — campos de valor por forma de pagamento no modal
+
 ### Deploy
 
 - **Auto:** push na `main` → GitHub Actions → SSH VPS → git pull + docker rebuild

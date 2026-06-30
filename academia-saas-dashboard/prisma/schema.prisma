@@ -66,6 +66,8 @@ model Tenant {
   fichasParq          FichaParq[]
   perguntasParq       ParqPergunta[]
   botConfusionEvents  BotConfusionEvent[]
+  funcionarios        Funcionario[]
+  codigosPagamento    CodigoPagamento[]
 
   @@index([userId])
   @@map("tenants")
@@ -517,6 +519,11 @@ enum CobrancaStatus {
   CANCELADA
 }
 
+enum FormaPagamento {
+  DINHEIRO
+  PIX
+}
+
 enum Periodicidade {
   MENSAL
   TRIMESTRAL
@@ -554,11 +561,13 @@ model PlanoAcademia {
   tenantId      String        @map("tenant_id") @db.Uuid
   nome          String        @db.VarChar(120)
   descricao     String?       @db.Text
-  valorCents    Int           @map("valor_cents")
-  periodicidade Periodicidade @default(MENSAL)
-  ativo         Boolean       @default(true)
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  valorCents         Int           @map("valor_cents")
+  valorCentsDinheiro Int?          @map("valor_cents_dinheiro")
+  valorCentsPix      Int?          @map("valor_cents_pix")
+  periodicidade      Periodicidade @default(MENSAL)
+  ativo              Boolean       @default(true)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
 
   tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   matriculas MatriculaAluno[]
@@ -622,15 +631,18 @@ model CobrancaAluno {
   descricao      String?        @db.VarChar(255)
   pixChave       String?        @map("pix_chave") @db.VarChar(120)
   observacoes    String?        @db.Text
-  enviadaWhatsapp Boolean       @default(false) @map("enviada_whatsapp")
-  comprovanteUrl    String?     @map("comprovante_url") @db.Text
-  comprovanteEnviadoEm DateTime? @map("comprovante_enviado_em")
+  enviadaWhatsapp            Boolean         @default(false) @map("enviada_whatsapp")
+  comprovanteUrl             String?         @map("comprovante_url") @db.Text
+  comprovanteEnviadoEm       DateTime?       @map("comprovante_enviado_em")
+  formaPagamento             FormaPagamento? @map("forma_pagamento")
+  confirmadoPorFuncionarioId String?         @map("confirmado_por_funcionario_id") @db.Uuid
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  aluno     Aluno           @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  matricula MatriculaAluno? @relation(fields: [matriculaId], references: [id], onDelete: SetNull)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aluno          Aluno           @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  matricula      MatriculaAluno? @relation(fields: [matriculaId], references: [id], onDelete: SetNull)
+  codigosPagamento CodigoPagamento[]
 
   @@index([tenantId])
   @@index([alunoId])
@@ -715,6 +727,42 @@ model FichaParq {
   @@index([tenantId])
   @@index([alunoId])
   @@map("fichas_parq")
+}
+
+// ─── Funcionários e Códigos de Pagamento ─────────────────────────────────────
+
+model Funcionario {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  nome      String   @db.VarChar(120)
+  telefone  String   @db.VarChar(30)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigosUsados CodigoPagamento[]
+
+  @@index([tenantId])
+  @@index([tenantId, telefone])
+  @@map("funcionarios")
+}
+
+model CodigoPagamento {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  cobrancaId    String    @map("cobranca_id") @db.Uuid
+  codigo        String    @unique @db.VarChar(10)
+  expiresAt     DateTime  @map("expires_at")
+  usadoEm       DateTime? @map("usado_em")
+  funcionarioId String?   @map("funcionario_id") @db.Uuid
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cobranca    CobrancaAluno @relation(fields: [cobrancaId], references: [id], onDelete: Cascade)
+  funcionario Funcionario?  @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([cobrancaId])
+  @@map("codigos_pagamento")
 }
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────

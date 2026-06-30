@@ -465,6 +465,48 @@ export async function rejeitarComprovante(cobrancaId: string, motivo?: string) {
   revalidatePath("/cobrancas");
 }
 
+// ─── Gerar código de pagamento em dinheiro ────────────────────────────────────
+
+function gerarCodigo(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `#${code}`;
+}
+
+export async function gerarCodigoPagamentoDinheiro(cobrancaId: string) {
+  const tenantId = await getAuthenticatedTenantId();
+
+  const cobranca = await prisma.cobrancaAluno.findFirst({
+    where: { id: cobrancaId, tenantId, status: { in: ["PENDENTE", "VENCIDO"] } },
+  });
+  if (!cobranca) throw new Error("Cobrança não encontrada ou já paga.");
+
+  // Expira códigos anteriores desta cobrança
+  await prisma.codigoPagamento.deleteMany({
+    where: { cobrancaId, usadoEm: null },
+  });
+
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+  let codigo = "";
+  for (let tentativa = 0; tentativa < 10; tentativa++) {
+    const candidato = gerarCodigo();
+    const existe = await prisma.codigoPagamento.findUnique({ where: { codigo: candidato } });
+    if (!existe) { codigo = candidato; break; }
+  }
+  if (!codigo) throw new Error("Não foi possível gerar um código único.");
+
+  const cp = await prisma.codigoPagamento.create({
+    data: { tenantId, cobrancaId, codigo, expiresAt },
+  });
+
+  revalidatePath("/cobrancas");
+  return cp;
+}
+
 // ─── Enviar cobrança via WhatsApp ─────────────────────────────────────────────
 
 export async function enviarCobrancaWhatsapp(cobrancaId: string) {
@@ -474,6 +516,7 @@ export async function enviarCobrancaWhatsapp(cobrancaId: string) {
     where: { id: cobrancaId, tenantId },
     include: {
       aluno: { select: { nome: true, telefone: true } },
+      matricula: { include: { plano: true } },
     },
   });
 
@@ -493,17 +536,19 @@ export async function enviarCobrancaWhatsapp(cobrancaId: string) {
     throw new Error("WhatsApp não conectado. Conecte o WhatsApp nas configurações.");
   }
 
-  const valorFormatado = (cobranca.valorCents / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-
-  const vencimento = new Date(cobranca.dataVencimento).toLocaleDateString("pt-BR");
   const nomeNegocio = tenant.companyName ?? "Academia";
-
-  // Pega a chave Pix do configNicho ou da própria cobrança
   const configNicho = tenant.configNicho as Record<string, string> | null;
   const pixChave = cobranca.pixChave ?? configNicho?.pixChave ?? null;
+
+  // Valores por forma de pagamento (do plano ou fallback para valorCents)
+  const plano = cobranca.matricula?.plano;
+  const valorPixCents = plano?.valorCentsPix ?? cobranca.valorCents;
+  const valorDinheiroCents = plano?.valorCentsDinheiro ?? null;
+
+  const fmtBRL = (cents: number) =>
+    (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const vencimento = new Date(cobranca.dataVencimento).toLocaleDateString("pt-BR");
 
   const linhas = [
     `Olá, ${cobranca.aluno.nome}! 👋`,
@@ -511,13 +556,20 @@ export async function enviarCobrancaWhatsapp(cobrancaId: string) {
     `🏋️ *${nomeNegocio}*`,
     ``,
     `Identificamos uma mensalidade em aberto:`,
-    `💰 *Valor:* ${valorFormatado}`,
+    pixChave ? `💰 *Pix:* ${fmtBRL(valorPixCents)}` : `💰 *Valor:* ${fmtBRL(cobranca.valorCents)}`,
+    valorDinheiroCents ? `💵 *Dinheiro:* ${fmtBRL(valorDinheiroCents)}` : null,
     `📅 *Vencimento:* ${vencimento}`,
     cobranca.descricao ? `📋 *Ref:* ${cobranca.descricao}` : null,
     ``,
-    pixChave ? `🔑 *Chave Pix:* \`${pixChave}\`` : null,
-    ``,
-    `Em caso de dúvidas, entre em contato com a gente. 😊`,
+    pixChave
+      ? `Para pagar via *Pix*, responda *PIX* e eu te mando a chave.`
+      : null,
+    valorDinheiroCents
+      ? `Para pagar em *dinheiro*, responda *DINHEIRO* e receba seu código de pagamento.`
+      : null,
+    (!pixChave && !valorDinheiroCents)
+      ? `Em caso de dúvidas, entre em contato com a gente. 😊`
+      : ``,
   ]
     .filter((l) => l !== null)
     .join("\n");

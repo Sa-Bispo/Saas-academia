@@ -14,6 +14,8 @@ type Plano = {
   nome: string;
   descricao: string | null;
   valorCents: number;
+  valorCentsDinheiro: number | null;
+  valorCentsPix: number | null;
   periodicidade: string;
   ativo: boolean;
   createdAt: Date;
@@ -45,6 +47,12 @@ function ModalPlano({
   const [nome, setNome] = useState(plano?.nome ?? "");
   const [descricao, setDescricao] = useState(plano?.descricao ?? "");
   const [valor, setValor] = useState(plano ? String(plano.valorCents / 100).replace(".", ",") : "");
+  const [valorDinheiro, setValorDinheiro] = useState(
+    plano?.valorCentsDinheiro ? String(plano.valorCentsDinheiro / 100).replace(".", ",") : ""
+  );
+  const [valorPix, setValorPix] = useState(
+    plano?.valorCentsPix ? String(plano.valorCentsPix / 100).replace(".", ",") : ""
+  );
   const [periodicidade, setPeriodicidade] = useState<"MENSAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL">(
     (plano?.periodicidade as "MENSAL" | "TRIMESTRAL" | "SEMESTRAL" | "ANUAL") ?? "MENSAL"
   );
@@ -57,6 +65,13 @@ function ModalPlano({
     const valorCents = Math.round(parseFloat(valor.replace(",", ".")) * 100);
     if (isNaN(valorCents) || valorCents <= 0) return;
 
+    const valorCentsDinheiro = valorDinheiro
+      ? Math.round(parseFloat(valorDinheiro.replace(",", ".")) * 100)
+      : null;
+    const valorCentsPix = valorPix
+      ? Math.round(parseFloat(valorPix.replace(",", ".")) * 100)
+      : null;
+
     setErro(null);
     startTransition(async () => {
       try {
@@ -65,6 +80,8 @@ function ModalPlano({
             nome,
             descricao: descricao || undefined,
             valorCents,
+            valorCentsDinheiro,
+            valorCentsPix,
             periodicidade,
           });
         } else {
@@ -72,6 +89,8 @@ function ModalPlano({
             nome,
             descricao: descricao || undefined,
             valorCents,
+            valorCentsDinheiro,
+            valorCentsPix,
             periodicidade,
           });
         }
@@ -109,7 +128,7 @@ function ModalPlano({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted">Valor (R$) *</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted">Valor padrão (R$) *</label>
               <input
                 className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
                 placeholder="99,90"
@@ -129,6 +148,30 @@ function ModalPlano({
                 <option value="SEMESTRAL">Semestral</option>
                 <option value="ANUAL">Anual</option>
               </select>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-line/50 bg-white/[0.02] p-3 space-y-3">
+            <p className="text-xs font-medium text-muted">Valores por forma de pagamento (opcional)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted">💵 Dinheiro (R$)</label>
+                <input
+                  className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                  placeholder="Ex: 90,00"
+                  value={valorDinheiro}
+                  onChange={(e) => setValorDinheiro(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted">🔑 Pix (R$)</label>
+                <input
+                  className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+                  placeholder="Ex: 95,00"
+                  value={valorPix}
+                  onChange={(e) => setValorPix(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
@@ -288,9 +331,21 @@ export function PlanosAcademiaClient({ planos }: Props) {
                 </div>
 
                 {/* Valor */}
-                <p className="text-sm font-semibold text-white tabular-nums">
-                  {formatCents(plano.valorCents)}
-                </p>
+                <div>
+                  <p className="text-sm font-semibold text-white tabular-nums">
+                    {formatCents(plano.valorCents)}
+                  </p>
+                  {(plano.valorCentsDinheiro || plano.valorCentsPix) && (
+                    <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                      {plano.valorCentsDinheiro && (
+                        <span className="text-[11px] text-muted">💵 {formatCents(plano.valorCentsDinheiro)}</span>
+                      )}
+                      {plano.valorCentsPix && (
+                        <span className="text-[11px] text-muted">🔑 {formatCents(plano.valorCentsPix)}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Periodicidade */}
                 <p className="text-sm text-muted">

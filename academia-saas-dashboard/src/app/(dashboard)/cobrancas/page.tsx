@@ -32,6 +32,11 @@ export default async function CobrancasPage() {
         include: {
           aluno: { select: { id: true, nome: true, telefone: true } },
           matricula: { include: { plano: true } },
+          codigosPagamento: {
+            where: { usadoEm: null, expiresAt: { gt: new Date() } },
+            orderBy: { expiresAt: "desc" },
+            take: 1,
+          },
         },
       }),
       prisma.cobrancaAluno.groupBy({

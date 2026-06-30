@@ -22,6 +22,8 @@ from database_api import (
     get_cobrancas_pendentes,
     get_pix_chave_tenant,
     salvar_comprovante_pagamento,
+    get_funcionario_by_phone,
+    get_codigo_pagamento,
 )
 from academia_flow import process_academia_message, AcademiaState, detectar_intent
 from ai_intent_classifier import classify_intent as _ai_classify_intent
@@ -320,6 +322,58 @@ async def _process_chat_message(
             except Exception:
                 session = {}
 
+            # ── Verifica se é um funcionário antes do fluxo normal do aluno ─
+            funcionario = None
+            codigo_match = re.search(r'#?([A-Z0-9]{6})', message.upper())
+            try:
+                funcionario = await get_funcionario_by_phone(tenant_id, session_id)
+            except Exception as exc:
+                logger.warning('[ACADEMIA] erro ao verificar funcionario: %s', exc)
+
+            if funcionario and (codigo_match or session.get('state') == AcademiaState.AGUARD_CONFIRM_CODIGO.value):
+                funcionario_id = str(funcionario.get('id') or '')
+                codigo_info = None
+                if codigo_match:
+                    codigo = '#' + codigo_match.group(1)
+                    try:
+                        codigo_info = await get_codigo_pagamento(tenant_id, codigo)
+                    except Exception as exc:
+                        logger.warning('[ACADEMIA] erro ao buscar codigo: %s', exc)
+
+                # callback de confirmação — chama a API do dashboard
+                import requests as _requests
+                DASHBOARD_URL = 'http://academia_web:3000'
+
+                def _confirmar_codigo_fn(codigo: str, func_id: str) -> None:
+                    resp = _requests.post(
+                        f'{DASHBOARD_URL}/api/bot/confirmar-codigo',
+                        json={'codigo': codigo, 'funcionarioId': func_id, 'tenantId': tenant_id},
+                        timeout=10,
+                    )
+                    if not resp.ok:
+                        raise Exception(resp.json().get('error', 'Erro ao confirmar'))
+
+                reply_func, session_func = process_academia_message(
+                    text=message,
+                    session=session,
+                    aluno=None,
+                    matricula=None,
+                    cobrancas=[],
+                    pix_chave=None,
+                    tenant_config=configs,
+                    is_funcionario=True,
+                    funcionario_id=funcionario_id,
+                    codigo_info=codigo_info,
+                    confirmar_codigo_fn=_confirmar_codigo_fn,
+                )
+                try:
+                    if redis_sync:
+                        redis_sync.setex(session_key, 3600, json.dumps(session_func, ensure_ascii=False))
+                except Exception:
+                    pass
+                resp = reply_func if isinstance(reply_func, str) else (reply_func[-1] if reply_func else '')
+                return {'reply': resp, 'response': resp, 'sale_complete': False, 'confetti': False}
+
             # Carrega dados do aluno — na primeira mensagem (IDENTIFICANDO) ou se ainda não temos
             aluno_id = session.get('aluno_id')
             aluno = None
@@ -395,6 +449,24 @@ async def _process_chat_message(
                 except Exception:
                     ai_result = None
 
+            # callback para gerar código de dinheiro para o aluno
+            def _gerar_codigo_fn_aluno() -> dict:
+                import requests as _req
+                DASHBOARD_URL = 'http://academia_web:3000'
+                cobranca_id = str((cobrancas[0] or {}).get('id') or '') if cobrancas else ''
+                if not cobranca_id:
+                    raise Exception('Sem cobrança pendente')
+                resp = _req.post(
+                    f'{DASHBOARD_URL}/api/bot/gerar-codigo',
+                    json={'cobrancaId': cobranca_id, 'tenantId': tenant_id},
+                    timeout=10,
+                )
+                if not resp.ok:
+                    raise Exception(resp.json().get('error', 'Erro'))
+                return resp.json()
+
+            plano_valor_dinheiro = int(matricula.get('plano_valor_dinheiro') or 0) if matricula else None
+
             reply_academia, session_atualizada = process_academia_message(
                 text=message,
                 session=session,
@@ -405,6 +477,8 @@ async def _process_chat_message(
                 tenant_config=configs,
                 imagem_recebida=bool(imagem_recebida and aluno is not None),
                 ai_result=ai_result,
+                gerar_codigo_fn=_gerar_codigo_fn_aluno if cobrancas else None,
+                plano_valor_dinheiro=plano_valor_dinheiro if plano_valor_dinheiro else None,
             )
 
             # Persiste histórico e última msg do bot para enriquecer contexto da próxima chamada

@@ -1244,6 +1244,8 @@ async def get_matricula_ativa(tenant_id: str, aluno_id: str) -> dict[str, Any] |
                 m.status,
                 p.nome  AS plano_nome,
                 p.valor_cents AS plano_valor_cents,
+                p.valor_cents_dinheiro AS plano_valor_dinheiro,
+                p.valor_cents_pix AS plano_valor_pix,
                 p.periodicidade
             FROM matriculas_alunos m
             JOIN planos_academia p ON p.id = m.plano_id
@@ -1336,6 +1338,81 @@ async def registrar_aviso_pagamento(tenant_id: str, aluno_id: str, cobranca_id: 
             tenant_id,
             aluno_id,
         )
+    finally:
+        await conn.close()
+
+
+async def get_funcionario_by_phone(tenant_id: str, phone: str) -> dict[str, Any] | None:
+    """Verifica se o telefone pertence a um funcionário ativo do tenant."""
+    if not BOT_DATABASE_CONNECTION_URI:
+        return None
+
+    phone_digits = re.sub(r'\D', '', phone or '')
+    if not phone_digits:
+        return None
+
+    variants = _phone_variants(phone_digits)
+    placeholders = ', '.join(f'${i + 2}' for i in range(len(variants)))
+
+    conn = await asyncpg.connect(BOT_DATABASE_CONNECTION_URI)
+    try:
+        row = await conn.fetchrow(
+            f"""
+            SELECT id, nome, telefone
+            FROM funcionarios
+            WHERE tenant_id = $1
+              AND ativo = TRUE
+              AND regexp_replace(telefone, '[^0-9]', '', 'g') IN ({placeholders})
+            LIMIT 1
+            """,
+            tenant_id,
+            *variants,
+        )
+        return dict(row) if row else None
+    finally:
+        await conn.close()
+
+
+async def get_codigo_pagamento(tenant_id: str, codigo: str) -> dict[str, Any] | None:
+    """Busca um código de pagamento válido (não expirado, não usado)."""
+    if not BOT_DATABASE_CONNECTION_URI:
+        return None
+
+    conn = await asyncpg.connect(BOT_DATABASE_CONNECTION_URI)
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT
+                cp.id,
+                cp.codigo,
+                cp.cobranca_id,
+                cp.expires_at,
+                ca.valor_cents,
+                ca.status AS cobranca_status,
+                ca.descricao,
+                a.nome AS aluno_nome,
+                p.valor_cents_dinheiro
+            FROM codigos_pagamento cp
+            JOIN cobrancas_alunos ca ON ca.id = cp.cobranca_id
+            JOIN alunos a ON a.id = ca.aluno_id
+            LEFT JOIN matriculas_alunos m ON m.id = ca.matricula_id
+            LEFT JOIN planos_academia p ON p.id = m.plano_id
+            WHERE cp.tenant_id = $1
+              AND cp.codigo = $2
+              AND cp.usado_em IS NULL
+              AND cp.expires_at > NOW()
+            LIMIT 1
+            """,
+            tenant_id,
+            codigo,
+        )
+        if not row:
+            return None
+        d = dict(row)
+        # Usa valor_cents_dinheiro do plano se disponível
+        valor_display = d.get('valor_cents_dinheiro') or d.get('valor_cents') or 0
+        d['valor_display_cents'] = int(valor_display)
+        return d
     finally:
         await conn.close()
 

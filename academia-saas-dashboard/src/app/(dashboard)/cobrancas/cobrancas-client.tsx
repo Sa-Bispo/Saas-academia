@@ -16,6 +16,8 @@ import {
   ImageIcon,
   Bell,
   Maximize2,
+  Hash,
+  Copy,
 } from "lucide-react";
 
 import {
@@ -27,11 +29,13 @@ import {
   validarComprovante,
   rejeitarComprovante,
   registrarPagamentoDinheiro,
+  gerarCodigoPagamentoDinheiro,
 } from "@/actions/cobrancas.actions";
 
 type Aluno = { id: string; nome: string; telefone: string };
-type Plano = { id: string; nome: string; valorCents: number };
+type Plano = { id: string; nome: string; valorCents: number; valorCentsDinheiro?: number | null };
 type Matricula = { id: string; plano: Plano } | null;
+type CodigoPagamento = { id: string; codigo: string; expiresAt: Date };
 
 type Cobranca = {
   id: string;
@@ -44,8 +48,11 @@ type Cobranca = {
   enviadaWhatsapp: boolean;
   comprovanteUrl: string | null;
   comprovanteEnviadoEm: Date | null;
+  formaPagamento: string | null;
+  confirmadoPorFuncionarioId: string | null;
   aluno: Aluno;
   matricula: Matricula;
+  codigosPagamento: CodigoPagamento[];
 };
 
 type ResumoItem = {
@@ -417,6 +424,8 @@ export function CobrancasPageClient({
   const [cobrancaDinheiro, setCobrancaDinheiro] = useState<Cobranca | null>(null);
   const [pending, startTransition] = useTransition();
   const [enviandoId, setEnviandoId] = useState<string | null>(null);
+  const [gerandoCodigoId, setGerandoCodigoId] = useState<string | null>(null);
+  const [codigoGerado, setCodigoGerado] = useState<{ cobrancaId: string; codigo: string } | null>(null);
 
   const comprovantesPendentes = cobrancas.filter((c) => c.status === "AGUARDANDO_VALIDACAO");
 
@@ -512,6 +521,20 @@ export function CobrancasPageClient({
         await marcarCobrancaVencida(id);
       } catch (err) {
         alert(err instanceof Error ? err.message : "Erro ao marcar cobrança como vencida.");
+      }
+    });
+  }
+
+  function handleGerarCodigo(cobrancaId: string) {
+    setGerandoCodigoId(cobrancaId);
+    startTransition(async () => {
+      try {
+        const cp = await gerarCodigoPagamentoDinheiro(cobrancaId);
+        setCodigoGerado({ cobrancaId, codigo: cp.codigo });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erro ao gerar código.");
+      } finally {
+        setGerandoCodigoId(null);
       }
     });
   }
@@ -708,6 +731,9 @@ export function CobrancasPageClient({
               const pendente = c.status === "PENDENTE";
               const aguardandoValidacao = c.status === "AGUARDANDO_VALIDACAO";
 
+              const codigoAtivo = c.codigosPagamento?.[0] ?? null;
+              const codigoExibir = codigoGerado?.cobrancaId === c.id ? codigoGerado.codigo : codigoAtivo?.codigo ?? null;
+
               return (
                 <div
                   key={c.id}
@@ -715,13 +741,30 @@ export function CobrancasPageClient({
                 >
                   {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="truncate text-sm font-medium text-white">{c.aluno.nome}</p>
                       <span
                         className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.bg} ${st.color}`}
                       >
                         {st.label}
                       </span>
+                      {c.formaPagamento && (
+                        <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-muted">
+                          {c.formaPagamento === "DINHEIRO" ? "💵 Dinheiro" : "🔑 Pix"}
+                        </span>
+                      )}
+                      {codigoExibir && (
+                        <button
+                          type="button"
+                          title="Copiar código"
+                          onClick={() => navigator.clipboard.writeText(codigoExibir)}
+                          className="shrink-0 flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-indigo-400 hover:bg-indigo-500/20"
+                        >
+                          <Hash size={9} />
+                          {codigoExibir.replace("#", "")}
+                          <Copy size={9} />
+                        </button>
+                      )}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted">
                       <span className="flex items-center gap-1">
@@ -791,6 +834,17 @@ export function CobrancasPageClient({
                         >
                           <Wallet size={12} />
                           Dinheiro
+                        </button>
+
+                        <button
+                          type="button"
+                          title="Gerar código de pagamento em dinheiro para o bot"
+                          disabled={gerandoCodigoId === c.id && pending}
+                          onClick={() => handleGerarCodigo(c.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-400 transition hover:bg-indigo-600/20 disabled:opacity-50"
+                        >
+                          <Hash size={12} />
+                          {gerandoCodigoId === c.id && pending ? "..." : codigoExibir ? "Novo código" : "Código bot"}
                         </button>
 
                         <button

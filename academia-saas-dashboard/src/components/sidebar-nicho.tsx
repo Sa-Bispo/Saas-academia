@@ -14,6 +14,7 @@ import {
   Menu,
   MessageCircle,
   Settings,
+  UserCheck,
   Users,
   Wallet,
   X,
@@ -79,6 +80,11 @@ export function SidebarNicho({
     ),
     ...(isAcademia
       ? [
+          {
+            href: "/funcionarios",
+            label: "Funcionários",
+            icon: UserCheck,
+          },
           {
             href: "/parq-config",
             label: "PAR-Q",
