@@ -79,6 +79,7 @@ enum Niche {
   DELIVERY
   CLINICA
   EMPRESA
+  ACADEMIA
 }
 
 enum SubscriptionStatus {
@@ -542,6 +543,8 @@ model Aluno {
   observacoes     String?     @db.Text
   status                 AlunoStatus @default(ATIVO)
   precisaLiberacaoMedica Boolean     @default(false) @map("precisa_liberacao_medica")
+  optoutCobranca         Boolean     @default(false) @map("optout_cobranca")
+  optoutCobrancaAt       DateTime?   @map("optout_cobranca_at")
   createdAt              DateTime    @default(now()) @map("created_at")
   updatedAt              DateTime    @updatedAt @map("updated_at")
 
