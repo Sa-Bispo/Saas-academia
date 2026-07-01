@@ -154,17 +154,13 @@ services:
       migrator:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
     networks:
       - saas_net
-
-volumes:
-  # Volumes nomeados removidos — dados agora em paths explícitos no host (/opt/pyra/dados/)
-  # para garantir cobertura pelo backup semanal da Hostinger
 
 networks:
   saas_net:
