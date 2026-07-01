@@ -49,3 +49,6 @@ token.json
 
 # Graphify (grafo gerado localmente)
 graphify-out/
+
+# Scripts locais de teste
+tornar_inadimplente.sh
