@@ -24,6 +24,7 @@ from database_api import (
     salvar_comprovante_pagamento,
     get_funcionario_by_phone,
     get_codigo_pagamento,
+    set_aluno_optout_cobranca,
 )
 from academia_flow import process_academia_message, AcademiaState, detectar_intent
 from ai_intent_classifier import classify_intent as _ai_classify_intent
@@ -503,6 +504,17 @@ async def _process_chat_message(
                         )
                 except Exception as exc:
                     logger.error('[ACADEMIA] erro ao salvar comprovante de pagamento: %s', exc, exc_info=True)
+
+            # Aluno pediu pra parar de receber cobranças — persiste opt-out no banco
+            # pra que o cobranca_worker nunca mais dispare mensagem pra ele.
+            if session_atualizada.get('optout_solicitado') and not session.get('optout_solicitado'):
+                try:
+                    aid = session_atualizada.get('aluno_id') or (aluno or {}).get('id')
+                    if aid:
+                        await set_aluno_optout_cobranca(tenant_id, str(aid))
+                        logger.info('[ACADEMIA] aluno=%s optou por sair de cobrancas automaticas', aid)
+                except Exception as exc:
+                    logger.error('[ACADEMIA] erro ao registrar opt-out: %s', exc, exc_info=True)
 
             try:
                 if redis_sync:

@@ -2,9 +2,12 @@
 cobranca_worker.py — Worker de disparo em lote de cobranças via WhatsApp.
 
 Fluxo:
-  1. Consome fila Redis `cobrancas_queue:{tenant_id}` (RPOP)
+  1. Consome fila Redis `cobrancas_queue:{tenant_id}` (RPOP), só quando o tenant
+     está dentro do horário comercial configurado (evita disparo fora de hora)
   2. Para cada cobrança: busca dados no banco, monta mensagem, envia via Evolution
-  3. Aguarda delay aleatório (45-90s) antes da próxima
+  3. Aguarda um delay calculado para espalhar os envios pela janela de disparo
+     (COBRANCA_JANELA_INICIO–COBRANCA_JANELA_FIM) em vez de esvaziar a fila em
+     rajada sempre no mesmo horário — reduz o "fingerprint" de bot pra Meta
   4. Atualiza hash de progresso `cobrancas_progress:{tenant_id}`
   5. Respeita limite diário `cobrancas_daily:{tenant_id}:{data}` (TTL 24h)
 
@@ -12,6 +15,7 @@ Estrutura Redis:
   cobrancas_queue:{tenant_id}     → List  [cobranca_id, ...]
   cobrancas_progress:{tenant_id}  → Hash  {total, sent, failed, status, started_at}
   cobrancas_daily:{tenant_id}:{YYYY-MM-DD} → String contador (TTL 86400s)
+  cobranca_horarios_cache:{tenant_id} → String JSON (TTL 300s, cache do config_nicho.horarios)
 """
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ import asyncpg
 import os
 
 from config import BOT_DATABASE_CONNECTION_URI, EVOLUTION_API_URL, EVOLUTION_AUTHENTICATION_API_KEY
+from router import is_within_hours
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +42,14 @@ DELAY_MIN = int(os.getenv('COBRANCA_DELAY_MIN', '45'))
 DELAY_MAX = int(os.getenv('COBRANCA_DELAY_MAX', '90'))
 DAILY_LIMIT_DEFAULT = 50   # máximo de mensagens por dia por tenant
 QUEUE_POLL_INTERVAL = 5    # segundos entre polls quando fila está vazia
+
+# Janela de disparo: fora dela o worker não envia, só espera. Os envios dentro
+# da janela são espaçados para cobrir o período inteiro (em vez de uma rajada
+# de DELAY_MIN-DELAY_MAX segundos logo no início da janela todo santo dia).
+JANELA_DISPARO_INICIO = int(os.getenv('COBRANCA_JANELA_INICIO', '8'))
+JANELA_DISPARO_FIM = int(os.getenv('COBRANCA_JANELA_FIM', '19'))
+DELAY_MAX_ESPACADO = int(os.getenv('COBRANCA_DELAY_MAX_ESPACADO', '900'))  # teto de 15min entre envios
+HORARIOS_CACHE_TTL = 300  # 5 minutos
 
 # ─── Helpers Redis ────────────────────────────────────────────────────────────
 
@@ -77,6 +90,80 @@ async def _set_progress(redis, tenant_id: str, **kwargs: Any) -> None:
         pass
 
 
+# ─── Janela de disparo / anti-burst ────────────────────────────────────────────
+
+def _horarios_cache_key(tenant_id: str) -> str:
+    return f'cobranca_horarios_cache:{tenant_id}'
+
+
+async def _get_tenant_horarios_cached(redis, tenant_id: str) -> list:
+    """Busca o config_nicho.horarios do tenant, cacheado em Redis por
+    HORARIOS_CACHE_TTL para não bater no banco a cada poll do worker."""
+    cache_key = _horarios_cache_key(tenant_id)
+    try:
+        cached = await redis.get(cache_key)
+        if cached is not None:
+            return json.loads(cached)
+    except Exception:
+        pass
+
+    horarios: list = []
+    if BOT_DATABASE_CONNECTION_URI:
+        conn = await asyncpg.connect(BOT_DATABASE_CONNECTION_URI)
+        try:
+            row = await conn.fetchrow('SELECT config_nicho FROM tenants WHERE id = $1', tenant_id)
+            if row:
+                cfg = row['config_nicho'] or {}
+                if isinstance(cfg, str):
+                    try:
+                        cfg = json.loads(cfg)
+                    except Exception:
+                        cfg = {}
+                candidato = cfg.get('horarios')
+                if isinstance(candidato, list):
+                    horarios = candidato
+        except Exception as exc:
+            logger.warning('[WORKER] erro ao buscar horarios do tenant=%s: %s', tenant_id, exc)
+        finally:
+            await conn.close()
+
+    try:
+        await redis.setex(cache_key, HORARIOS_CACHE_TTL, json.dumps(horarios))
+    except Exception:
+        pass
+
+    return horarios
+
+
+def _dentro_da_janela_disparo(agora: datetime) -> bool:
+    """Janela global de disparo (além do horário comercial do tenant) —
+    nunca dispara cobrança de madrugada, independente da config do tenant."""
+    return JANELA_DISPARO_INICIO <= agora.hour < JANELA_DISPARO_FIM
+
+
+def _calcular_delay_espalhado(
+    agora: datetime,
+    fila_restante: int,
+    janela_fim_hora: int = JANELA_DISPARO_FIM,
+    delay_min: int = DELAY_MIN,
+    delay_max: int = DELAY_MAX,
+    delay_max_espacado: int = DELAY_MAX_ESPACADO,
+) -> float:
+    """Calcula quanto esperar até o próximo envio, espalhando o que resta da
+    fila pelo tempo restante da janela de disparo em vez de drenar tudo em
+    rajada logo no início. Sempre respeita o piso de `delay_min`.
+    """
+    fim_janela = agora.replace(hour=janela_fim_hora, minute=0, second=0, microsecond=0)
+    segundos_restantes = (fim_janela - agora).total_seconds()
+
+    if fila_restante <= 0 or segundos_restantes <= delay_min:
+        return random.uniform(delay_min, delay_max)
+
+    delay_alvo = segundos_restantes / (fila_restante + 1)
+    delay_alvo *= random.uniform(0.6, 1.4)  # jitter — evita um padrão temporal previsível
+    return max(delay_min, min(delay_alvo, delay_max_espacado))
+
+
 # ─── Banco de dados ───────────────────────────────────────────────────────────
 
 async def _get_cobranca(tenant_id: str, cobranca_id: str) -> dict | None:
@@ -101,6 +188,7 @@ async def _get_cobranca(tenant_id: str, cobranca_id: str) -> dict | None:
                 ca.status,
                 a.nome     AS aluno_nome,
                 a.telefone AS aluno_telefone,
+                a.optout_cobranca AS "alunoOptout",
                 t."companyName"          AS negocio_nome,
                 t."evolutionInstanceName" AS instance,
                 t."evolutionApiKey"       AS api_key,
@@ -399,6 +487,10 @@ async def _processar_uma(redis, tenant_id: str, cobranca_id: str, daily_limit: i
         logger.info('[WORKER] cobrança já enviada, paga ou com comprovante pendente, pulando: %s', cobranca_id)
         return False
 
+    if cobranca.get('alunoOptout'):
+        logger.info('[WORKER] aluno em opt-out de cobranças, pulando: %s', cobranca_id)
+        return False
+
     instance = cobranca.get('instance')
     if not instance:
         logger.warning('[WORKER] tenant sem Evolution configurado: %s', tenant_id)
@@ -446,6 +538,14 @@ async def run_cobranca_worker(redis, daily_limit: int = DAILY_LIMIT_DEFAULT) -> 
 
     while True:
         try:
+            agora = datetime.now()
+
+            # Janela global de disparo — nunca manda cobrança de madrugada,
+            # independente do horário comercial configurado por tenant.
+            if not _dentro_da_janela_disparo(agora):
+                await asyncio.sleep(QUEUE_POLL_INTERVAL * 12)  # ~1min, não precisa pollar rápido fora da janela
+                continue
+
             # Busca todas as filas ativas (padrão cobrancas_queue:*)
             keys = await redis.keys('cobrancas_queue:*')
 
@@ -453,9 +553,17 @@ async def run_cobranca_worker(redis, daily_limit: int = DAILY_LIMIT_DEFAULT) -> 
                 await asyncio.sleep(QUEUE_POLL_INTERVAL)
                 continue
 
+            algum_enviado = False
+
             for key in keys:
                 key_str = key if isinstance(key, str) else key.decode()
                 tenant_id = key_str.replace('cobrancas_queue:', '')
+
+                # Respeita o horário comercial configurado pelo tenant — se
+                # estiver fora, nem mexe na fila desse tenant neste ciclo.
+                horarios_tenant = await _get_tenant_horarios_cached(redis, tenant_id)
+                if not is_within_hours(horarios_tenant):
+                    continue
 
                 # Pega próxima da fila (RPOP = do final, ou seja, FIFO com LPUSH)
                 cobranca_id = await redis.rpop(key_str)
@@ -474,6 +582,7 @@ async def run_cobranca_worker(redis, daily_limit: int = DAILY_LIMIT_DEFAULT) -> 
                 await _set_progress(redis, tenant_id, status='enviando', current=cobranca_id)
 
                 ok = await _processar_uma(redis, tenant_id, cobranca_id, daily_limit)
+                algum_enviado = True
 
                 if ok:
                     sent += 1
@@ -494,12 +603,16 @@ async def run_cobranca_worker(redis, daily_limit: int = DAILY_LIMIT_DEFAULT) -> 
                 )
 
                 if ok:
-                    # Delay aleatório entre mensagens — comportamento humano
-                    delay = random.uniform(DELAY_MIN, DELAY_MAX)
-                    logger.info('[WORKER] aguardando %.0fs antes da próxima mensagem', delay)
+                    # Espalha os envios pelo resto da janela de disparo em vez
+                    # de drenar a fila em rajada — reduz o padrão temporal fixo.
+                    delay = _calcular_delay_espalhado(datetime.now(), fila_restante)
+                    logger.info('[WORKER] aguardando %.0fs antes da próxima mensagem (fila_restante=%d)', delay, fila_restante)
                     await asyncio.sleep(delay)
                 else:
                     await asyncio.sleep(2)
+
+            if not algum_enviado:
+                await asyncio.sleep(QUEUE_POLL_INTERVAL)
 
         except asyncio.CancelledError:
             logger.info('[WORKER] worker cancelado, encerrando.')

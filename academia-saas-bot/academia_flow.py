@@ -210,6 +210,21 @@ _PATTERNS_RENOVAR = [
     r'\b(reativar|reativacao|voltar (a treinar|para academia))\b',
 ]
 
+# Pedido explícito pra parar de receber mensagens/cobranças — tem prioridade
+# absoluta sobre qualquer outra intenção (compliance + protege o número de bloqueios).
+_PATTERNS_OPTOUT = [
+    r'\boptout\b',  # usado pelo fallback de IA (texto sintético, ver ai_intent_classifier.py)
+    r'\b(para|pare|parem) de (mandar|enviar|me mandar|me enviar)\b',
+    r'\b(nao quero mais receber|nao quero receber mais) (mensagens?|cobrancas?|avisos?|nada)\b',
+    r'\b(nao (me )?manda(m)? mais (nada|mensagem|mensagens|cobranca|cobrancas))\b',
+    r'\b(remov(e|er|a) (meu )?(numero|contato|nome)( da lista)?)\b',
+    r'\b(tira(r)? meu (numero|nome)( da lista)?)\b',
+    r'\b(descadastrar|descadastra|cancelar inscricao|sair da lista)\b',
+    r'^(stop|unsubscribe)[\s!.]*$',
+    r'\b(bloqueia(r)? (esse|esta|o) numero)\b',
+    r'\b(nao quero mais (mensagens|contato|isso) (do whatsapp|por aqui|no whatsapp)?)\b',
+]
+
 
 def detectar_intent(text: str, learned_patterns: list[dict] | None = None) -> str:
     # Normaliza (remove acentos, lowercase) e expande abreviações
@@ -225,7 +240,10 @@ def detectar_intent(text: str, learned_patterns: list[dict] | None = None) -> st
             except Exception:
                 pass
 
-    # Prioridade: paguei > desistir > renovar > dinheiro > pix > cobranca > matricula > encerrar > menu > sim/nao
+    # Prioridade: optout > paguei > desistir > renovar > dinheiro > pix > cobranca > matricula > encerrar > menu > sim/nao
+    for p in _PATTERNS_OPTOUT:
+        if re.search(p, t):
+            return 'optout'
     for p in _PATTERNS_PAGUEI:
         if re.search(p, t):
             return 'paguei'
@@ -488,6 +506,15 @@ def _msg_encerrar(nome: str) -> str:
     return f'Foi um prazer ajudar, *{primeiro}*! 💪\nQualquer coisa é só chamar. Bons treinos! 🏋️'
 
 
+def _msg_optout_confirmado(nome: str) -> str:
+    primeiro = (nome or 'você').split()[0]
+    return (
+        f'Entendido, *{primeiro}*. ✅ Você não vai mais receber avisos automáticos de cobrança por aqui.\n\n'
+        f'Se quiser reativar ou tiver alguma dúvida sobre sua mensalidade, '
+        f'é só passar na recepção. 😊'
+    )
+
+
 _DESISTIR_COMPROVANTE_VARIACOES = [
     'Sem problema! 😊 Se quiser regularizar depois, é só me chamar por aqui.',
     'Tudo bem! Quando quiser pagar, estou por aqui. 💪',
@@ -643,9 +670,24 @@ def process_academia_message(
         session['aluno_id']   = str(aluno.get('id') or '')
         session['aluno_nome'] = str(aluno.get('nome') or '')
         session['state']      = AcademiaState.MENU.value
-        return _msg_menu(session['aluno_nome'], matricula, cobrancas), session
+        # Se a primeira mensagem já tem uma intent específica, processa agora
+        # em vez de mostrar o menu genérico (ex: aluno responde "DINHEIRO" à notificação).
+        first_intent = detectar_intent(text, learned_patterns)
+        if first_intent in ('dinheiro', 'pix', 'paguei', 'matricula', 'cobranca', 'renovar', 'optout'):
+            # cai nos blocos abaixo com a sessão já atualizada
+            pass
+        else:
+            return _msg_menu(session['aluno_nome'], matricula, cobrancas), session
 
     nome = session.get('aluno_nome', '')
+
+    # ── Opt-out em qualquer momento (após identificado) ────────────────────────
+    # Pedido explícito de parar de receber mensagens tem prioridade sobre tudo,
+    # inclusive sobre estar aguardando comprovante/código.
+    if detectar_intent(text, learned_patterns) == 'optout':
+        session['state'] = AcademiaState.FINALIZADO.value
+        session['optout_solicitado'] = True
+        return _msg_optout_confirmado(nome), session
 
     # ── Imagem recebida em qualquer momento (após identificado) ────────────────
     # Tratamos como possível comprovante de pagamento, independente do estado
@@ -707,7 +749,7 @@ def process_academia_message(
 
         if intent == 'cobranca':
             session['confusion_count'] = 0
-            return _msg_cobrancas(cobrancas, pix_chave), session
+            return _msg_cobrancas(cobrancas, pix_chave, tem_dinheiro=bool(plano_valor_dinheiro)), session
 
         if intent == 'dinheiro':
             session['confusion_count'] = 0
@@ -719,8 +761,9 @@ def process_academia_message(
                     codigo = resultado.get('codigo', '')
                     valor = plano_valor_dinheiro or (cobrancas[0].get('valor_cents') or 0)
                     return _msg_dinheiro_codigo(codigo, valor, nome), session
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging as _log
+                    _log.getLogger(__name__).error("[dinheiro] falha ao gerar código: %s", e)
             return _msg_dinheiro_sem_config(), session
 
         if intent == 'pix':

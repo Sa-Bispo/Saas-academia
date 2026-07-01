@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 VALID_INTENTS = frozenset([
     'matricula', 'cobranca', 'pix', 'paguei', 'renovar',
-    'encerrar', 'menu', 'sim', 'nao', 'desconhecido',
+    'encerrar', 'menu', 'sim', 'nao', 'optout', 'desconhecido',
 ])
 
 _FALLBACK = {'intent': 'desconhecido', 'resposta': None}
@@ -34,6 +34,7 @@ Classifique a MENSAGEM ATUAL do aluno em UMA das intenções:
 • menu        — quer ver as opções, voltar ao menu, saudação genérica
 • sim         — confirmação/afirmação em resposta ao que o bot perguntou
 • nao         — negação/recusa em resposta ao que o bot perguntou
+• optout      — pede explicitamente para parar de receber mensagens/cobranças, sair da lista, ser removido
 • desconhecido — pergunta genérica sobre a academia ou não se encaixa em nada acima
 
 ━━━ CONTEXTO DO ATENDIMENTO ━━━

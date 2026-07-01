@@ -1342,6 +1342,30 @@ async def registrar_aviso_pagamento(tenant_id: str, aluno_id: str, cobranca_id: 
         await conn.close()
 
 
+async def set_aluno_optout_cobranca(tenant_id: str, aluno_id: str) -> None:
+    """Marca o aluno como opt-out de cobranças automáticas via WhatsApp.
+
+    Usado quando o aluno pede explicitamente para parar de receber mensagens —
+    a partir daqui o cobranca_worker nunca mais dispara pra esse aluno.
+    """
+    if not BOT_DATABASE_CONNECTION_URI:
+        return
+
+    conn = await asyncpg.connect(BOT_DATABASE_CONNECTION_URI)
+    try:
+        await conn.execute(
+            """
+            UPDATE alunos
+            SET optout_cobranca = TRUE, optout_cobranca_at = NOW(), updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+            """,
+            aluno_id,
+            tenant_id,
+        )
+    finally:
+        await conn.close()
+
+
 async def get_funcionario_by_phone(tenant_id: str, phone: str) -> dict[str, Any] | None:
     """Verifica se o telefone pertence a um funcionário ativo do tenant."""
     if not BOT_DATABASE_CONNECTION_URI:

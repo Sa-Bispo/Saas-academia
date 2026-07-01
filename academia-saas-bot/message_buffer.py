@@ -33,6 +33,8 @@ from database_api import (
     get_cobrancas_pendentes,
     get_pix_chave_tenant,
     salvar_comprovante_pagamento,
+    get_funcionario_by_phone,
+    get_codigo_pagamento,
 )
 from academia_flow import process_academia_message
 from chains import generate_persona_response, invoke_rag_chain
@@ -804,12 +806,58 @@ async def _handle_academia_message(
         load_learned_patterns,
     )
 
+    import re as _re
     session_key = f'academia_session:{tenant_id}:{chat_id}'
     try:
         session_raw = await redis_client.get(session_key)
         session = json.loads(session_raw) if session_raw else {}
     except Exception:
         session = {}
+
+    # ── Verifica se é funcionário ──────────────────────────────────────────────
+    codigo_match = _re.search(r'#?([A-Z0-9]{6})', full_message.upper())
+    from academia_flow import AcademiaState
+    funcionario = None
+    try:
+        funcionario = await get_funcionario_by_phone(tenant_id, chat_id)
+    except Exception as e:
+        log(f'[ACADEMIA] erro ao verificar funcionario: {e}')
+
+    if funcionario and (codigo_match or session.get('state') == AcademiaState.AGUARD_CONFIRM_CODIGO.value):
+        funcionario_id = str(funcionario.get('id') or '')
+        codigo_info = None
+        if codigo_match:
+            codigo = '#' + codigo_match.group(1)
+            try:
+                codigo_info = await get_codigo_pagamento(tenant_id, codigo)
+            except Exception as e:
+                log(f'[ACADEMIA] erro ao buscar codigo: {e}')
+
+        def _confirmar_codigo_fn(codigo: str, func_id: str) -> None:
+            import requests as _req
+            resp = _req.post(
+                'http://academia_web:3000/api/bot/confirmar-codigo',
+                json={'codigo': codigo, 'funcionarioId': func_id, 'tenantId': tenant_id},
+                timeout=10,
+            )
+            if not resp.ok:
+                raise Exception(resp.json().get('error', 'Erro ao confirmar'))
+
+        reply_func, session_func = process_academia_message(
+            text=full_message,
+            session=session,
+            aluno=None,
+            matricula=None,
+            cobrancas=[],
+            pix_chave=None,
+            tenant_config=configs,
+            is_funcionario=True,
+            funcionario_id=funcionario_id,
+            codigo_info=codigo_info,
+            confirmar_codigo_fn=_confirmar_codigo_fn,
+        )
+        await redis_client.set(session_key, json.dumps(session_func, ensure_ascii=False), ex=3600)
+        return reply_func if isinstance(reply_func, str) else (reply_func[-1] if reply_func else '')
 
     aluno = None
     matricula = None
@@ -825,6 +873,23 @@ async def _handle_academia_message(
         pix_chave = await get_pix_chave_tenant(tenant_id)
     except Exception as e:
         log(f'[ACADEMIA] erro ao buscar dados do aluno para {chat_id}: {e}')
+
+    plano_valor_dinheiro = int(matricula.get('plano_valor_dinheiro') or 0) if matricula else 0
+
+    def _gerar_codigo_fn() -> dict:
+        import requests as _req
+        cobranca_id = str((cobrancas[0] or {}).get('id') or '') if cobrancas else ''
+        if not cobranca_id:
+            raise Exception('Sem cobrança pendente')
+        dashboard_url = 'http://academia_web:3000'
+        resp = _req.post(
+            f'{dashboard_url}/api/bot/gerar-codigo',
+            json={'cobrancaId': cobranca_id, 'tenantId': tenant_id},
+            timeout=10,
+        )
+        if not resp.ok:
+            raise Exception(resp.json().get('error', 'Erro ao gerar código'))
+        return resp.json()
 
     # Carrega padrões aprendidos pelo admin para este nicho
     learned_patterns: list[dict] = []
@@ -850,6 +915,8 @@ async def _handle_academia_message(
             tenant_config=configs,
             imagem_recebida=imagem_recebida and aluno is not None,
             learned_patterns=learned_patterns,
+            gerar_codigo_fn=_gerar_codigo_fn if cobrancas else None,
+            plano_valor_dinheiro=plano_valor_dinheiro or None,
         )
 
         # Persiste histórico na sessão
