@@ -149,33 +149,24 @@ export async function ensureTenantForUser(
       select: { id: true },
     });
 
-    const user = existingByEmail
-      ? await prisma.user.update({
-          where: { id: existingByEmail.id },
-          data: { nome },
-          select: {
-            id: true,
-            email: true,
-            nome: true,
-          },
-        })
-      : await prisma.user.upsert({
-          where: { id: authUser.id },
-          create: {
-            id: authUser.id,
-            email,
-            nome,
-          },
-          update: {
-            email,
-            nome,
-          },
-          select: {
-            id: true,
-            email: true,
-            nome: true,
-          },
-        });
+    const targetId = existingByEmail?.id ?? authUser.id;
+
+    const user = await prisma.user.upsert({
+      where: { id: targetId },
+      create: {
+        id: targetId,
+        email,
+        nome,
+      },
+      update: {
+        nome,
+      },
+      select: {
+        id: true,
+        email: true,
+        nome: true,
+      },
+    });
 
     const cookieStore = await cookies();
     const impersonatedTenantId = cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value;
