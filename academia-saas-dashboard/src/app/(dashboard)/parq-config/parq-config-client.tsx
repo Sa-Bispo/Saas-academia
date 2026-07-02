@@ -79,7 +79,7 @@ type Pergunta = {
   id: number;
   ordem: number;
   texto: string;
-  tipo: "PERGUNTA" | "INFORMATIVO";
+  tipo: "PERGUNTA" | "TEXTO";
   ativo: boolean;
 };
 
@@ -748,7 +748,7 @@ function FichasTab({
 // ─── Tab: Perguntas ───────────────────────────────────────────────────────────
 
 function TipoBadge({ tipo }: { tipo: Pergunta["tipo"] }) {
-  if (tipo === "INFORMATIVO") {
+  if (tipo === "TEXTO") {
     return (
       <span
         className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
@@ -778,7 +778,7 @@ function TipoSelect({
 }) {
   return (
     <div className="flex gap-1.5">
-      {(["PERGUNTA", "INFORMATIVO"] as const).map((t) => (
+      {(["PERGUNTA", "TEXTO"] as const).map((t) => (
         <button
           key={t}
           type="button"
@@ -943,7 +943,7 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
                       border: "1px solid var(--accent)",
                       color: "var(--text-primary)",
                     }}
-                    rows={tipoEdit === "INFORMATIVO" ? 8 : 2}
+                    rows={tipoEdit === "TEXTO" ? 8 : 2}
                     value={textoEdit}
                     onChange={(e) => setTextoEdit(e.target.value)}
                     autoFocus
@@ -965,7 +965,7 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
                       color: "var(--text-primary)",
                       textDecoration: p.ativo ? undefined : "line-through",
                       opacity: p.ativo ? 1 : 0.45,
-                      whiteSpace: p.tipo === "INFORMATIVO" ? "pre-wrap" : undefined,
+                      whiteSpace: p.tipo === "TEXTO" ? "pre-wrap" : undefined,
                     }}
                   >
                     {p.texto}
@@ -1050,9 +1050,9 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
               border: "1px solid var(--border-color)",
               color: "var(--text-primary)",
             }}
-            rows={novoTipo === "INFORMATIVO" ? 8 : 2}
+            rows={novoTipo === "TEXTO" ? 8 : 2}
             placeholder={
-              novoTipo === "INFORMATIVO"
+              novoTipo === "TEXTO"
                 ? "Texto informativo (ex: horário de funcionamento, regulamento)..."
                 : "Texto da nova pergunta (Sim/Não)..."
             }

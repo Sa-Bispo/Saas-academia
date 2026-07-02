@@ -86,7 +86,7 @@ export async function salvarPerguntaParq(data: {
   id?: number;
   texto: string;
   ordem: number;
-  tipo?: "PERGUNTA" | "INFORMATIVO";
+  tipo?: "PERGUNTA" | "TEXTO";
 }) {
   const tenantId = await getAuthenticatedTenantId();
   const texto = data.texto.trim();

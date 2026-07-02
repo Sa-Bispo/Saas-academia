@@ -525,9 +525,9 @@ enum FormaPagamento {
   PIX
 }
 
-enum ParqPerguntaTipo {
+enum ParqItemTipo {
   PERGUNTA
-  INFORMATIVO
+  TEXTO
 }
 
 enum Periodicidade {
@@ -700,13 +700,13 @@ model BotLearnedPattern {
 // ─── PAR-Q ────────────────────────────────────────────────────────────────────
 
 model ParqPergunta {
-  id        Int              @id @default(autoincrement())
-  tenantId  String?          @map("tenant_id") @db.Uuid
+  id        Int          @id @default(autoincrement())
+  tenantId  String?      @map("tenant_id") @db.Uuid
   ordem     Int
-  texto     String           @db.Text
-  tipo      ParqPerguntaTipo @default(PERGUNTA)
-  ativo     Boolean          @default(true)
-  createdAt DateTime         @default(now()) @map("created_at")
+  texto     String       @db.Text
+  tipo      ParqItemTipo @default(PERGUNTA)
+  ativo     Boolean      @default(true)
+  createdAt DateTime     @default(now()) @map("created_at")
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

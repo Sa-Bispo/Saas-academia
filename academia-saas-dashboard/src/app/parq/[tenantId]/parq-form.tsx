@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle, Info, Loader2, RotateCcw } from "lucide-rea
 import { SignaturePad, SignaturePadHandle } from "@/components/parq/signature-pad";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
 
-type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "INFORMATIVO" };
+type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "TEXTO" };
 
 type Props = {
   tenantId: string;
@@ -202,7 +202,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
           </div>
 
           {perguntas.map((p) => {
-            if (p.tipo === "INFORMATIVO") {
+            if (p.tipo === "TEXTO") {
               return (
                 <div
                   key={p.id}
