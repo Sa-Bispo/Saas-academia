@@ -33,7 +33,14 @@ import {
 } from "lucide-react";
 import FloatingActionMenu from "@/components/ui/floating-action-menu";
 
-import { criarAluno, atualizarAluno, excluirAluno, buscarAluno, enviarLembrete } from "@/actions/alunos.actions";
+import {
+  criarAluno,
+  atualizarAluno,
+  atualizarVencimentoMatricula,
+  excluirAluno,
+  buscarAluno,
+  enviarLembrete,
+} from "@/actions/alunos.actions";
 import { matricularAluno, criarPlanoAcademia, listarPlanosAcademia } from "@/actions/planos-academia.actions";
 import { validarComprovante, rejeitarComprovante } from "@/actions/cobrancas.actions";
 import { ModalImportar } from "@/components/alunos/modal-importar";
@@ -613,6 +620,8 @@ function ModalDetalheAluno({
   const [dataNascimento, setDataNascimento] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [status, setStatus] = useState<"ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO" | "SEM_MATRICULA">("ATIVO");
+  const [matriculaAtivaId, setMatriculaAtivaId] = useState<string | null>(null);
+  const [dataVencimentoMatricula, setDataVencimentoMatricula] = useState("");
 
   function handleValidarComprovante(cobrancaId: string) {
     setComprovantePendingId(cobrancaId);
@@ -643,6 +652,9 @@ function ModalDetalheAluno({
     setDataNascimento(toDateInputValue(a.dataNascimento));
     setObservacoes(a.observacoes ?? "");
     setStatus(a.status as "ATIVO" | "INADIMPLENTE" | "INATIVO" | "SUSPENSO" | "SEM_MATRICULA");
+    const matriculaAtiva = a.matriculas.find((m) => m.status === "ATIVA") ?? null;
+    setMatriculaAtivaId(matriculaAtiva?.id ?? null);
+    setDataVencimentoMatricula(toDateInputValue(matriculaAtiva?.dataVencimento));
   }
 
   useEffect(() => {
@@ -672,6 +684,9 @@ function ModalDetalheAluno({
         observacoes: observacoes || undefined,
         status,
       });
+      if (matriculaAtivaId && dataVencimentoMatricula) {
+        await atualizarVencimentoMatricula(matriculaAtivaId, dataVencimentoMatricula);
+      }
       const atualizado = await buscarAluno(alunoId);
       if (atualizado) {
         setAluno(atualizado as unknown as AlunoDetalhe);
@@ -809,6 +824,22 @@ function ModalDetalheAluno({
                   <option value="SUSPENSO">Suspenso</option>
                 </select>
               </div>
+              {matriculaAtivaId ? (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted">
+                    Data de cobrança/pagamento
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full rounded-xl border border-line bg-white/5 px-3 py-2 text-sm text-white focus:border-brand/50 focus:outline-none"
+                    value={dataVencimentoMatricula}
+                    onChange={(e) => setDataVencimentoMatricula(e.target.value)}
+                  />
+                  <p className="mt-1 text-[11px] text-muted">
+                    Próximo vencimento da matrícula ativa — define quando a próxima cobrança é gerada.
+                  </p>
+                </div>
+              ) : null}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-muted">Observações</label>
                 <textarea

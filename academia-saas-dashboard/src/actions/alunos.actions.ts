@@ -159,6 +159,19 @@ export async function atualizarAluno(
   revalidatePath("/dashboard/academia");
 }
 
+export async function atualizarVencimentoMatricula(matriculaId: string, novaDataVencimento: string) {
+  const tenantId = await getAuthenticatedTenantId();
+
+  await prisma.matriculaAluno.updateMany({
+    where: { id: matriculaId, tenantId },
+    data: { dataVencimento: new Date(novaDataVencimento) },
+  });
+
+  revalidatePath("/alunos");
+  revalidatePath("/cobrancas");
+  revalidatePath("/dashboard/academia");
+}
+
 export async function excluirAluno(alunoId: string) {
   const tenantId = await getAuthenticatedTenantId();
 
