@@ -498,7 +498,17 @@ export async function disconnectWhatsApp(tenantId?: string): Promise<{
     }
 
     try {
-      // Apenas desvincula no SaaS; a instância central não é removida.
+      // Remove a instância na Evolution API para encerrar a sessão do WhatsApp
+      // de fato. Sem isso, o nome da instância (derivado do tenant.id) é
+      // determinístico e a Evolution recria a mesma sessão já conectada ao
+      // gerar um novo QR Code, impedindo reconectar ou trocar de número.
+      try {
+        await evolutionService.deleteInstance(tenant.evolutionInstanceName);
+      } catch {
+        // Instância pode já ter sido removida/desconectada — segue para
+        // limpar o vínculo local de qualquer forma.
+      }
+
       await prisma.tenant.update({
         where: { id: tenant.id },
         data: {
