@@ -127,6 +127,7 @@ export type TenantConfigDTO = {
   pixChave: string | null;
   diasAntecedenciaCobranca: number;
   limiteDiarioCobrancas: number;
+  ocultarModalidadesPagamento: boolean;
 };
 
 export type UpdateTenantConfigInput = z.infer<typeof updateTenantConfigSchema>;
@@ -202,6 +203,7 @@ export async function getTenantConfig(): Promise<TenantConfigDTO> {
     pixChave: typeof cfg.pixChave === "string" ? cfg.pixChave : null,
     diasAntecedenciaCobranca: typeof cfg.dias_antecedencia_cobranca === "number" ? cfg.dias_antecedencia_cobranca : 5,
     limiteDiarioCobrancas: typeof cfg.limite_diario_cobrancas === "number" ? cfg.limite_diario_cobrancas : 50,
+    ocultarModalidadesPagamento: cfg.ocultar_modalidades_pagamento === true,
   };
 }
 

@@ -240,6 +240,7 @@ function Textarea({ ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement
 export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO }) {
   const isSchedulingNiche = tenant.niche === "CLINICA";
   const isAcademia = tenant.subNicho === "academia";
+  const ocultarModalidadesPagamento = tenant.ocultarModalidadesPagamento;
   const [toast, setToast] = useState<ToastState>(null);
   const [operationDetails, setOperationDetails] = useState<OperationDetails>(
     () => parseOperationContext(tenant.operationContext ?? "", isSchedulingNiche, isAcademia)
@@ -439,7 +440,7 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
           </div>
 
           {/* Modalidades — academia ou clínica */}
-          {(isAcademia || isSchedulingNiche) && (
+          {(isAcademia || isSchedulingNiche) && !ocultarModalidadesPagamento && (
             <div>
               <FieldLabel>
                 <Dumbbell size={13} className="inline mr-1.5 opacity-60" />
@@ -475,37 +476,39 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
             </div>
           )}
 
-          <div>
-            <FieldLabel><Banknote size={13} className="inline mr-1.5 opacity-60" />Formas de pagamento aceitas</FieldLabel>
-            <div className="flex flex-wrap gap-2 mt-1.5">
-              {PAYMENT_METHODS.map((method) => {
-                const checked = operationDetails.paymentMethods.includes(method.id);
-                return (
-                  <button
-                    key={method.id}
-                    type="button"
-                    onClick={() =>
-                      setOperationDetails((p) => ({
-                        ...p,
-                        paymentMethods: checked
-                          ? p.paymentMethods.filter((m) => m !== method.id)
-                          : [...p.paymentMethods, method.id],
-                      }))
-                    }
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                      checked
-                        ? "border-accent/40 bg-accent/15 text-accent"
-                        : "border-line bg-white/4 text-muted hover:border-accent/30 hover:text-foreground"
-                    }`}
-                  >
-                    {checked && <span className="mr-1">✓</span>}
-                    {method.label}
-                  </button>
-                );
-              })}
+          {!ocultarModalidadesPagamento && (
+            <div>
+              <FieldLabel><Banknote size={13} className="inline mr-1.5 opacity-60" />Formas de pagamento aceitas</FieldLabel>
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {PAYMENT_METHODS.map((method) => {
+                  const checked = operationDetails.paymentMethods.includes(method.id);
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() =>
+                        setOperationDetails((p) => ({
+                          ...p,
+                          paymentMethods: checked
+                            ? p.paymentMethods.filter((m) => m !== method.id)
+                            : [...p.paymentMethods, method.id],
+                        }))
+                      }
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                        checked
+                          ? "border-accent/40 bg-accent/15 text-accent"
+                          : "border-line bg-white/4 text-muted hover:border-accent/30 hover:text-foreground"
+                      }`}
+                    >
+                      {checked && <span className="mr-1">✓</span>}
+                      {method.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-muted">Selecione todas que se aplicam.</p>
             </div>
-            <p className="mt-2 text-xs text-muted">Selecione todas que se aplicam.</p>
-          </div>
+          )}
         </SectionCard>
 
         {/* ── 2. ACADEMIA / COBRANÇAS ── */}
