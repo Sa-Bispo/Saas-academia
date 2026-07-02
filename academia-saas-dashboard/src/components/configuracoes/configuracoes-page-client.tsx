@@ -351,6 +351,25 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
+              <FieldLabel><Bot size={13} className="inline mr-1.5 opacity-60" />Nome do Assistente</FieldLabel>
+              <Input {...register("botName")} placeholder="Ex: Zé, Júlia, PyraBot" />
+              {errors.botName && <p className="mt-1 text-xs text-red-400">{errors.botName.message}</p>}
+            </div>
+            <div>
+              <FieldLabel><Building2 size={13} className="inline mr-1.5 opacity-60" />Nome do Estabelecimento</FieldLabel>
+              <Input
+                {...register("companyName")}
+                placeholder={
+                  isAcademia
+                    ? "Ex: Smart Fit Centro, Academia Power"
+                    : isSchedulingNiche
+                    ? "Ex: Studio Bella, Barbearia Prime"
+                    : "Ex: Pizzaria do Zé"
+                }
+              />
+              {errors.companyName && <p className="mt-1 text-xs text-red-400">{errors.companyName.message}</p>}
+            </div>
+            <div>
               <FieldLabel>
                 <Clock size={13} className="inline mr-1.5 opacity-60" />
                 Horário de funcionamento
@@ -508,33 +527,18 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel><CalendarDays size={13} className="inline mr-1.5 opacity-60" />Dias de antecedência</FieldLabel>
-                <Input
-                  type="number"
-                  min={1}
-                  max={30}
-                  {...register("diasAntecedenciaCobranca")}
-                  placeholder="5"
-                />
-                <p className="mt-1.5 text-xs text-muted">
-                  Quantos dias antes do vencimento o aluno é avisado.
-                </p>
-              </div>
-              <div>
-                <FieldLabel><Banknote size={13} className="inline mr-1.5 opacity-60" />Limite diário de cobranças</FieldLabel>
-                <Input
-                  type="number"
-                  min={1}
-                  max={500}
-                  {...register("limiteDiarioCobrancas")}
-                  placeholder="50"
-                />
-                <p className="mt-1.5 text-xs text-muted">
-                  Máximo de mensagens de cobrança por dia (evita spam).
-                </p>
-              </div>
+            <div>
+              <FieldLabel><CalendarDays size={13} className="inline mr-1.5 opacity-60" />Dias de antecedência</FieldLabel>
+              <Input
+                type="number"
+                min={1}
+                max={30}
+                {...register("diasAntecedenciaCobranca")}
+                placeholder="5"
+              />
+              <p className="mt-1.5 text-xs text-muted">
+                Quantos dias antes do vencimento o aluno é avisado.
+              </p>
             </div>
           </SectionCard>
         )}
@@ -549,28 +553,6 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
           </summary>
 
           <div className="space-y-4 px-6 pb-6 pt-1">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel><Bot size={13} className="inline mr-1.5 opacity-60" />Nome do Assistente</FieldLabel>
-                <Input {...register("botName")} placeholder="Ex: Zé, Júlia, PyraBot" />
-                {errors.botName && <p className="mt-1 text-xs text-red-400">{errors.botName.message}</p>}
-              </div>
-              <div>
-                <FieldLabel><Building2 size={13} className="inline mr-1.5 opacity-60" />Nome do Estabelecimento</FieldLabel>
-                <Input
-                  {...register("companyName")}
-                  placeholder={
-                    isAcademia
-                      ? "Ex: Smart Fit Centro, Academia Power"
-                      : isSchedulingNiche
-                      ? "Ex: Studio Bella, Barbearia Prime"
-                      : "Ex: Pizzaria do Zé"
-                  }
-                />
-                {errors.companyName && <p className="mt-1 text-xs text-red-400">{errors.companyName.message}</p>}
-              </div>
-            </div>
-
             <div>
               <FieldLabel><MessageSquare size={13} className="inline mr-1.5 opacity-60" />Tom de Voz</FieldLabel>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
