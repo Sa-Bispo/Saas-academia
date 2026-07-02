@@ -336,56 +336,10 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
-        {/* ── 1. IDENTIDADE ── */}
-        <SectionCard
-          icon={<Bot size={18} />}
-          label="Seção 1"
-          title="Identidade do Assistente"
-          subtitle="Como o bot se apresenta para os seus clientes."
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <FieldLabel><Bot size={13} className="inline mr-1.5 opacity-60" />Nome do Assistente</FieldLabel>
-              <Input {...register("botName")} placeholder="Ex: Zé, Júlia, PyraBot" />
-              {errors.botName && <p className="mt-1 text-xs text-red-400">{errors.botName.message}</p>}
-            </div>
-            <div>
-              <FieldLabel><Building2 size={13} className="inline mr-1.5 opacity-60" />Nome do Estabelecimento</FieldLabel>
-              <Input
-                {...register("companyName")}
-                placeholder={
-                  isAcademia
-                    ? "Ex: Smart Fit Centro, Academia Power"
-                    : isSchedulingNiche
-                    ? "Ex: Studio Bella, Barbearia Prime"
-                    : "Ex: Pizzaria do Zé"
-                }
-              />
-              {errors.companyName && <p className="mt-1 text-xs text-red-400">{errors.companyName.message}</p>}
-            </div>
-          </div>
-
-          <div>
-            <FieldLabel><MessageSquare size={13} className="inline mr-1.5 opacity-60" />Tom de Voz</FieldLabel>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {TONE_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className="relative flex cursor-pointer flex-col gap-0.5 rounded-xl border border-line bg-white/4 px-4 py-3 transition hover:border-accent/50 has-[:checked]:border-accent has-[:checked]:bg-accent/10"
-                >
-                  <input type="radio" value={opt.value} {...register("toneOfVoice")} className="sr-only" />
-                  <span className="text-sm font-medium text-foreground">{opt.label}</span>
-                  <span className="text-xs text-muted">{opt.desc}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </SectionCard>
-
-        {/* ── 2. OPERAÇÃO ── */}
+        {/* ── 1. OPERAÇÃO ── */}
         <SectionCard
           icon={<Store size={18} />}
-          label="Seção 2"
+          label="Seção 1"
           title={isAcademia ? "Detalhes da Academia" : "Detalhes da Operação"}
           subtitle={
             isAcademia
@@ -535,51 +489,11 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
           </div>
         </SectionCard>
 
-        {/* ── 3. REGRAS ── */}
-        <SectionCard
-          icon={<ShieldAlert size={18} />}
-          label="Seção 3"
-          title="Regras do Bot"
-          subtitle="O que o assistente NUNCA deve fazer ou falar — limites e proibições."
-        >
-          <Textarea
-            rows={4}
-            {...register("strictRules")}
-            placeholder={`Ex:\n- Nunca ofereça desconto acima de 10%\n- Não aceite pedidos fora do horário de funcionamento\n- Não comente sobre concorrentes\n- Se o cliente reclamar, peça desculpas e ofereça falar com o responsável`}
-          />
-        </SectionCard>
-
-        {/* ── 4. NOTIFICAÇÕES ── */}
-        <SectionCard
-          icon={<Smartphone size={18} />}
-          label="Seção 4"
-          title="Notificações"
-          subtitle={
-            isSchedulingNiche
-              ? "Número que receberá alertas de novos agendamentos via WhatsApp."
-              : "Número que receberá alertas de novos pedidos via WhatsApp."
-          }
-        >
-          <div>
-            <FieldLabel>WhatsApp do responsável</FieldLabel>
-            <Input
-              {...register("whatsappAdmin")}
-              placeholder="5511999999999  (com DDI, sem espaços)"
-            />
-            {errors.whatsappAdmin && (
-              <p className="mt-1 text-xs text-red-400">{errors.whatsappAdmin.message}</p>
-            )}
-            <p className="mt-1.5 text-xs text-muted">
-              Inclua o código do país. Ex: 55 (Brasil) + DDD + número.
-            </p>
-          </div>
-        </SectionCard>
-
-        {/* ── 5. ACADEMIA / COBRANÇAS ── */}
+        {/* ── 2. ACADEMIA / COBRANÇAS ── */}
         {isAcademia && (
           <SectionCard
             icon={<Dumbbell size={18} />}
-            label="Seção 5"
+            label="Seção 2"
             title="Cobranças e PIX"
             subtitle="Configurações de cobrança automática para alunos da academia."
           >
@@ -624,6 +538,80 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
             </div>
           </SectionCard>
         )}
+
+        {/* ── Avançado: personalização de IA (só entra em ação quando o fluxo padrão não reconhece a mensagem) ── */}
+        <details className="group rounded-2xl border border-line bg-white/4 backdrop-blur">
+          <summary className="cursor-pointer select-none px-6 py-4 text-sm font-medium text-foreground/90">
+            Configurações avançadas
+            <span className="mt-0.5 block text-xs font-normal text-muted">
+              Personalidade e regras usadas apenas quando o bot não reconhece a mensagem do cliente, além de campos experimentais. A maior parte do atendimento não passa por aqui.
+            </span>
+          </summary>
+
+          <div className="space-y-4 px-6 pb-6 pt-1">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <FieldLabel><Bot size={13} className="inline mr-1.5 opacity-60" />Nome do Assistente</FieldLabel>
+                <Input {...register("botName")} placeholder="Ex: Zé, Júlia, PyraBot" />
+                {errors.botName && <p className="mt-1 text-xs text-red-400">{errors.botName.message}</p>}
+              </div>
+              <div>
+                <FieldLabel><Building2 size={13} className="inline mr-1.5 opacity-60" />Nome do Estabelecimento</FieldLabel>
+                <Input
+                  {...register("companyName")}
+                  placeholder={
+                    isAcademia
+                      ? "Ex: Smart Fit Centro, Academia Power"
+                      : isSchedulingNiche
+                      ? "Ex: Studio Bella, Barbearia Prime"
+                      : "Ex: Pizzaria do Zé"
+                  }
+                />
+                {errors.companyName && <p className="mt-1 text-xs text-red-400">{errors.companyName.message}</p>}
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel><MessageSquare size={13} className="inline mr-1.5 opacity-60" />Tom de Voz</FieldLabel>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {TONE_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className="relative flex cursor-pointer flex-col gap-0.5 rounded-xl border border-line bg-white/4 px-4 py-3 transition hover:border-accent/50 has-[:checked]:border-accent has-[:checked]:bg-accent/10"
+                  >
+                    <input type="radio" value={opt.value} {...register("toneOfVoice")} className="sr-only" />
+                    <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                    <span className="text-xs text-muted">{opt.desc}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel><ShieldAlert size={13} className="inline mr-1.5 opacity-60" />Regras do Bot</FieldLabel>
+              <Textarea
+                rows={4}
+                {...register("strictRules")}
+                placeholder={`Ex:\n- Nunca ofereça desconto acima de 10%\n- Não aceite pedidos fora do horário de funcionamento\n- Não comente sobre concorrentes\n- Se o cliente reclamar, peça desculpas e ofereça falar com o responsável`}
+              />
+              <p className="mt-1.5 text-xs text-muted">O que o assistente NUNCA deve fazer ou falar — limites e proibições.</p>
+            </div>
+
+            <div>
+              <FieldLabel><Smartphone size={13} className="inline mr-1.5 opacity-60" />WhatsApp do responsável</FieldLabel>
+              <Input
+                {...register("whatsappAdmin")}
+                placeholder="5511999999999  (com DDI, sem espaços)"
+              />
+              {errors.whatsappAdmin && (
+                <p className="mt-1 text-xs text-red-400">{errors.whatsappAdmin.message}</p>
+              )}
+              <p className="mt-1.5 text-xs text-muted">
+                Inclua o código do país (Ex: 55 + DDD + número). Recurso ainda não ativo — o bot ainda não envia alertas para este número.
+              </p>
+            </div>
+          </div>
+        </details>
 
         {/* ── Preview do prompt ── */}
         <details className="group rounded-2xl border border-dashed border-line bg-white/2">
