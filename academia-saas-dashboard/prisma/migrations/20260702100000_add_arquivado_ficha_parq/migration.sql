@@ -1,0 +1,2 @@
+ALTER TABLE fichas_parq
+  ADD COLUMN IF NOT EXISTS "arquivado" BOOLEAN NOT NULL DEFAULT false;

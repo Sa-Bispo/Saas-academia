@@ -4,6 +4,8 @@ import { type Dispatch, type SetStateAction, useState, useTransition } from "rea
 import dynamic from "next/dynamic";
 import {
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   ArrowDown,
   ArrowUp,
   Check,
@@ -16,11 +18,13 @@ import {
   Link2,
   Pencil,
   Plus,
+  Search,
   Settings2,
   Trash2,
   X,
 } from "lucide-react";
 import {
+  arquivarFichaParq,
   excluirPerguntaParq,
   matricularLeadParq,
   reordenarPerguntasParq,
@@ -72,6 +76,7 @@ type Ficha = {
   ip: string | null;
   userAgent: string | null;
   consentimentoLgpd: boolean;
+  arquivado: boolean;
   assinadoEm: Date;
   aluno: Aluno;
 };
@@ -586,6 +591,33 @@ function ModalMatricular({
 
 // ─── Tab: Fichas ──────────────────────────────────────────────────────────────
 
+type StatusFiltro = "todos" | "matriculado" | "lead";
+
+function FiltroPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
+      style={{
+        background: active ? "var(--accent)" : "var(--bg-primary)",
+        color: active ? "#fff" : "var(--text-secondary)",
+        border: `1px solid ${active ? "var(--accent)" : "var(--border-color)"}`,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function FichasTab({
   fichas,
   planos,
@@ -601,147 +633,259 @@ function FichasTab({
   onVerFicha: (id: string) => void;
   onMatricular: (id: string) => void;
 }) {
-  if (fichas.length === 0) {
-    return (
-      <div
-        className="rounded-2xl border p-10 text-center"
-        style={{
-          background: "var(--bg-secondary)",
-          borderColor: "var(--border-color)",
-        }}
-      >
-        <ClipboardList
-          size={32}
-          className="mx-auto mb-3"
-          style={{ color: "var(--text-secondary)" }}
-        />
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Nenhuma ficha PAR-Q recebida ainda.
-        </p>
-        <p
-          className="mt-1 text-xs"
-          style={{ color: "var(--text-secondary)", opacity: 0.7 }}
-        >
-          Compartilhe o link do formulário com seus alunos.
-        </p>
-      </div>
-    );
+  const [busca, setBusca] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
+  const [apenasLibMedica, setApenasLibMedica] = useState(false);
+  const [verArquivados, setVerArquivados] = useState(false);
+  const [arquivandoId, setArquivandoId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  function handleArquivar(id: string, arquivado: boolean) {
+    setArquivandoId(id);
+    startTransition(async () => {
+      try {
+        await arquivarFichaParq(id, arquivado);
+      } finally {
+        setArquivandoId(null);
+      }
+    });
   }
 
+  const totalArquivadas = fichas.filter((f) => f.arquivado).length;
+
+  const fichasFiltradas = fichas.filter((f) => {
+    if (f.arquivado !== verArquivados) return false;
+
+    const jaMatriculado = f.aluno.status !== "SEM_MATRICULA";
+    if (statusFiltro === "matriculado" && !jaMatriculado) return false;
+    if (statusFiltro === "lead" && jaMatriculado) return false;
+
+    if (apenasLibMedica && !f.precisaLiberacaoMedica) return false;
+
+    const termo = busca.trim().toLowerCase();
+    if (termo) {
+      const termoDigits = termo.replace(/\D/g, "");
+      const nomeMatch = f.aluno.nome.toLowerCase().includes(termo);
+      const cpfMatch = termoDigits.length > 0 && f.assinanteCpf.replace(/\D/g, "").includes(termoDigits);
+      const telMatch = termoDigits.length > 0 && f.aluno.telefone.replace(/\D/g, "").includes(termoDigits);
+      if (!nomeMatch && !cpfMatch && !telMatch) return false;
+    }
+
+    return true;
+  });
+
   return (
-    <div
-      className="rounded-2xl border overflow-hidden"
-      style={{
-        background: "var(--bg-secondary)",
-        borderColor: "var(--border-color)",
-      }}
-    >
-      <table className="w-full text-sm">
-        <thead>
-          <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-            {["Nome", "CPF", "Telefone", "Data", "Lib. médica", ""].map((h) => (
-              <th
-                key={h}
-                className="px-4 py-3 text-left text-xs font-medium"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {fichas.map((f, i) => (
-            <tr
-              key={f.id}
-              style={{
-                borderTop: i > 0 ? "1px solid var(--border-color)" : undefined,
-              }}
+    <div className="space-y-3">
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: "var(--text-secondary)" }}
+          />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, CPF ou telefone..."
+            className="w-full rounded-lg border py-2 pl-8 pr-3 text-xs outline-none"
+            style={{
+              background: "var(--bg-primary)",
+              borderColor: "var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <FiltroPill active={statusFiltro === "todos"} onClick={() => setStatusFiltro("todos")}>
+            Todos
+          </FiltroPill>
+          <FiltroPill active={statusFiltro === "matriculado"} onClick={() => setStatusFiltro("matriculado")}>
+            Já matriculados
+          </FiltroPill>
+          <FiltroPill active={statusFiltro === "lead"} onClick={() => setStatusFiltro("lead")}>
+            Leads
+          </FiltroPill>
+        </div>
+
+        <FiltroPill active={apenasLibMedica} onClick={() => setApenasLibMedica((v) => !v)}>
+          <span className="inline-flex items-center gap-1">
+            <AlertTriangle size={11} />
+            Lib. médica: Sim
+          </span>
+        </FiltroPill>
+
+        <FiltroPill active={verArquivados} onClick={() => setVerArquivados((v) => !v)}>
+          <span className="inline-flex items-center gap-1">
+            <Archive size={11} />
+            Arquivados
+            {totalArquivadas > 0 && ` (${totalArquivadas})`}
+          </span>
+        </FiltroPill>
+      </div>
+
+      {fichasFiltradas.length === 0 ? (
+        <div
+          className="rounded-2xl border p-10 text-center"
+          style={{
+            background: "var(--bg-secondary)",
+            borderColor: "var(--border-color)",
+          }}
+        >
+          <ClipboardList
+            size={32}
+            className="mx-auto mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          />
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            {fichas.length === 0
+              ? "Nenhuma ficha PAR-Q recebida ainda."
+              : verArquivados
+                ? "Nenhuma ficha arquivada."
+                : "Nenhuma ficha encontrada para os filtros selecionados."}
+          </p>
+          {fichas.length === 0 && (
+            <p
+              className="mt-1 text-xs"
+              style={{ color: "var(--text-secondary)", opacity: 0.7 }}
             >
-              <td
-                className="px-4 py-3 font-medium"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {f.aluno.nome}
-              </td>
-              <td
-                className="px-4 py-3 font-mono text-xs"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {formatCpf(f.assinanteCpf)}
-              </td>
-              <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>
-                {f.aluno.telefone}
-              </td>
-              <td
-                className="px-4 py-3 text-xs"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {formatData(f.assinadoEm)}
-              </td>
-              <td className="px-4 py-3">
-                {f.precisaLiberacaoMedica ? (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}
+              Compartilhe o link do formulário com seus alunos.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div
+          className="rounded-2xl border overflow-hidden"
+          style={{
+            background: "var(--bg-secondary)",
+            borderColor: "var(--border-color)",
+          }}
+        >
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                {["Nome", "CPF", "Telefone", "Data", "Lib. médica", ""].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-xs font-medium"
+                    style={{ color: "var(--text-secondary)" }}
                   >
-                    <AlertTriangle size={10} />
-                    Sim
-                  </span>
-                ) : (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={{ background: "rgba(52,211,153,0.15)", color: "#34d399" }}
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {fichasFiltradas.map((f, i) => (
+                <tr
+                  key={f.id}
+                  style={{
+                    borderTop: i > 0 ? "1px solid var(--border-color)" : undefined,
+                    opacity: arquivandoId === f.id ? 0.5 : 1,
+                  }}
+                >
+                  <td
+                    className="px-4 py-3 font-medium"
+                    style={{ color: "var(--text-primary)" }}
                   >
-                    Não
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3 text-right">
-                <div className="inline-flex items-center gap-2">
-                  <ParqPdfButton
-                    ficha={f}
-                    perguntas={perguntas}
-                    academiaName={academiaName}
-                    termoTexto={PARQ_TERMO_V1}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onVerFicha(f.id)}
-                    className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors"
-                    style={{
-                      borderColor: "var(--border-color)",
-                      color: "var(--text-secondary)",
-                    }}
+                    {f.aluno.nome}
+                  </td>
+                  <td
+                    className="px-4 py-3 font-mono text-xs"
+                    style={{ color: "var(--text-secondary)" }}
                   >
-                    <FileText size={12} />
-                    Ver ficha
-                  </button>
-                  {f.aluno.status === "SEM_MATRICULA" ? (
-                    <button
-                      type="button"
-                      onClick={() => onMatricular(f.id)}
-                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold text-white transition-all hover:opacity-90"
-                      style={{ background: "var(--accent)" }}
-                    >
-                      <Plus size={12} />
-                      Matricular
-                    </button>
-                  ) : (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium"
-                      style={{ background: "rgba(52,211,153,0.12)", color: "#34d399" }}
-                    >
-                      <Check size={11} />
-                      Matriculado
-                    </span>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                    {formatCpf(f.assinanteCpf)}
+                  </td>
+                  <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>
+                    {f.aluno.telefone}
+                  </td>
+                  <td
+                    className="px-4 py-3 text-xs"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {formatData(f.assinadoEm)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {f.precisaLiberacaoMedica ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}
+                      >
+                        <AlertTriangle size={10} />
+                        Sim
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={{ background: "rgba(52,211,153,0.15)", color: "#34d399" }}
+                      >
+                        Não
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="inline-flex items-center gap-2">
+                      <ParqPdfButton
+                        ficha={f}
+                        perguntas={perguntas}
+                        academiaName={academiaName}
+                        termoTexto={PARQ_TERMO_V1}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => onVerFicha(f.id)}
+                        className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors"
+                        style={{
+                          borderColor: "var(--border-color)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        <FileText size={12} />
+                        Ver ficha
+                      </button>
+                      <button
+                        type="button"
+                        disabled={arquivandoId === f.id}
+                        onClick={() => handleArquivar(f.id, !f.arquivado)}
+                        title={f.arquivado ? "Desarquivar" : "Arquivar"}
+                        className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors disabled:opacity-50"
+                        style={{
+                          borderColor: "var(--border-color)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {f.arquivado ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+                        {f.arquivado ? "Desarquivar" : "Arquivar"}
+                      </button>
+                      {f.aluno.status === "SEM_MATRICULA" ? (
+                        <button
+                          type="button"
+                          onClick={() => onMatricular(f.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold text-white transition-all hover:opacity-90"
+                          style={{ background: "var(--accent)" }}
+                        >
+                          <Plus size={12} />
+                          Matricular
+                        </button>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium"
+                          style={{ background: "rgba(52,211,153,0.12)", color: "#34d399" }}
+                        >
+                          <Check size={11} />
+                          Matriculado
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

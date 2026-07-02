@@ -728,6 +728,7 @@ model FichaParq {
   ip                     String?  @db.VarChar(50)
   userAgent              String?  @map("user_agent") @db.Text
   consentimentoLgpd      Boolean  @default(false) @map("consentimento_lgpd")
+  arquivado              Boolean  @default(false)
   assinadoEm             DateTime @default(now()) @map("assinado_em")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

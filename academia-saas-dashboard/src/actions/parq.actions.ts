@@ -48,6 +48,22 @@ export async function listarFichasParq() {
   });
 }
 
+export async function arquivarFichaParq(id: string, arquivado: boolean) {
+  const tenantId = await getAuthenticatedTenantId();
+
+  const existing = await prisma.fichaParq.findFirst({
+    where: { id, tenantId },
+  });
+  if (!existing) throw new Error("Ficha não encontrada ou sem permissão.");
+
+  await prisma.fichaParq.update({
+    where: { id },
+    data: { arquivado },
+  });
+
+  revalidatePath("/parq-config");
+}
+
 // ─── Perguntas ────────────────────────────────────────────────────────────────
 
 export async function ensurePerguntasTenant(tenantId: string): Promise<void> {
