@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle, Info, Loader2, RotateCcw } from "lucide-react";
 import { SignaturePad, SignaturePadHandle } from "@/components/parq/signature-pad";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
+import { TextoInformativo } from "@/lib/parq-texto-informativo";
 
 type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "TEXTO" };
 
@@ -209,9 +210,10 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
                   className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
                 >
                   <Info size={14} className="mt-0.5 shrink-0 text-white/30" />
-                  <p className="whitespace-pre-line text-xs leading-relaxed text-white/60">
-                    {p.texto}
-                  </p>
+                  <TextoInformativo
+                    texto={p.texto}
+                    className="space-y-1 text-xs leading-relaxed text-white/60"
+                  />
                 </div>
               );
             }

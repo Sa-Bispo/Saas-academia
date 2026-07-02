@@ -92,23 +92,25 @@ export async function salvarPerguntaParq(data: {
   const texto = data.texto.trim();
   if (!texto) throw new Error("O texto da pergunta não pode estar vazio.");
 
+  let pergunta;
   if (data.id) {
     const existing = await prisma.parqPergunta.findFirst({
       where: { id: data.id, tenantId },
     });
     if (!existing) throw new Error("Pergunta não encontrada.");
 
-    await prisma.parqPergunta.update({
+    pergunta = await prisma.parqPergunta.update({
       where: { id: data.id },
       data: { texto, ordem: data.ordem, ...(data.tipo ? { tipo: data.tipo } : {}) },
     });
   } else {
-    await prisma.parqPergunta.create({
+    pergunta = await prisma.parqPergunta.create({
       data: { tenantId, texto, ordem: data.ordem, tipo: data.tipo ?? "PERGUNTA", ativo: true },
     });
   }
 
   revalidatePath("/parq-config");
+  return pergunta;
 }
 
 export async function excluirPerguntaParq(id: number) {

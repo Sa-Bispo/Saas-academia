@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { type Dispatch, type SetStateAction, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import {
   AlertTriangle,
@@ -28,6 +28,7 @@ import {
   togglePerguntaAtiva,
 } from "@/actions/parq.actions";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
+import { TextoInformativo } from "@/lib/parq-texto-informativo";
 
 const ParqPdfButton = dynamic(
   () => import("@/components/parq/parq-pdf-button").then((m) => m.ParqPdfButton),
@@ -797,8 +798,13 @@ function TipoSelect({
   );
 }
 
-function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
-  const [perguntas, setPerguntas] = useState<Pergunta[]>(inicial);
+function PerguntasTab({
+  perguntas,
+  setPerguntas,
+}: {
+  perguntas: Pergunta[];
+  setPerguntas: Dispatch<SetStateAction<Pergunta[]>>;
+}) {
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [textoEdit, setTextoEdit] = useState("");
   const [tipoEdit, setTipoEdit] = useState<Pergunta["tipo"]>("PERGUNTA");
@@ -869,7 +875,11 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
     setNovoTipo("PERGUNTA");
     setAdicionando(false);
     startTransition(async () => {
-      await salvarPerguntaParq({ texto, ordem: maxOrdem + 1, tipo });
+      const criada = await salvarPerguntaParq({ texto, ordem: maxOrdem + 1, tipo });
+      setPerguntas((prev) => [
+        ...prev,
+        { id: criada.id, ordem: criada.ordem, texto: criada.texto, tipo: criada.tipo, ativo: criada.ativo },
+      ]);
     });
   }
 
@@ -959,17 +969,27 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
               ) : (
                 <>
                   <TipoBadge tipo={p.tipo} />
-                  <p
-                    className="text-sm"
-                    style={{
-                      color: "var(--text-primary)",
-                      textDecoration: p.ativo ? undefined : "line-through",
-                      opacity: p.ativo ? 1 : 0.45,
-                      whiteSpace: p.tipo === "TEXTO" ? "pre-wrap" : undefined,
-                    }}
-                  >
-                    {p.texto}
-                  </p>
+                  {p.tipo === "TEXTO" ? (
+                    <TextoInformativo
+                      texto={p.texto}
+                      className="space-y-1 text-sm"
+                      style={{
+                        textDecoration: p.ativo ? undefined : "line-through",
+                        opacity: p.ativo ? 1 : 0.45,
+                      }}
+                    />
+                  ) : (
+                    <p
+                      className="text-sm"
+                      style={{
+                        color: "var(--text-primary)",
+                        textDecoration: p.ativo ? undefined : "line-through",
+                        opacity: p.ativo ? 1 : 0.45,
+                      }}
+                    >
+                      {p.texto}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -1117,11 +1137,12 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function ParqConfigClient({ fichas, perguntas, planos, tenantId, academiaName }: Props) {
+export function ParqConfigClient({ fichas, perguntas: perguntasIniciais, planos, tenantId, academiaName }: Props) {
   const [tab, setTab] = useState<"fichas" | "perguntas">("fichas");
   const [fichaModalId, setFichaModalId] = useState<string | null>(null);
   const [matricularFichaId, setMatricularFichaId] = useState<string | null>(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [perguntas, setPerguntas] = useState<Pergunta[]>(perguntasIniciais);
 
   const perguntaMap = new Map(perguntas.map((p) => [String(p.id), p.texto]));
 
@@ -1225,7 +1246,7 @@ export function ParqConfigClient({ fichas, perguntas, planos, tenantId, academia
           onMatricular={setMatricularFichaId}
         />
       ) : (
-        <PerguntasTab perguntas={perguntas} />
+        <PerguntasTab perguntas={perguntas} setPerguntas={setPerguntas} />
       )}
 
       {/* Ficha detail modal */}

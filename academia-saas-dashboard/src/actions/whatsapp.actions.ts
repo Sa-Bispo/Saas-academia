@@ -294,6 +294,16 @@ export async function getWhatsAppStatus(tenantId: string): Promise<WhatsAppStatu
   };
 }
 
+/**
+ * Leitura rápida (somente banco local, sem chamar a Evolution API) usada
+ * para manter indicadores de UI (ex: sidebar) atualizados em tempo real
+ * sem sobrecarregar a API externa em toda página do dashboard.
+ */
+export async function getWhatsAppConnectionFlag(tenantId: string): Promise<boolean> {
+  const tenant = await assertTenantOwnership(tenantId);
+  return tenant.whatsappStatus === "CONNECTED";
+}
+
 export async function getWhatsAppQRCode(tenantId: string): Promise<WhatsAppQrCodeResponse> {
   const tenant = await assertTenantOwnership(tenantId);
   const response = await autoConnectWhatsApp();

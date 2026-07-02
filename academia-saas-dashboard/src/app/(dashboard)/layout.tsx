@@ -40,6 +40,7 @@ export default async function DashboardLayout({
     return (
       <div className="dashboard-layout bg-background text-foreground">
         <SidebarNicho
+          tenantId={tenantData.tenant.id}
           tenantName={tenantData.tenant.companyName ?? tenantData.tenant.nome}
           planName="Academia Pro"
           botAtivo={false}
@@ -88,6 +89,7 @@ export default async function DashboardLayout({
       <Toaster position="bottom-right" theme="dark" richColors />
       <div className="dashboard-layout bg-background text-foreground">
         <SidebarNicho
+          tenantId={tenant.id}
           tenantName={tenant.companyName || tenant.nome}
           planName={tenant.subscription.plan.name}
           botAtivo={tenant.whatsappStatus === "CONNECTED"}

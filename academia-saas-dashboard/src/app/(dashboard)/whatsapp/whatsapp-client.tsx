@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
   disconnectWhatsApp,
   getWhatsAppQRCode,
+  getWhatsAppStatus,
   reconnectWhatsApp,
   type WhatsAppQrCodeResponse,
   type WhatsAppStatus,
@@ -15,6 +16,9 @@ type Props = {
   status: WhatsAppStatus;
 };
 
+const QR_POLL_INTERVAL_MS = 5000;
+const STATUS_POLL_INTERVAL_MS = 8000;
+
 export function WhatsAppClient({ tenantId, status }: Props) {
   const [state, setState] = useState<WhatsAppStatus>(status);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -23,6 +27,88 @@ export function WhatsAppClient({ tenantId, status }: Props) {
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const isOnline = state.connected;
+
+  // Enquanto aguarda o escaneamento, verifica em segundo plano se o QR Code
+  // mudou (a Evolution API o renova periodicamente) ou se a conexão foi concluída.
+  useEffect(() => {
+    if (!tenantId || isOnline || !qrCode) return;
+
+    let cancelled = false;
+
+    const interval = setInterval(async () => {
+      try {
+        const response: WhatsAppQrCodeResponse = await getWhatsAppQRCode(tenantId);
+        if (cancelled || !response.success) return;
+
+        if (response.status === "CONNECTED") {
+          setQrCode(null);
+          setState((prev) => ({ ...prev, connected: true }));
+          setFeedback("Número conectado com sucesso!");
+          return;
+        }
+
+        if (response.qrCode && response.qrCode !== qrCode) {
+          setQrCode(response.qrCode);
+        }
+      } catch {
+        // Ignora falhas pontuais de rede durante o polling em segundo plano.
+      }
+    }, QR_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [tenantId, isOnline, qrCode]);
+
+  // Quando não há QR Code em exibição, ainda assim verifica periodicamente
+  // se o status mudou (ex: conexão feita por outra aba/dispositivo).
+  useEffect(() => {
+    if (!tenantId || isOnline || qrCode) return;
+
+    let cancelled = false;
+
+    const interval = setInterval(async () => {
+      try {
+        const freshStatus = await getWhatsAppStatus(tenantId);
+        if (cancelled) return;
+        setState(freshStatus);
+      } catch {
+        // Ignora falhas pontuais de rede durante o polling em segundo plano.
+      }
+    }, STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [tenantId, isOnline, qrCode]);
+
+  // Enquanto conectado, verifica periodicamente se a instância caiu
+  // (ex: número deslogado direto pelo celular).
+  useEffect(() => {
+    if (!tenantId || !isOnline) return;
+
+    let cancelled = false;
+
+    const interval = setInterval(async () => {
+      try {
+        const freshStatus = await getWhatsAppStatus(tenantId);
+        if (cancelled) return;
+        if (!freshStatus.connected) {
+          setFeedback("Número desconectado.");
+        }
+        setState(freshStatus);
+      } catch {
+        // Ignora falhas pontuais de rede durante o polling em segundo plano.
+      }
+    }, STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [tenantId, isOnline]);
 
   return (
     <div

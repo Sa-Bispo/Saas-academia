@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
@@ -26,8 +26,10 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { ProfilePopover } from "@/components/ui/profile-popover";
 import { useNotificacoes } from "@/hooks/use-notificacoes";
+import { getWhatsAppConnectionFlag } from "@/actions/whatsapp.actions";
 
 type SidebarNichoProps = {
+  tenantId?: string;
   tenantName: string;
   planName: string;
   botAtivo: boolean;
@@ -36,6 +38,8 @@ type SidebarNichoProps = {
   userName?: string;
   subNicho?: string;
 };
+
+const BOT_STATUS_POLL_INTERVAL_MS = 10000;
 
 type LinkItem = {
   href: string;
@@ -59,6 +63,7 @@ const SETTINGS_LINKS: LinkItem[] = [
 ];
 
 export function SidebarNicho({
+  tenantId,
   tenantName,
   planName,
   botAtivo,
@@ -69,7 +74,33 @@ export function SidebarNicho({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [botAtivoLive, setBotAtivoLive] = useState(botAtivo);
   const notificacoes = useNotificacoes();
+
+  // Mantém o indicador de bot no rodapé em sincronia mesmo sem navegar
+  // entre páginas (ex: usuário conecta o WhatsApp em outra aba).
+  useEffect(() => {
+    setBotAtivoLive(botAtivo);
+  }, [botAtivo]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const connected = await getWhatsAppConnectionFlag(tenantId);
+        if (!cancelled) setBotAtivoLive(connected);
+      } catch {
+        // Ignora falhas pontuais de rede durante o polling em segundo plano.
+      }
+    }, BOT_STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [tenantId]);
 
   const isAcademia = subNicho === "academia";
   const operationalLinks: LinkItem[] = [
@@ -208,7 +239,7 @@ export function SidebarNicho({
           <span
             className="relative flex h-2 w-2 shrink-0"
           >
-            {botAtivo && (
+            {botAtivoLive && (
               <span
                 className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
                 style={{ background: "var(--accent)" }}
@@ -216,11 +247,11 @@ export function SidebarNicho({
             )}
             <span
               className="relative inline-flex h-2 w-2 rounded-full"
-              style={{ background: botAtivo ? "var(--accent)" : "#ef4444" }}
+              style={{ background: botAtivoLive ? "var(--accent)" : "#ef4444" }}
             />
           </span>
           <span className="text-xs" style={{ color: "var(--sidebar-text-muted)" }}>
-            {isSigningOut ? "Saindo..." : botAtivo ? "Bot conectado" : "Bot desconectado"}
+            {isSigningOut ? "Saindo..." : botAtivoLive ? "Bot conectado" : "Bot desconectado"}
           </span>
         </div>
 
