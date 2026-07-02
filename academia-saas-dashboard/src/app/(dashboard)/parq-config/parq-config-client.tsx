@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Info,
   Link2,
   Pencil,
   Plus,
@@ -78,6 +79,7 @@ type Pergunta = {
   id: number;
   ordem: number;
   texto: string;
+  tipo: "PERGUNTA" | "INFORMATIVO";
   ativo: boolean;
 };
 
@@ -745,12 +747,64 @@ function FichasTab({
 
 // ─── Tab: Perguntas ───────────────────────────────────────────────────────────
 
+function TipoBadge({ tipo }: { tipo: Pergunta["tipo"] }) {
+  if (tipo === "INFORMATIVO") {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+        style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8" }}
+      >
+        <Info size={10} />
+        Informativo
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+      style={{ background: "rgba(52,211,153,0.12)", color: "#34d399" }}
+    >
+      Sim/Não
+    </span>
+  );
+}
+
+function TipoSelect({
+  value,
+  onChange,
+}: {
+  value: Pergunta["tipo"];
+  onChange: (tipo: Pergunta["tipo"]) => void;
+}) {
+  return (
+    <div className="flex gap-1.5">
+      {(["PERGUNTA", "INFORMATIVO"] as const).map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onChange(t)}
+          className="rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors"
+          style={{
+            background: value === t ? "var(--accent)" : "var(--bg-primary)",
+            color: value === t ? "#fff" : "var(--text-secondary)",
+            border: `1px solid ${value === t ? "var(--accent)" : "var(--border-color)"}`,
+          }}
+        >
+          {t === "PERGUNTA" ? "Pergunta médica (Sim/Não)" : "Texto informativo"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
   const [perguntas, setPerguntas] = useState<Pergunta[]>(inicial);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [textoEdit, setTextoEdit] = useState("");
+  const [tipoEdit, setTipoEdit] = useState<Pergunta["tipo"]>("PERGUNTA");
   const [adicionando, setAdicionando] = useState(false);
   const [novoTexto, setNovoTexto] = useState("");
+  const [novoTipo, setNovoTipo] = useState<Pergunta["tipo"]>("PERGUNTA");
   const [pending, startTransition] = useTransition();
 
   function mover(index: number, direcao: -1 | 1) {
@@ -767,6 +821,7 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
   function iniciarEdicao(p: Pergunta) {
     setEditandoId(p.id);
     setTextoEdit(p.texto);
+    setTipoEdit(p.tipo);
   }
 
   function cancelarEdicao() {
@@ -777,12 +832,13 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
   function handleSalvarEdicao(p: Pergunta) {
     if (!textoEdit.trim()) return;
     const novoTextoEdit = textoEdit;
+    const novoTipoEdit = tipoEdit;
     setPerguntas((prev) =>
-      prev.map((x) => (x.id === p.id ? { ...x, texto: novoTextoEdit } : x))
+      prev.map((x) => (x.id === p.id ? { ...x, texto: novoTextoEdit, tipo: novoTipoEdit } : x))
     );
     setEditandoId(null);
     startTransition(async () => {
-      await salvarPerguntaParq({ id: p.id, texto: novoTextoEdit, ordem: p.ordem });
+      await salvarPerguntaParq({ id: p.id, texto: novoTextoEdit, ordem: p.ordem, tipo: novoTipoEdit });
     });
   }
 
@@ -808,10 +864,12 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
     const maxOrdem =
       perguntas.length > 0 ? Math.max(...perguntas.map((p) => p.ordem)) : 0;
     const texto = novoTexto;
+    const tipo = novoTipo;
     setNovoTexto("");
+    setNovoTipo("PERGUNTA");
     setAdicionando(false);
     startTransition(async () => {
-      await salvarPerguntaParq({ texto, ordem: maxOrdem + 1 });
+      await salvarPerguntaParq({ texto, ordem: maxOrdem + 1, tipo });
     });
   }
 
@@ -874,38 +932,45 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
             </span>
 
             {/* Text or edit */}
-            <div className="flex-1">
+            <div className="flex-1 space-y-2">
               {editandoId === p.id ? (
-                <textarea
-                  className="w-full resize-none rounded-xl px-3 py-2 text-sm focus:outline-none"
-                  style={{
-                    background: "var(--bg-primary)",
-                    border: "1px solid var(--accent)",
-                    color: "var(--text-primary)",
-                  }}
-                  rows={2}
-                  value={textoEdit}
-                  onChange={(e) => setTextoEdit(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSalvarEdicao(p);
-                    }
-                    if (e.key === "Escape") cancelarEdicao();
-                  }}
-                />
+                <>
+                  <TipoSelect value={tipoEdit} onChange={setTipoEdit} />
+                  <textarea
+                    className="w-full resize-none rounded-xl px-3 py-2 text-sm focus:outline-none"
+                    style={{
+                      background: "var(--bg-primary)",
+                      border: "1px solid var(--accent)",
+                      color: "var(--text-primary)",
+                    }}
+                    rows={tipoEdit === "INFORMATIVO" ? 8 : 2}
+                    value={textoEdit}
+                    onChange={(e) => setTextoEdit(e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey && tipoEdit === "PERGUNTA") {
+                        e.preventDefault();
+                        handleSalvarEdicao(p);
+                      }
+                      if (e.key === "Escape") cancelarEdicao();
+                    }}
+                  />
+                </>
               ) : (
-                <p
-                  className="text-sm"
-                  style={{
-                    color: "var(--text-primary)",
-                    textDecoration: p.ativo ? undefined : "line-through",
-                    opacity: p.ativo ? 1 : 0.45,
-                  }}
-                >
-                  {p.texto}
-                </p>
+                <>
+                  <TipoBadge tipo={p.tipo} />
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: "var(--text-primary)",
+                      textDecoration: p.ativo ? undefined : "line-through",
+                      opacity: p.ativo ? 1 : 0.45,
+                      whiteSpace: p.tipo === "INFORMATIVO" ? "pre-wrap" : undefined,
+                    }}
+                  >
+                    {p.texto}
+                  </p>
+                </>
               )}
             </div>
 
@@ -977,6 +1042,7 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
             borderColor: "var(--accent)",
           }}
         >
+          <TipoSelect value={novoTipo} onChange={setNovoTipo} />
           <textarea
             className="w-full resize-none rounded-xl px-3 py-2 text-sm focus:outline-none"
             style={{
@@ -984,13 +1050,17 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
               border: "1px solid var(--border-color)",
               color: "var(--text-primary)",
             }}
-            rows={2}
-            placeholder="Texto da nova pergunta..."
+            rows={novoTipo === "INFORMATIVO" ? 8 : 2}
+            placeholder={
+              novoTipo === "INFORMATIVO"
+                ? "Texto informativo (ex: horário de funcionamento, regulamento)..."
+                : "Texto da nova pergunta (Sim/Não)..."
+            }
             value={novoTexto}
             onChange={(e) => setNovoTexto(e.target.value)}
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && novoTipo === "PERGUNTA") {
                 e.preventDefault();
                 handleAdicionarNova();
               }
@@ -1015,6 +1085,7 @@ function PerguntasTab({ perguntas: inicial }: { perguntas: Pergunta[] }) {
               onClick={() => {
                 setAdicionando(false);
                 setNovoTexto("");
+                setNovoTipo("PERGUNTA");
               }}
               className="rounded-xl border px-3 py-1.5 text-xs transition-colors"
               style={{

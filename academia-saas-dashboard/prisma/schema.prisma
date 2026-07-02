@@ -19,55 +19,55 @@ model User {
 }
 
 model Tenant {
-  id                     String   @id @default(uuid()) @db.Uuid
-  nome                   String   @db.VarChar(120)
-  plano                  String   @default("pro") @db.VarChar(20)
-  promptIa               String?
-  whatsappAdmin          String?  @db.VarChar(30)
-  dataCriacao            DateTime @default(now()) @map("data_criacao")
-  userId                 String   @map("user_id") @db.Uuid
-  evolutionInstanceName  String?  @unique @db.VarChar(120)
-  evolutionApiKey        String?
-  whatsappStatus         String   @default("DISCONNECTED") @db.VarChar(20)
+  id                    String   @id @default(uuid()) @db.Uuid
+  nome                  String   @db.VarChar(120)
+  plano                 String   @default("pro") @db.VarChar(20)
+  promptIa              String?
+  whatsappAdmin         String?  @db.VarChar(30)
+  dataCriacao           DateTime @default(now()) @map("data_criacao")
+  userId                String   @map("user_id") @db.Uuid
+  evolutionInstanceName String?  @unique @db.VarChar(120)
+  evolutionApiKey       String?
+  whatsappStatus        String   @default("DISCONNECTED") @db.VarChar(20)
 
   // Construtor de Persona (campos estruturados)
-  botName                String?  @db.VarChar(80)
-  companyName            String?  @db.VarChar(120)
-  toneOfVoice            String?  @db.VarChar(40)
-  strictRules            String?  @db.Text
-  botObjective           String?  @db.VarChar(40)
-  operationContext       String?  @db.Text   // horários, área, pagamentos, etc.
+  botName          String? @db.VarChar(80)
+  companyName      String? @db.VarChar(120)
+  toneOfVoice      String? @db.VarChar(40)
+  strictRules      String? @db.Text
+  botObjective     String? @db.VarChar(40)
+  operationContext String? @db.Text // horários, área, pagamentos, etc.
 
   // Configuração de sub-nicho (adega, pizzaria, etc.)
-  configNicho            Json     @map("config_nicho") @default("{}")
+  configNicho Json @default("{}") @map("config_nicho")
 
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stockItems      StockItem[]
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stockItems         StockItem[]
   categoriasCardapio CategoriaCardapio[]
-  combos          Combo[]
-  pizzaTamanhos   PizzaTamanho[]
-  pizzaBordas     PizzaBorda[]
-  bebidas         Bebida[]
-  stockMovements  StockMovement[]
-  customers       Customer[]
-  orders          Order[]
-  motoboys        Motoboy[]
-  zonasEntrega    ZonaEntrega[]
-  entregas        Entrega[]
-  produtos        Produto[]
-  subscription    Subscription?
-  appointments    Appointment[]
-  chamados        Chamado[]
-  alunos              Aluno[]
-  planosAcademia      PlanoAcademia[]
-  matriculasAlunos    MatriculaAluno[]
-  cobrancasAlunos     CobrancaAluno[]
-  frequenciasAlunos   FrequenciaAluno[]
-  fichasParq          FichaParq[]
-  perguntasParq       ParqPergunta[]
-  botConfusionEvents  BotConfusionEvent[]
-  funcionarios        Funcionario[]
-  codigosPagamento    CodigoPagamento[]
+  combos             Combo[]
+  pizzaTamanhos      PizzaTamanho[]
+  pizzaBordas        PizzaBorda[]
+  bebidas            Bebida[]
+  stockMovements     StockMovement[]
+  customers          Customer[]
+  orders             Order[]
+  motoboys           Motoboy[]
+  zonasEntrega       ZonaEntrega[]
+  entregas           Entrega[]
+  produtos           Produto[]
+  subscription       Subscription?
+  appointments       Appointment[]
+  chamados           Chamado[]
+  alunos             Aluno[]
+  planosAcademia     PlanoAcademia[]
+  matriculasAlunos   MatriculaAluno[]
+  cobrancasAlunos    CobrancaAluno[]
+  frequenciasAlunos  FrequenciaAluno[]
+  fichasParq         FichaParq[]
+  perguntasParq      ParqPergunta[]
+  botConfusionEvents BotConfusionEvent[]
+  funcionarios       Funcionario[]
+  codigosPagamento   CodigoPagamento[]
 
   @@index([userId])
   @@map("tenants")
@@ -83,19 +83,19 @@ enum Niche {
 }
 
 enum SubscriptionStatus {
-  PENDING    // aguardando primeiro pagamento
-  ACTIVE     // pago e ativo
-  PAST_DUE   // falha no pagamento (carência de 3 dias)
-  CANCELLED  // cancelado pelo usuário
-  EXPIRED    // carência encerrada, acesso bloqueado
+  PENDING // aguardando primeiro pagamento
+  ACTIVE // pago e ativo
+  PAST_DUE // falha no pagamento (carência de 3 dias)
+  CANCELLED // cancelado pelo usuário
+  EXPIRED // carência encerrada, acesso bloqueado
 }
 
 model Plan {
-  id          String @id @default(uuid()) @db.Uuid
-  code        String @unique @db.VarChar(60)  // ex: "delivery_basico"
-  niche       Niche
-  name        String @db.VarChar(80)
-  priceCents  Int    @map("price_cents")       // 4990 = R$49,90
+  id         String @id @default(uuid()) @db.Uuid
+  code       String @unique @db.VarChar(60) // ex: "delivery_basico"
+  niche      Niche
+  name       String @db.VarChar(80)
+  priceCents Int    @map("price_cents") // 4990 = R$49,90
 
   // Limites quantitativos (-1 = ilimitado)
   maxMessagesMonth     Int @default(-1) @map("max_messages_month")
@@ -106,16 +106,16 @@ model Plan {
   maxDocuments         Int @default(-1) @map("max_documents")
 
   // Feature flags
-  menuReaderEnabled    Boolean @default(false) @map("menu_reader_enabled")
-  reportsEnabled       Boolean @default(false) @map("reports_enabled")
-  ragEnabled           Boolean @default(false) @map("rag_enabled")
-  humanHandoffEnabled  Boolean @default(false) @map("human_handoff_enabled")
-  remindersEnabled     Boolean @default(false) @map("reminders_enabled")
-  cancellationEnabled  Boolean @default(false) @map("cancellation_enabled")
-  multiProfessional    Boolean @default(false) @map("multi_professional")
+  menuReaderEnabled   Boolean @default(false) @map("menu_reader_enabled")
+  reportsEnabled      Boolean @default(false) @map("reports_enabled")
+  ragEnabled          Boolean @default(false) @map("rag_enabled")
+  humanHandoffEnabled Boolean @default(false) @map("human_handoff_enabled")
+  remindersEnabled    Boolean @default(false) @map("reminders_enabled")
+  cancellationEnabled Boolean @default(false) @map("cancellation_enabled")
+  multiProfessional   Boolean @default(false) @map("multi_professional")
 
   subscriptions Subscription[]
-  createdAt     DateTime @default(now()) @map("created_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
 
   @@map("plans")
 }
@@ -129,7 +129,7 @@ model Subscription {
   currentPeriodStart DateTime @map("current_period_start")
   currentPeriodEnd   DateTime @map("current_period_end")
 
-  mpPaymentId    String? @map("mp_payment_id") @db.VarChar(80)
+  mpPaymentId     String? @map("mp_payment_id") @db.VarChar(80)
   mpPreapprovalId String? @map("mp_preapproval_id") @db.VarChar(80)
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -144,7 +144,7 @@ model Subscription {
 model UsageRecord {
   id           String @id @default(uuid()) @db.Uuid
   tenantId     String @map("tenant_id") @db.Uuid
-  period       String @db.VarChar(7)   // "2026-04"
+  period       String @db.VarChar(7) // "2026-04"
   messages     Int    @default(0)
   appointments Int    @default(0)
   tickets      Int    @default(0)
@@ -154,20 +154,20 @@ model UsageRecord {
 }
 
 model StockItem {
-  id          String   @id @default(uuid()) @db.Uuid
-  nome        String   @db.VarChar(160)
-  descricao   String?  @db.Text
-  variacao    String?  @db.VarChar(120)
-  preco       Decimal  @db.Decimal(10, 2)
-  tem_variacoes Boolean @default(false)
-  quantidade  Int      @default(0)
-  ativo       Boolean  @default(true)
-  tenantId    String   @map("tenant_id") @db.Uuid
-  dataCriacao DateTime @default(now()) @map("data_criacao")
+  id            String   @id @default(uuid()) @db.Uuid
+  nome          String   @db.VarChar(160)
+  descricao     String?  @db.Text
+  variacao      String?  @db.VarChar(120)
+  preco         Decimal  @db.Decimal(10, 2)
+  tem_variacoes Boolean  @default(false)
+  quantidade    Int      @default(0)
+  ativo         Boolean  @default(true)
+  tenantId      String   @map("tenant_id") @db.Uuid
+  dataCriacao   DateTime @default(now()) @map("data_criacao")
 
-  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  movements StockMovement[]
-  variacoes ItemVariacao[]
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  movements  StockMovement[]
+  variacoes  ItemVariacao[]
   adicionais ItemAdicional[]
 
   @@index([tenantId])
@@ -250,15 +250,15 @@ model MensagemChamado {
 }
 
 model Combo {
-  id         String   @id @default(uuid()) @db.Uuid
-  tenantId   String   @map("tenant_id") @db.Uuid
-  nome       String   @db.VarChar(160)
-  descricao  String?  @db.Text
-  preco      Float
-  ativo      Boolean  @default(true)
-  itens      String[]
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  nome      String   @db.VarChar(160)
+  descricao String?  @db.Text
+  preco     Float
+  ativo     Boolean  @default(true)
+  itens     String[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -278,8 +278,8 @@ model PizzaTamanho {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId])
   @@unique([tenantId, sigla])
+  @@index([tenantId])
   @@map("pizza_tamanhos")
 }
 
@@ -292,8 +292,8 @@ model PizzaBorda {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId])
   @@unique([tenantId, nome])
+  @@index([tenantId])
   @@map("pizza_bordas")
 }
 
@@ -316,8 +316,8 @@ model StockMovement {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
   productId   String   @map("product_id") @db.Uuid
-  type        String   @db.VarChar(40)   // "saida_automatica" | "entrada_manual" | "saida_manual"
-  quantity    Int                         // positivo = entrada, negativo = saída
+  type        String   @db.VarChar(40) // "saida_automatica" | "entrada_manual" | "saida_manual"
+  quantity    Int // positivo = entrada, negativo = saída
   description String   @db.VarChar(255)
   orderId     String?  @map("order_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
@@ -331,17 +331,17 @@ model StockMovement {
 }
 
 model Produto {
-  id                String   @id @default(uuid()) @db.Uuid
-  nome              String   @db.VarChar(160)
-  categoria         String   @db.VarChar(120)
-  precoBase         Decimal  @map("preco_base") @db.Decimal(10, 2)
-  ativo             Boolean  @default(true)
-  classeNegocio     String   @map("classe_negocio") @db.VarChar(50)
-  configNicho       Json     @map("config_nicho") @default("{}")
-  regrasIa          String?  @map("regras_ia") @db.Text
-  tenantId          String   @map("tenant_id") @db.Uuid
-  dataCriacao       DateTime @default(now()) @map("data_criacao")
-  dataAtualizacao   DateTime @updatedAt @map("data_atualizacao")
+  id              String   @id @default(uuid()) @db.Uuid
+  nome            String   @db.VarChar(160)
+  categoria       String   @db.VarChar(120)
+  precoBase       Decimal  @map("preco_base") @db.Decimal(10, 2)
+  ativo           Boolean  @default(true)
+  classeNegocio   String   @map("classe_negocio") @db.VarChar(50)
+  configNicho     Json     @default("{}") @map("config_nicho")
+  regrasIa        String?  @map("regras_ia") @db.Text
+  tenantId        String   @map("tenant_id") @db.Uuid
+  dataCriacao     DateTime @default(now()) @map("data_criacao")
+  dataAtualizacao DateTime @updatedAt @map("data_atualizacao")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -422,16 +422,16 @@ model ZonaEntrega {
 }
 
 model Entrega {
-  id            String   @id @default(uuid()) @db.Uuid
-  tenant_id     String   @db.Uuid
-  order_id      String   @unique @db.Uuid
-  motoboy_id    String   @db.Uuid
-  zona_id       String?  @db.Uuid
+  id            String    @id @default(uuid()) @db.Uuid
+  tenant_id     String    @db.Uuid
+  order_id      String    @unique @db.Uuid
+  motoboy_id    String    @db.Uuid
+  zona_id       String?   @db.Uuid
   taxa          Float
-  fixo_incluido Boolean  @default(false)
-  status        String   @default("PENDENTE")
+  fixo_incluido Boolean   @default(false)
+  status        String    @default("PENDENTE")
   pago_em       DateTime?
-  created_at    DateTime @default(now())
+  created_at    DateTime  @default(now())
 
   tenant  Tenant       @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   order   Order        @relation(fields: [order_id], references: [id], onDelete: Cascade)
@@ -525,6 +525,11 @@ enum FormaPagamento {
   PIX
 }
 
+enum ParqPerguntaTipo {
+  PERGUNTA
+  INFORMATIVO
+}
+
 enum Periodicidade {
   MENSAL
   TRIMESTRAL
@@ -533,14 +538,14 @@ enum Periodicidade {
 }
 
 model Aluno {
-  id              String      @id @default(uuid()) @db.Uuid
-  tenantId        String      @map("tenant_id") @db.Uuid
-  nome            String      @db.VarChar(120)
-  telefone        String      @db.VarChar(30)
-  email           String?     @db.VarChar(255)
-  cpf             String?     @db.VarChar(14)
-  dataNascimento  DateTime?   @map("data_nascimento")
-  observacoes     String?     @db.Text
+  id                     String      @id @default(uuid()) @db.Uuid
+  tenantId               String      @map("tenant_id") @db.Uuid
+  nome                   String      @db.VarChar(120)
+  telefone               String      @db.VarChar(30)
+  email                  String?     @db.VarChar(255)
+  cpf                    String?     @db.VarChar(14)
+  dataNascimento         DateTime?   @map("data_nascimento")
+  observacoes            String?     @db.Text
   status                 AlunoStatus @default(ATIVO)
   precisaLiberacaoMedica Boolean     @default(false) @map("precisa_liberacao_medica")
   optoutCobranca         Boolean     @default(false) @map("optout_cobranca")
@@ -560,10 +565,10 @@ model Aluno {
 }
 
 model PlanoAcademia {
-  id            String        @id @default(uuid()) @db.Uuid
-  tenantId      String        @map("tenant_id") @db.Uuid
-  nome          String        @db.VarChar(120)
-  descricao     String?       @db.Text
+  id                 String        @id @default(uuid()) @db.Uuid
+  tenantId           String        @map("tenant_id") @db.Uuid
+  nome               String        @db.VarChar(120)
+  descricao          String?       @db.Text
   valorCents         Int           @map("valor_cents")
   valorCentsDinheiro Int?          @map("valor_cents_dinheiro")
   valorCentsPix      Int?          @map("valor_cents_pix")
@@ -580,16 +585,16 @@ model PlanoAcademia {
 }
 
 model MatriculaAluno {
-  id             String         @id @default(uuid()) @db.Uuid
-  alunoId        String         @map("aluno_id") @db.Uuid
-  planoId        String         @map("plano_id") @db.Uuid
-  tenantId       String         @map("tenant_id") @db.Uuid
-  dataInicio     DateTime       @map("data_inicio")
-  dataVencimento DateTime       @map("data_vencimento")
+  id             String          @id @default(uuid()) @db.Uuid
+  alunoId        String          @map("aluno_id") @db.Uuid
+  planoId        String          @map("plano_id") @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  dataInicio     DateTime        @map("data_inicio")
+  dataVencimento DateTime        @map("data_vencimento")
   status         MatriculaStatus @default(ATIVA)
-  observacoes    String?        @db.Text
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  observacoes    String?         @db.Text
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
   aluno     Aluno           @relation(fields: [alunoId], references: [id], onDelete: Cascade)
   plano     PlanoAcademia   @relation(fields: [planoId], references: [id], onDelete: Restrict)
@@ -607,13 +612,13 @@ model FrequenciaAluno {
   tenantId    String   @map("tenant_id") @db.Uuid
   alunoId     String   @map("aluno_id") @db.Uuid
   data        DateTime @db.Date
-  horaEntrada String?  @map("hora_entrada") @db.VarChar(5)   // "07:30"
-  horaSaida   String?  @map("hora_saida")   @db.VarChar(5)
+  horaEntrada String?  @map("hora_entrada") @db.VarChar(5) // "07:30"
+  horaSaida   String?  @map("hora_saida") @db.VarChar(5)
   observacoes String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  aluno  Aluno  @relation(fields: [alunoId],  references: [id], onDelete: Cascade)
+  aluno  Aluno  @relation(fields: [alunoId], references: [id], onDelete: Cascade)
 
   @@unique([alunoId, data])
   @@index([tenantId])
@@ -623,28 +628,28 @@ model FrequenciaAluno {
 }
 
 model CobrancaAluno {
-  id             String         @id @default(uuid()) @db.Uuid
-  tenantId       String         @map("tenant_id") @db.Uuid
-  alunoId        String         @map("aluno_id") @db.Uuid
-  matriculaId    String?        @map("matricula_id") @db.Uuid
-  valorCents     Int            @map("valor_cents")
-  dataVencimento DateTime       @map("data_vencimento")
-  dataPagamento  DateTime?      @map("data_pagamento")
-  status         CobrancaStatus @default(PENDENTE)
-  descricao      String?        @db.VarChar(255)
-  pixChave       String?        @map("pix_chave") @db.VarChar(120)
-  observacoes    String?        @db.Text
+  id                         String          @id @default(uuid()) @db.Uuid
+  tenantId                   String          @map("tenant_id") @db.Uuid
+  alunoId                    String          @map("aluno_id") @db.Uuid
+  matriculaId                String?         @map("matricula_id") @db.Uuid
+  valorCents                 Int             @map("valor_cents")
+  dataVencimento             DateTime        @map("data_vencimento")
+  dataPagamento              DateTime?       @map("data_pagamento")
+  status                     CobrancaStatus  @default(PENDENTE)
+  descricao                  String?         @db.VarChar(255)
+  pixChave                   String?         @map("pix_chave") @db.VarChar(120)
+  observacoes                String?         @db.Text
   enviadaWhatsapp            Boolean         @default(false) @map("enviada_whatsapp")
   comprovanteUrl             String?         @map("comprovante_url") @db.Text
   comprovanteEnviadoEm       DateTime?       @map("comprovante_enviado_em")
   formaPagamento             FormaPagamento? @map("forma_pagamento")
   confirmadoPorFuncionarioId String?         @map("confirmado_por_funcionario_id") @db.Uuid
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  createdAt                  DateTime        @default(now()) @map("created_at")
+  updatedAt                  DateTime        @updatedAt @map("updated_at")
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  aluno          Aluno           @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  matricula      MatriculaAluno? @relation(fields: [matriculaId], references: [id], onDelete: SetNull)
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aluno            Aluno             @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  matricula        MatriculaAluno?   @relation(fields: [matriculaId], references: [id], onDelete: SetNull)
   codigosPagamento CodigoPagamento[]
 
   @@index([tenantId])
@@ -657,17 +662,17 @@ model CobrancaAluno {
 // ─── Bot Feedback System ──────────────────────────────────────────────────────
 
 model BotConfusionEvent {
-  id             String    @id @default(uuid()) @db.Uuid
-  tenantId       String?   @map("tenant_id") @db.Uuid
-  nicho          String    @db.VarChar(50)
-  phone          String?   @db.VarChar(50)
-  messagesJson   Json      @map("messages_json") @default("[]")
-  textoProblema  String    @map("texto_problema") @db.Text
-  status         String    @default("pendente") @db.VarChar(20)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  resolvedAt     DateTime? @map("resolved_at")
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String?   @map("tenant_id") @db.Uuid
+  nicho         String    @db.VarChar(50)
+  phone         String?   @db.VarChar(50)
+  messagesJson  Json      @default("[]") @map("messages_json")
+  textoProblema String    @map("texto_problema") @db.Text
+  status        String    @default("pendente") @db.VarChar(20)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  resolvedAt    DateTime? @map("resolved_at")
 
-  tenant          Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  tenant          Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   learnedPatterns BotLearnedPattern[]
 
   @@index([status])
@@ -677,13 +682,13 @@ model BotConfusionEvent {
 }
 
 model BotLearnedPattern {
-  id         String    @id @default(uuid()) @db.Uuid
-  nicho      String    @db.VarChar(50)
-  frase      String    @db.Text
-  intentAlvo String    @map("intent_alvo") @db.VarChar(50)
-  eventoId   String?   @map("evento_id") @db.Uuid
-  ativo      Boolean   @default(true)
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id         String   @id @default(uuid()) @db.Uuid
+  nicho      String   @db.VarChar(50)
+  frase      String   @db.Text
+  intentAlvo String   @map("intent_alvo") @db.VarChar(50)
+  eventoId   String?  @map("evento_id") @db.Uuid
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
 
   evento BotConfusionEvent? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
 
@@ -695,14 +700,15 @@ model BotLearnedPattern {
 // ─── PAR-Q ────────────────────────────────────────────────────────────────────
 
 model ParqPergunta {
-  id        Int      @id @default(autoincrement())
-  tenantId  String?  @map("tenant_id") @db.Uuid
+  id        Int              @id @default(autoincrement())
+  tenantId  String?          @map("tenant_id") @db.Uuid
   ordem     Int
-  texto     String   @db.Text
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
+  texto     String           @db.Text
+  tipo      ParqPerguntaTipo @default(PERGUNTA)
+  ativo     Boolean          @default(true)
+  createdAt DateTime         @default(now()) @map("created_at")
 
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@map("parq_perguntas")

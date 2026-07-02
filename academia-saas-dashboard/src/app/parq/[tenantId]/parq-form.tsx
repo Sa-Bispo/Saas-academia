@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle, Loader2, RotateCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle, Info, Loader2, RotateCcw } from "lucide-react";
 import { SignaturePad, SignaturePadHandle } from "@/components/parq/signature-pad";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
 
-type Pergunta = { id: number; texto: string };
+type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "INFORMATIVO" };
 
 type Props = {
   tenantId: string;
@@ -44,7 +44,8 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
   const [tentouEnviar, setTentouEnviar] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const todasRespondidas = perguntas.every((p) => respostas[p.id] !== undefined);
+  const perguntasMedicas = perguntas.filter((p) => p.tipo === "PERGUNTA");
+  const todasRespondidas = perguntasMedicas.every((p) => respostas[p.id] !== undefined);
   const temAlertaMedico = Object.values(respostas).some((v) => v === "S");
 
   function handleResposta(id: number, valor: "S" | "N") {
@@ -200,12 +201,26 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
             </p>
           </div>
 
-          {perguntas.map((p, i) => {
+          {perguntas.map((p) => {
+            if (p.tipo === "INFORMATIVO") {
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                >
+                  <Info size={14} className="mt-0.5 shrink-0 text-white/30" />
+                  <p className="whitespace-pre-line text-xs leading-relaxed text-white/60">
+                    {p.texto}
+                  </p>
+                </div>
+              );
+            }
+            const i = perguntasMedicas.findIndex((x) => x.id === p.id) + 1;
             const naoRespondida = tentouEnviar && respostas[p.id] === undefined;
             return (
               <div key={p.id} className="space-y-2">
                 <p className={`text-sm ${naoRespondida ? "text-red-400" : "text-white/80"}`}>
-                  <span className={`mr-1.5 font-semibold ${naoRespondida ? "text-red-400" : "text-white/40"}`}>{i + 1}.</span>
+                  <span className={`mr-1.5 font-semibold ${naoRespondida ? "text-red-400" : "text-white/40"}`}>{i}.</span>
                   {p.texto}
                   {naoRespondida && <span className="ml-1.5 text-xs font-normal text-red-400">— obrigatório</span>}
                 </p>

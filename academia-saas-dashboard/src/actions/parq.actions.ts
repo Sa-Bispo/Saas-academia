@@ -66,6 +66,7 @@ export async function ensurePerguntasTenant(tenantId: string): Promise<void> {
       tenantId,
       ordem: p.ordem,
       texto: p.texto,
+      tipo: p.tipo,
       ativo: p.ativo,
     })),
   });
@@ -85,6 +86,7 @@ export async function salvarPerguntaParq(data: {
   id?: number;
   texto: string;
   ordem: number;
+  tipo?: "PERGUNTA" | "INFORMATIVO";
 }) {
   const tenantId = await getAuthenticatedTenantId();
   const texto = data.texto.trim();
@@ -98,11 +100,11 @@ export async function salvarPerguntaParq(data: {
 
     await prisma.parqPergunta.update({
       where: { id: data.id },
-      data: { texto, ordem: data.ordem },
+      data: { texto, ordem: data.ordem, ...(data.tipo ? { tipo: data.tipo } : {}) },
     });
   } else {
     await prisma.parqPergunta.create({
-      data: { tenantId, texto, ordem: data.ordem, ativo: true },
+      data: { tenantId, texto, ordem: data.ordem, tipo: data.tipo ?? "PERGUNTA", ativo: true },
     });
   }
 

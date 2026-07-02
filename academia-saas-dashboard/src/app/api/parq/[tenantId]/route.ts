@@ -76,7 +76,23 @@ async function handlePost(
   const cpfLimpo = cpf.replace(/\D/g, "");
   const telefoneLimpo = telefone.replace(/\D/g, "");
 
-  const precisaLiberacao = Object.values(respostas).some((v) => v === "S");
+  // Só perguntas médicas (tipo PERGUNTA) contam para liberação médica —
+  // blocos informativos (regulamento, horário etc.) não têm valor clínico
+  // mesmo que o payload traga uma resposta "S" para o id deles.
+  let perguntasMedicas = await prisma.parqPergunta.findMany({
+    where: { tenantId, tipo: "PERGUNTA" },
+    select: { id: true },
+  });
+  if (perguntasMedicas.length === 0) {
+    perguntasMedicas = await prisma.parqPergunta.findMany({
+      where: { tenantId: null, tipo: "PERGUNTA" },
+      select: { id: true },
+    });
+  }
+  const idsMedicos = new Set(perguntasMedicas.map((p) => String(p.id)));
+  const precisaLiberacao = Object.entries(respostas).some(
+    ([id, v]) => idsMedicos.has(id) && v === "S"
+  );
   const termoHash = createHash("sha256").update(PARQ_TERMO_V1).digest("hex");
   const ip = getIp(req);
   const userAgent = req.headers.get("user-agent") ?? null;

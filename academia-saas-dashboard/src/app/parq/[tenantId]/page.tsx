@@ -32,7 +32,7 @@ export default async function ParqPage({ params }: Props) {
     <ParqFormClient
       tenantId={tenant.id}
       academiaName={tenant.nome}
-      perguntas={perguntas.map((p) => ({ id: p.id, texto: p.texto }))}
+      perguntas={perguntas.map((p) => ({ id: p.id, texto: p.texto, tipo: p.tipo }))}
     />
   );
 }
