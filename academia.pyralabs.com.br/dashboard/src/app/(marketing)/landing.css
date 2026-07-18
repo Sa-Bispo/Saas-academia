@@ -1,0 +1,156 @@
+/*
+ * Landing "Academia PyraLabs" — estilos ESCOPADOS em .landing-scope
+ * para não vazar no tema indigo do dashboard.
+ * (não importa o Tailwind aqui; ele já vem do globals.css raiz)
+ */
+
+.landing-scope {
+  /* Neutros quentes — ferro, concreto, giz */
+  --bg: #0b0b0d;
+  --bg-elevated: #141317;
+  --bg-card: #151419;
+  --bg-card-hover: #1b191f;
+
+  --text-primary: #f2f0ec;
+  --text-secondary: #9a9aa2;
+  --text-tertiary: #6e6e76;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  --accent: #cfccd4;
+  --accent-strong: #f2f0ec;
+  --accent-soft: rgba(242, 240, 236, 0.08);
+
+  --wpp: #25d366;
+  --wpp-strong: #1eb955;
+
+  --font-display: var(--font-archivo), var(--font-barlow), sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* canvas da landing */
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  min-height: 100vh;
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+/* cor de borda padrão dentro do escopo (especificidade 0 — utilitários explícitos vencem) */
+:where(.landing-scope) *,
+:where(.landing-scope) ::before,
+:where(.landing-scope) ::after {
+  border-color: var(--border);
+}
+
+.landing-scope ::selection {
+  background: rgba(242, 240, 236, 0.16);
+  color: #ffffff;
+}
+
+/* Tipografia */
+.landing-scope .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+.landing-scope .font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+.landing-scope .text-gradient {
+  background: linear-gradient(180deg, #ffffff 0%, #cbc9c4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Cards */
+.landing-scope .card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+}
+.landing-scope .card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-card-hover);
+}
+
+/* Fundos decorativos */
+.landing-scope .bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.016) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 65% 55% at 50% 0%, #000 30%, transparent 95%);
+}
+.landing-scope .hero-glow {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% -8%, rgba(255, 245, 230, 0.05), transparent 72%),
+    radial-gradient(ellipse 80% 40% at 50% -20%, rgba(255, 255, 255, 0.03), transparent 70%);
+}
+.landing-scope .wa-wallpaper {
+  background-color: #0a090c;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+.landing-scope .nav-glass {
+  background: rgba(11, 11, 13, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+.landing-scope .phone-glow {
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.14) 52%,
+    transparent 78%
+  );
+  filter: blur(52px);
+  animation: glow-breathe 7s ease-in-out infinite;
+}
+
+/* Animações */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(0.92); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+.landing-scope .animate-fade-up { animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.landing-scope .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+.landing-scope .msg-in { animation: msg-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.landing-scope .typing-dot { animation: typing-bounce 1.2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-scope .msg-in,
+  .landing-scope .typing-dot,
+  .landing-scope .animate-fade-up,
+  .landing-scope .pulse-dot {
+    animation: none !important;
+  }
+  .landing-scope .phone-glow {
+    animation: none;
+    opacity: 0.75;
+    transform: translate(-50%, -50%);
+  }
+}

@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "academia.pyralabs.com.br/landing",
       "port": 3100
+    },
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "academia.pyralabs.com.br/dashboard",
+      "port": 3000
     }
   ]
 }
