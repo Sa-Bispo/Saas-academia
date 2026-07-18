@@ -37,6 +37,8 @@ async function handlePost(
 ) {
   const { tenantId } = await params;
 
+  const ip = getIp(req);
+
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) {
     return NextResponse.json({ error: "Academia não encontrada." }, { status: 404 });
@@ -76,6 +78,13 @@ async function handlePost(
   const cpfLimpo = cpf.replace(/\D/g, "");
   const telefoneLimpo = telefone.replace(/\D/g, "");
 
+  if (cpfLimpo.length !== 11) {
+    return NextResponse.json({ error: "CPF inválido. Informe os 11 dígitos." }, { status: 422 });
+  }
+  if (telefoneLimpo.length < 10 || telefoneLimpo.length > 11) {
+    return NextResponse.json({ error: "Telefone inválido." }, { status: 422 });
+  }
+
   // Só perguntas médicas (tipo PERGUNTA) contam para liberação médica —
   // blocos informativos (regulamento, horário etc.) não têm valor clínico
   // mesmo que o payload traga uma resposta "S" para o id deles.
@@ -94,7 +103,6 @@ async function handlePost(
     ([id, v]) => idsMedicos.has(id) && v === "S"
   );
   const termoHash = createHash("sha256").update(PARQ_TERMO_V1).digest("hex");
-  const ip = getIp(req);
   const userAgent = req.headers.get("user-agent") ?? null;
 
   let aluno = await prisma.aluno.findFirst({

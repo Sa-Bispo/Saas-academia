@@ -361,8 +361,11 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
           )}
         </button>
 
-        <p className="pb-8 text-center text-[11px] text-white/20">
+        <p className="text-center text-[11px] text-white/20">
           Seus dados são protegidos e usados apenas para fins de cadastro na academia.
+        </p>
+        <p className="pb-8 text-center text-[11px] text-white/20">
+          Desenvolvido por PyraLab&apos;s &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>

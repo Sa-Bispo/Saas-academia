@@ -413,6 +413,7 @@ const MESES_POR_PERIODICIDADE: Record<string, number> = {
 
 function calcVencimento(inicio: string, periodicidade: string): string {
   const d = new Date(inicio);
+  if (Number.isNaN(d.getTime())) return "";
   d.setMonth(d.getMonth() + (MESES_POR_PERIODICIDADE[periodicidade] ?? 1));
   return d.toISOString().split("T")[0];
 }

@@ -14,8 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://pyralabs.com.br"),
   title: "WhatsApp SaaS",
   description: "Painel e landing page para um SaaS de chatbot para WhatsApp.",
+  openGraph: {
+    title: "WhatsApp SaaS",
+    description: "Painel e landing page para um SaaS de chatbot para WhatsApp.",
+    images: ["/py_transparent.png"],
+  },
 };
 
 export default function RootLayout({
