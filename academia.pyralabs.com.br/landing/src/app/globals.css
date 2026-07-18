@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+:root {
+  /* Neutros quentes — ferro, concreto, giz (sai do azul-preto frio) */
+  --bg: #0b0b0d;
+  --bg-elevated: #141317;
+  --bg-card: #151419;
+  --bg-card-hover: #1b191f;
+
+  --text-primary: #f2f0ec; /* giz — branco quente */
+  --text-secondary: #9a9aa2; /* aço */
+  --text-tertiary: #6e6e76;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  /* "Accent" agora é neutro quente (giz/aço) — a cor real vem da foto */
+  --accent: #cfccd4;
+  --accent-strong: #f2f0ec;
+  --accent-soft: rgba(242, 240, 236, 0.08);
+
+  /* Verde — só onde é funcional (WhatsApp / Pix / dinheiro) */
+  --wpp: #25d366;
+  --wpp-strong: #1eb955;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-card: var(--bg-card);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-wpp: var(--wpp);
+
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-archivo), var(--font-barlow), sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, "SFMono-Regular", monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(242, 240, 236, 0.16);
+  color: #ffffff;
+}
+
+/* Display — industrial, apertado */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Números como "dado de sistema" */
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Texto giz com leve profundidade */
+.text-gradient {
+  background: linear-gradient(180deg, #ffffff 0%, #cbc9c4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+}
+.card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-card-hover);
+}
+
+/* Grade de fundo — bem discreta */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.016) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 65% 55% at 50% 0%, #000 30%, transparent 95%);
+}
+
+/* Luz de topo quente e sutil — sem neon */
+.hero-glow {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% -8%, rgba(255, 245, 230, 0.05), transparent 72%),
+    radial-gradient(ellipse 80% 40% at 50% -20%, rgba(255, 255, 255, 0.03), transparent 70%);
+}
+
+/* Animações */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.msg-in {
+  animation: msg-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+.typing-dot {
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-in,
+  .typing-dot,
+  .animate-fade-up,
+  .pulse-dot {
+    animation: none !important;
+  }
+}
+
+/* Brilho ambiente atrás do celular — sutil, respirando (sem neon) */
+.phone-glow {
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.14) 52%,
+    transparent 78%
+  );
+  filter: blur(52px);
+  animation: glow-breathe 7s ease-in-out infinite;
+}
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .phone-glow {
+    animation: none;
+    opacity: 0.75;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Papel de parede sutil do chat — textura, não vazio */
+.wa-wallpaper {
+  background-color: #0a090c;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.nav-glass {
+  background: rgba(11, 11, 13, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
