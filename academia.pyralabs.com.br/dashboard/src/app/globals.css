@@ -26,8 +26,8 @@
   --sidebar-bg: #ffffff;
   --sidebar-text: #374151;
   --sidebar-text-muted: #6b7280;
-  --sidebar-active-bg: rgba(99, 102, 241, 0.08);
-  --sidebar-active-text: #4F46E5;
+  --sidebar-active-bg: rgba(30, 185, 85, 0.10);
+  --sidebar-active-text: #1eb955;
   --sidebar-border: #e8eaef;
 
   /* Header */
@@ -48,9 +48,9 @@
   --info-bg: #eef2ff;
   --info-text: #3730a3;
 
-  /* Accent — Indigo */
-  --accent: #4F46E5;
-  --accent-hover: #4338CA;
+  /* Accent — verde funcional (WhatsApp/Pix) */
+  --accent: #1eb955;
+  --accent-hover: #149e4b;
   --accent-text: #ffffff;
   --shadow: var(--card-shadow);
 
@@ -66,40 +66,43 @@
 }
 
 .dark {
-  --bg-primary: #090B12;
-  --bg-secondary: #0E1018;
-  --bg-tertiary: #070810;
-  --bg-sidebar: #0C0E17;
-  --text-primary: #F1F2F7;
-  --text-secondary: #9CA3AF;
-  --text-tertiary: #6B7280;
-  --text-muted: #374151;
-  --border-color: rgba(255,255,255,0.07);
-  --border-strong: rgba(255,255,255,0.13);
-  --card-bg: #0E1018;
+  /* Neutros quentes — ferro, concreto, giz (alinhado à landing) */
+  --bg-primary: #0b0b0d;
+  --bg-secondary: #141317;
+  --bg-tertiary: #08080a;
+  --bg-sidebar: #100f13;
+  --text-primary: #f2f0ec;
+  --text-secondary: #9a9aa2;
+  --text-tertiary: #6e6e76;
+  --text-muted: #3a3a40;
+  --border-color: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.14);
+  --card-bg: #151419;
   --card-border: rgba(255,255,255,0.07);
-  --card-shadow: 0 1px 12px rgba(0,0,0,0.5);
-  --sidebar-bg: #0C0E17;
-  --sidebar-text: #C9D1D9;
-  --sidebar-text-muted: #8B949E;
-  --sidebar-active-bg: rgba(129, 140, 248, 0.15);
-  --sidebar-active-text: #A5B4FC;
+  --card-shadow: 0 1px 12px rgba(0,0,0,0.55);
+  --sidebar-bg: #100f13;
+  --sidebar-text: #c9cdd6;
+  --sidebar-text-muted: #8b8f9e;
+  --sidebar-active-bg: rgba(37, 211, 102, 0.12);
+  --sidebar-active-text: #4fd48a;
   --sidebar-border: rgba(255,255,255,0.07);
-  --header-bg: #0C0E17;
+  --header-bg: #100f13;
   --header-border: rgba(255,255,255,0.07);
-  --skeleton-from: #131520;
-  --skeleton-to: #1A1D2C;
-  --success-bg: rgba(16, 185, 129, 0.12);
-  --success-text: #34d399;
-  --warning-bg: rgba(245,158,11,0.12);
-  --warning-text: #fbbf24;
-  --danger-bg: rgba(239,68,68,0.12);
-  --danger-text: #f87171;
-  --info-bg: rgba(99, 102, 241, 0.12);
-  --info-text: #A5B4FC;
-  --accent: #818CF8;
-  --accent-hover: #A5B4FC;
-  --accent-text: #ffffff;
+  --skeleton-from: #151419;
+  --skeleton-to: #1b191f;
+  /* Semânticas — o status é a única cor saturada */
+  --success-bg: rgba(37, 211, 102, 0.12);
+  --success-text: #4fd48a;
+  --warning-bg: rgba(224, 179, 65, 0.12);
+  --warning-text: #e0b341;
+  --danger-bg: rgba(224, 106, 84, 0.12);
+  --danger-text: #e06a54;
+  --info-bg: rgba(37, 211, 102, 0.10);
+  --info-text: #4fd48a;
+  /* Accent — verde funcional (WhatsApp/Pix), texto escuro por cima */
+  --accent: #25d366;
+  --accent-hover: #1eb955;
+  --accent-text: #04140a;
   --shadow: var(--card-shadow);
 
   /* Backward-compatible theme tokens */
@@ -123,8 +126,15 @@
   --color-brand: var(--brand);
   --color-brand-strong: var(--brand-strong);
   --color-accent: var(--accent);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-archivo), var(--font-barlow), sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, "SFMono-Regular", monospace;
+}
+
+/* Display — industrial (títulos), alinhado à landing */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 * {
@@ -145,11 +155,13 @@ input {
 }
 
 /* Safety net: avoid white-on-white text in light mode while legacy classes are being migrated */
-html:not(.dark) [class*="text-white"] {
+html:not(.dark) [class*="text-white"]:not([class*="bg-brand"]):not([class*="bg-accent"]) {
   color: var(--text-primary) !important;
 }
 
-html:not(.dark) [class*="bg-brand"][class*="text-white"] {
+/* Accent agora é verde-claro: botões bg-brand/bg-accent precisam de texto escuro em ambos os modos */
+[class*="bg-brand"][class*="text-white"],
+[class*="bg-accent"][class*="text-white"] {
   color: var(--accent-text) !important;
 }
 
@@ -195,10 +207,10 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
   background-image:
-    radial-gradient(ellipse at 15% 0%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 100%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 40%);
+    radial-gradient(ellipse at 15% 0%, rgba(255,245,230,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 100%, rgba(255,255,255,0.025) 0%, transparent 40%);
 }
 
 a {
@@ -260,7 +272,7 @@ a {
   border-radius: 14px !important;
   padding: 0 !important;
   box-shadow:
-    0 0 0 1px rgba(99, 102, 241, 0.08),
+    0 0 0 1px rgba(30, 185, 85, 0.08),
     0 12px 40px rgba(0, 0, 0, 0.22),
     0 4px 12px rgba(0, 0, 0, 0.1) !important;
   max-width: 340px !important;
@@ -320,7 +332,7 @@ a {
   background: linear-gradient(90deg, var(--accent), var(--accent-hover)) !important;
   width: calc((100% - 40px) * var(--pyra-tour-pct, 0.1)) !important;
   transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 0 6px rgba(129, 140, 248, 0.3) !important;
+  box-shadow: 0 0 6px rgba(37, 211, 102, 0.3) !important;
 }
 
 /* Texto do progresso */
@@ -427,10 +439,10 @@ a {
 .driver-active-element,
 .driver-highlighted-element {
   border-radius: 10px !important;
-  outline: 2px solid rgba(129, 140, 248, 0.9) !important;
+  outline: 2px solid rgba(37, 211, 102, 0.9) !important;
   outline-offset: 3px !important;
   box-shadow:
-    0 0 0 4px rgba(99, 102, 241, 0.22),
-    0 0 24px rgba(99, 102, 241, 0.25) !important;
+    0 0 0 4px rgba(30, 185, 85, 0.22),
+    0 0 24px rgba(30, 185, 85, 0.25) !important;
   filter: brightness(1.08) !important;
 }

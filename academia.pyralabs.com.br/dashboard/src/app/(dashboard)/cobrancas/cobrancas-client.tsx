@@ -758,7 +758,7 @@ export function CobrancasPageClient({
                           type="button"
                           title="Copiar código"
                           onClick={() => navigator.clipboard.writeText(codigoExibir)}
-                          className="shrink-0 flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-indigo-400 hover:bg-indigo-500/20"
+                          className="shrink-0 flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-400 hover:bg-emerald-500/20"
                         >
                           <Hash size={9} />
                           {codigoExibir.replace("#", "")}
@@ -841,7 +841,7 @@ export function CobrancasPageClient({
                           title="Gerar código de pagamento em dinheiro para o bot"
                           disabled={gerandoCodigoId === c.id && pending}
                           onClick={() => handleGerarCodigo(c.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600/10 px-3 py-1.5 text-xs font-medium text-indigo-400 transition hover:bg-indigo-600/20 disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-600/20 disabled:opacity-50"
                         >
                           <Hash size={12} />
                           {gerandoCodigoId === c.id && pending ? "..." : codigoExibir ? "Novo código" : "Código bot"}

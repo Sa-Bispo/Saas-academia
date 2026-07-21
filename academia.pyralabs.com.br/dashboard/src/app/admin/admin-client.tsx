@@ -85,7 +85,7 @@ function isRecent(date: Date | string | null) {
 function nichePalette(niche: string) {
   if (niche === "adega") return "bg-amber-500/15 text-amber-300 ring-amber-400/30";
   if (niche === "pizzaria") return "bg-red-500/15 text-red-300 ring-red-400/30";
-  if (niche === "academia") return "bg-indigo-500/15 text-indigo-300 ring-indigo-400/30";
+  if (niche === "academia") return "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30";
   return "bg-sky-500/15 text-sky-300 ring-sky-400/30";
 }
 
@@ -414,8 +414,10 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">PyraLabs</p>
-            <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Painel admin</h1>
-            <p className="mt-1 text-sm text-muted">Gestão central de clientes, bots e receita.</p>
+            <h1 className="font-display mt-2 text-2xl font-bold uppercase tracking-tight text-white sm:text-3xl">
+              Operação
+            </h1>
+            <p className="mt-1 text-sm text-muted">Clientes, bots e receita num relance.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -613,9 +615,9 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
 
               <div className="space-y-1.5 text-sm">
                 <p className="text-muted">Pedidos hoje</p>
-                <p className="font-semibold text-white">{tenant.pedidosHoje}</p>
+                <p className="font-mono font-bold tabular-nums text-white">{tenant.pedidosHoje}</p>
                 <p className="text-muted">Faturamento do dia</p>
-                <p className="font-semibold text-white">{BRL.format(tenant.faturamentoHoje)}</p>
+                <p className="font-mono font-bold tabular-nums text-white">{BRL.format(tenant.faturamentoHoje)}</p>
               </div>
 
               <div className="space-y-2 text-sm">
@@ -641,7 +643,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                   type="button"
                   onClick={() => onOpenModulos(tenant.id, tenant.nome)}
                   disabled={pending}
-                  className="rounded-lg border border-indigo-500/35 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-300 transition hover:bg-indigo-500/20 disabled:opacity-60"
+                  className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-60"
                 >
                   Módulos
                 </button>
@@ -1073,7 +1075,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                     key={m.chave}
                     className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition ${
                       m.ativo
-                        ? "border-indigo-500/35 bg-indigo-500/10"
+                        ? "border-emerald-500/35 bg-emerald-500/10"
                         : "border-line bg-transparent hover:border-white/15"
                     } ${m.chave === "alunos" ? "cursor-default opacity-60" : ""}`}
                   >
@@ -1082,7 +1084,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                       checked={m.ativo || m.chave === "alunos"}
                       disabled={m.chave === "alunos"}
                       onChange={() => onToggleModulo(m.chave)}
-                      className="mt-0.5 accent-indigo-400"
+                      className="mt-0.5 accent-emerald-400"
                     />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-white">
@@ -1112,7 +1114,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 type="button"
                 onClick={onSaveModulos}
                 disabled={pending || modulosLoading}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60"
               >
                 {pending ? "Salvando..." : "Salvar"}
               </button>
@@ -1139,12 +1141,14 @@ function MetricCard({
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }) {
   return (
-    <article className="rounded-2xl border border-line bg-surface/60 p-4 backdrop-blur transition hover:border-brand/25">
+    <article className="rounded-2xl border border-line bg-surface/60 p-4 backdrop-blur transition hover:border-white/15">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">{title}</p>
-        <Icon size={15} className="text-brand" />
+        <p className="text-[13px] text-muted">{title}</p>
+        <Icon size={14} className="text-muted" />
       </div>
-      <p className="mt-3 text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-3 font-mono text-[28px] font-bold tracking-tight tabular-nums text-white">
+        {value}
+      </p>
     </article>
   );
 }

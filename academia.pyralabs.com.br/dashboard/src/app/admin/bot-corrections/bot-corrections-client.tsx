@@ -158,7 +158,7 @@ export default function BotCorrectionsClient({ initialEvents, initialPatterns, b
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="flex items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-600/90 px-4 py-3 text-sm text-white shadow-lg backdrop-blur"
+            className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-600/90 px-4 py-3 text-sm text-white shadow-lg backdrop-blur"
           >
             <Zap className="size-4 shrink-0" />
             {t.msg}
@@ -194,7 +194,7 @@ export default function BotCorrectionsClient({ initialEvents, initialPatterns, b
                   onClick={() => handleTabChange(tab.value as typeof statusTab)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     statusTab === tab.value
-                      ? "border-indigo-500 text-indigo-400"
+                      ? "border-emerald-500 text-emerald-400"
                       : "border-transparent text-[--text-muted] hover:text-[--text-primary]"
                   }`}
                 >
@@ -215,14 +215,14 @@ export default function BotCorrectionsClient({ initialEvents, initialPatterns, b
                   <button
                     key={ev.id}
                     onClick={() => setSelectedEvent(ev)}
-                    className="w-full text-left rounded-2xl border border-[--border-color] bg-[--bg-secondary] hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all overflow-hidden"
+                    className="w-full text-left rounded-2xl border border-[--border-color] bg-[--bg-secondary] hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all overflow-hidden"
                   >
                     {/* Topo do card: cliente + meta */}
                     <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-[--border-color]/50">
                       <div className="flex items-center gap-2.5 min-w-0">
                         {/* Avatar inicial */}
-                        <div className="size-8 rounded-xl bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-indigo-400">
+                        <div className="size-8 rounded-xl bg-emerald-600/20 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-emerald-400">
                             {(ev.tenantNome || ev.nicho).slice(0, 2).toUpperCase()}
                           </span>
                         </div>
@@ -236,7 +236,7 @@ export default function BotCorrectionsClient({ initialEvents, initialPatterns, b
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider rounded-md px-2 py-0.5 bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider rounded-md px-2 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                           {ev.nicho}
                         </span>
                         <span className="text-xs text-[--text-muted]">
@@ -341,12 +341,12 @@ function EventModal({
                 <div
                   className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-indigo-600/80 text-white rounded-tr-sm"
+                      ? "bg-emerald-600/80 text-white rounded-tr-sm"
                       : "bg-[--bg-tertiary] text-[--text-primary] rounded-tl-sm"
                   } ${msg.text === event.textoProblema ? "ring-2 ring-amber-400/50" : ""}`}
                 >
                   <p className="whitespace-pre-wrap">{msg.text}</p>
-                  <p className={`text-[10px] mt-1.5 ${msg.role === "user" ? "text-indigo-200/60 text-right" : "text-[--text-muted]"}`}>
+                  <p className={`text-[10px] mt-1.5 ${msg.role === "user" ? "text-emerald-200/60 text-right" : "text-[--text-muted]"}`}>
                     {msg.role === "user" ? "Aluno" : "Bot"} · {new Date(msg.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
@@ -437,12 +437,12 @@ function PatternsView({
             value={frase}
             onChange={(e) => setFrase(e.target.value)}
             placeholder="Frase/variação..."
-            className="flex-1 rounded-lg border border-[--border-color] bg-[--bg-primary] px-3 py-2 text-sm text-[--text-primary] placeholder:text-[--text-muted] focus:border-indigo-500 focus:outline-none"
+            className="flex-1 rounded-lg border border-[--border-color] bg-[--bg-primary] px-3 py-2 text-sm text-[--text-primary] placeholder:text-[--text-muted] focus:border-emerald-500 focus:outline-none"
           />
           <select
             value={intentAlvo}
             onChange={(e) => setIntentAlvo(e.target.value)}
-            className="w-44 rounded-lg border border-[--border-color] bg-[--bg-primary] px-3 py-2 text-sm text-[--text-primary] focus:border-indigo-500 focus:outline-none"
+            className="w-44 rounded-lg border border-[--border-color] bg-[--bg-primary] px-3 py-2 text-sm text-[--text-primary] focus:border-emerald-500 focus:outline-none"
           >
             <option value="">-- intent --</option>
             {INTENTS.map((i) => (
@@ -452,7 +452,7 @@ function PatternsView({
           <button
             onClick={handleAdd}
             disabled={saving || !frase || !intentAlvo}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-40 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors"
           >
             <Plus className="size-4" />
             Adicionar
@@ -475,7 +475,7 @@ function PatternsView({
                 className="flex items-center gap-3 rounded-lg border border-[--border-color] bg-[--bg-secondary] px-4 py-2.5"
               >
                 <span className="flex-1 text-sm text-[--text-primary] font-mono">&ldquo;{p.frase}&rdquo;</span>
-                <span className="rounded-full bg-indigo-500/15 text-indigo-300 text-xs px-2 py-0.5">
+                <span className="rounded-full bg-emerald-500/15 text-emerald-300 text-xs px-2 py-0.5">
                   {p.intentAlvo}
                 </span>
                 <span className="text-xs text-[--text-muted]">

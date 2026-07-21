@@ -481,9 +481,9 @@ export function ModalImportar({
                       <p className="text-xs text-emerald-400/70 uppercase tracking-wide font-semibold">Criados</p>
                       <p className="mt-1 text-2xl font-bold text-emerald-400">{resultado.criados}</p>
                     </div>
-                    <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
-                      <p className="text-xs text-indigo-400/70 uppercase tracking-wide font-semibold">Atualizados</p>
-                      <p className="mt-1 text-2xl font-bold text-indigo-400">{resultado.atualizados}</p>
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                      <p className="text-xs text-emerald-400/70 uppercase tracking-wide font-semibold">Atualizados</p>
+                      <p className="mt-1 text-2xl font-bold text-emerald-400">{resultado.atualizados}</p>
                     </div>
                   </div>
 

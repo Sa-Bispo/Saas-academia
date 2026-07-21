@@ -98,7 +98,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   INADIMPLENTE: { label: "Inadimplente", color: "bg-red-500/15 text-red-400", icon: UserX },
   INATIVO: { label: "Inativo", color: "bg-slate-500/15 text-slate-400", icon: UserX },
   SUSPENSO: { label: "Suspenso", color: "bg-amber-500/15 text-amber-400", icon: AlertTriangle },
-  SEM_MATRICULA: { label: "Lead", color: "bg-indigo-500/15 text-indigo-400", icon: UserPlus },
+  SEM_MATRICULA: { label: "Lead", color: "bg-emerald-500/15 text-emerald-400", icon: UserPlus },
 };
 
 const MATRICULA_STATUS_COLOR: Record<string, string> = {
@@ -1141,7 +1141,7 @@ function avatarInitials(nome: string): string {
 }
 
 const AVATAR_COLORS = [
-  "bg-indigo-500/30 text-indigo-300",
+  "bg-emerald-500/30 text-emerald-300",
   "bg-violet-500/30 text-violet-300",
   "bg-sky-500/30 text-sky-300",
   "bg-emerald-500/30 text-emerald-300",

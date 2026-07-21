@@ -176,8 +176,8 @@ export function FuncionariosClient({ funcionarios }: Props) {
       </div>
 
       {/* Info box */}
-      <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 text-xs text-indigo-300/80 leading-relaxed">
-        <p className="font-semibold text-indigo-300 mb-1">Como funciona o pagamento em dinheiro via bot</p>
+      <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-300/80 leading-relaxed">
+        <p className="font-semibold text-emerald-300 mb-1">Como funciona o pagamento em dinheiro via bot</p>
         <p>
           Quando um aluno escolhe pagar em dinheiro, o bot gera um código (ex: <span className="font-mono font-semibold">#A3K7B2</span>).
           O aluno apresenta o código na recepção. O funcionário envia o código pelo WhatsApp para o bot,

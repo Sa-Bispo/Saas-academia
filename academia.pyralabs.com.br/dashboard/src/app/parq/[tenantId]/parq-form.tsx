@@ -149,7 +149,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
           <div>
             <label className="mb-1.5 block text-xs font-medium text-white/60">Nome completo *</label>
             <input
-              className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-indigo-500/50 focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-emerald-500/50 focus:outline-none"
               placeholder="Seu nome"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
@@ -160,7 +160,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
             <div>
               <label className="mb-1.5 block text-xs font-medium text-white/60">CPF *</label>
               <input
-                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-indigo-500/50 focus:outline-none"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-emerald-500/50 focus:outline-none"
                 placeholder="000.000.000-00"
                 value={cpf}
                 onChange={(e) => setCpf(maskCpf(e.target.value))}
@@ -170,7 +170,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
             <div>
               <label className="mb-1.5 block text-xs font-medium text-white/60">WhatsApp *</label>
               <input
-                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-indigo-500/50 focus:outline-none"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-emerald-500/50 focus:outline-none"
                 placeholder="(00) 00000-0000"
                 value={telefone}
                 onChange={(e) => setTelefone(maskPhone(e.target.value))}
@@ -183,7 +183,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
             <label className="mb-1.5 block text-xs font-medium text-white/60">Data de nascimento</label>
             <input
               type="date"
-              className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white focus:border-indigo-500/50 focus:outline-none [color-scheme:dark]"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white focus:border-emerald-500/50 focus:outline-none [color-scheme:dark]"
               value={dataNascimento}
               onChange={(e) => setDataNascimento(e.target.value)}
               max={new Date().toISOString().split("T")[0]}
@@ -236,7 +236,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
                         respostas[p.id] === val
                           ? val === "S"
                             ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
-                            : "border-indigo-500/60 bg-indigo-500/15 text-indigo-300"
+                            : "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
                           : naoRespondida
                           ? "border-red-500/40 bg-red-500/5 text-white/40 hover:border-red-400/60 hover:text-white/70"
                           : "border-white/10 bg-white/[0.04] text-white/40 hover:border-white/20 hover:text-white/70"
@@ -327,7 +327,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
               type="checkbox"
               checked={lgpd}
               onChange={(e) => setLgpd(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-500"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
             />
             <span className="text-xs text-white/60">
               Li e concordo com o termo acima e autorizo o tratamento dos meus dados
@@ -349,7 +349,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
           type="button"
           disabled={pending}
           onClick={handleSubmit}
-          className="w-full rounded-2xl bg-indigo-600 py-3.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+          className="w-full rounded-2xl bg-emerald-600 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
         >
           {pending ? (
             <span className="inline-flex items-center gap-2">
