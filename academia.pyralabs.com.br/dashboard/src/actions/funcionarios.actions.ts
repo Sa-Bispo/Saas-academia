@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
+import { assertModuloAtivo } from "@/services/modulos.service";
 import { prisma } from "@/lib/prisma";
 
 async function getAuthenticatedTenantId(): Promise<string> {
@@ -17,6 +18,7 @@ async function getAuthenticatedTenantId(): Promise<string> {
     email: user.email,
     nome: (user.user_metadata?.nome as string | undefined) ?? undefined,
   });
+  await assertModuloAtivo(tenant.id, "financeiro");
   return tenant.id;
 }
 

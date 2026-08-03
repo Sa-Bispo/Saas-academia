@@ -32,7 +32,7 @@ export const MODULO_BASE: ModuloChave = "alunos";
 export const ROTA_MODULO: Record<string, ModuloChave> = {
   "/dashboard/academia": "relatorios",
   "/alunos":             "alunos",
-  "/funcionarios":       "alunos",
+  "/funcionarios":       "financeiro",
   "/frequencia":         "frequencia",
   "/cobrancas":          "financeiro",
   "/planos-academia":    "alunos",
