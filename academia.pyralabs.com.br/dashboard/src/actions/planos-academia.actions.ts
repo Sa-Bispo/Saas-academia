@@ -18,7 +18,7 @@ async function getAuthenticatedTenantId(): Promise<string> {
     email: user.email,
     nome: (user.user_metadata?.nome as string | undefined) ?? undefined,
   });
-  await assertModuloAtivo(tenant.id, "financeiro");
+  await assertModuloAtivo(tenant.id, "alunos");
   return tenant.id;
 }
 

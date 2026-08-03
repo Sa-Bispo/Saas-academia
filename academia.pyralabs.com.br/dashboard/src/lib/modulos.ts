@@ -35,7 +35,7 @@ export const ROTA_MODULO: Record<string, ModuloChave> = {
   "/funcionarios":       "alunos",
   "/frequencia":         "frequencia",
   "/cobrancas":          "financeiro",
-  "/planos-academia":    "financeiro",
+  "/planos-academia":    "alunos",
   "/parq-config":        "documentos",
   "/whatsapp":           "comunicacao",
 };
