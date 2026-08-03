@@ -93,6 +93,7 @@ services:
     env_file:
       - ./academia.pyralabs.com.br/bot/.env
     environment:
+      TZ: America/Sao_Paulo
       EVOLUTION_API_URL: http://evolution_api:8080
     depends_on:
       evolution_api:
@@ -118,6 +119,7 @@ services:
       dockerfile: Dockerfile.migrator
     container_name: db_migrator
     environment:
+      TZ: America/Sao_Paulo
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
       DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
     restart: "no"
@@ -144,6 +146,7 @@ services:
     env_file:
       - ./academia.pyralabs.com.br/dashboard/.env
     environment:
+      TZ: America/Sao_Paulo
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
       DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=public
       EVOLUTION_API_URL: http://evolution_api:8080

@@ -130,9 +130,11 @@ function formatCents(cents: number) {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+const BRT = "America/Sao_Paulo";
+
 function formatData(d: Date | string | null | undefined) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR");
+  return new Date(d).toLocaleDateString("pt-BR", { timeZone: BRT });
 }
 
 function formatCpf(cpf: string | null | undefined) {
@@ -152,16 +154,17 @@ function maskCpf(value: string) {
 
 function toDateInputValue(d: Date | string | null | undefined) {
   if (!d) return "";
-  return new Date(d).toISOString().split("T")[0];
+  // en-CA returns YYYY-MM-DD, exactly what <input type="date"> expects
+  return new Date(d).toLocaleDateString("en-CA", { timeZone: BRT });
 }
 
 function calcularIdade(dataNascimento: Date | string | null | undefined): number | null {
   if (!dataNascimento) return null;
-  const nasc = new Date(dataNascimento);
-  const hoje = new Date();
-  let idade = hoje.getFullYear() - nasc.getFullYear();
-  const m = hoje.getMonth() - nasc.getMonth();
-  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  const fmt = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: BRT }); // YYYY-MM-DD
+  const [nascY, nascM, nascD] = fmt(new Date(dataNascimento)).split("-").map(Number);
+  const [hojeY, hojeM, hojeD] = fmt(new Date()).split("-").map(Number);
+  let idade = hojeY - nascY;
+  if (hojeM < nascM || (hojeM === nascM && hojeD < nascD)) idade--;
   return idade;
 }
 
@@ -173,12 +176,15 @@ function isVencendo(dataVencimento: Date) {
 // Dias até o próximo aniversário (0 = hoje). null se sem data.
 function diasAteAniversario(dataNascimento: Date | null | undefined): number | null {
   if (!dataNascimento) return null;
-  const nasc = new Date(dataNascimento);
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const prox = new Date(hoje.getFullYear(), nasc.getMonth(), nasc.getDate());
-  if (prox < hoje) prox.setFullYear(hoje.getFullYear() + 1);
-  return Math.round((prox.getTime() - hoje.getTime()) / 86400000);
+  const fmt = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: BRT });
+  const [, nascM, nascD] = fmt(new Date(dataNascimento)).split("-").map(Number);
+  const [hojeY, hojeM, hojeD] = fmt(new Date()).split("-").map(Number);
+  const proxAniv = new Date(`${hojeY}-${String(nascM).padStart(2,"0")}-${String(nascD).padStart(2,"0")}T12:00:00`);
+  if (proxAniv.toLocaleDateString("en-CA", { timeZone: BRT }) < fmt(new Date())) {
+    proxAniv.setFullYear(hojeY + 1);
+  }
+  const hoje = new Date(new Date().toLocaleDateString("en-CA", { timeZone: BRT }) + "T12:00:00");
+  return Math.round((proxAniv.getTime() - hoje.getTime()) / 86400000);
 }
 
 function labelAniversario(dias: number | null): string | null {
@@ -1001,7 +1007,7 @@ function ModalDetalheAluno({
                 const mat = aluno.matriculas.find((m) => m.status === "ATIVA");
                 const estaPago = aluno.cobrancas[0]?.status === "PAGO";
                 return (
-                  <SecaoCard icon={Receipt} titulo="Mensalidade">
+                  <SecaoCard icon={Receipt} titulo="Mensalidade atual">
                     {mat ? (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between text-sm">
@@ -1049,6 +1055,56 @@ function ModalDetalheAluno({
                   </SecaoCard>
                 );
               })()}
+
+              {/* Histórico de pagamentos */}
+              {aluno.cobrancas.length > 0 && (
+                <SecaoCard icon={ClipboardList} titulo="Histórico de pagamentos">
+                  <div className="space-y-1.5">
+                    {aluno.cobrancas.map((c) => {
+                      const mesRef = new Date(c.dataVencimento).toLocaleDateString("pt-BR", {
+                        month: "short",
+                        year: "numeric",
+                      });
+                      const isPago = c.status === "PAGO";
+                      const isVencido = c.status === "VENCIDO";
+                      const statusLabel =
+                        isPago ? "Pago"
+                        : isVencido ? "Vencido"
+                        : c.status === "CANCELADA" ? "Cancelado"
+                        : "Pendente";
+                      const statusColor =
+                        isPago ? "bg-emerald-500/15 text-emerald-400"
+                        : isVencido ? "bg-red-500/15 text-red-400"
+                        : c.status === "CANCELADA" ? "bg-slate-500/15 text-slate-400"
+                        : "bg-amber-500/15 text-amber-400";
+
+                      return (
+                        <div
+                          key={c.id}
+                          className="flex items-center justify-between rounded-lg px-2.5 py-2 text-xs transition hover:bg-white/[0.03]"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusColor}`}
+                            >
+                              {statusLabel}
+                            </span>
+                            <span className="text-muted capitalize">{mesRef}</span>
+                            {c.dataPagamento && (
+                              <span className="text-muted/60 hidden sm:inline">
+                                pago em {formatData(c.dataPagamento)}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`font-mono font-semibold tabular-nums shrink-0 ${isPago ? "text-emerald-400" : "text-foreground"}`}>
+                            {formatCents(c.valorCents)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </SecaoCard>
+              )}
             </>
           )}
         </div>

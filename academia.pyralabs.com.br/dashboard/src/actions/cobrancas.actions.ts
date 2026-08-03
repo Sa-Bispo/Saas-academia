@@ -62,7 +62,7 @@ export async function criarCobranca(data: {
       alunoId: data.alunoId,
       matriculaId: data.matriculaId || null,
       valorCents: data.valorCents,
-      dataVencimento: new Date(data.dataVencimento),
+      dataVencimento: new Date(data.dataVencimento + "T12:00:00"),
       descricao: data.descricao?.trim() || null,
       pixChave: data.pixChave?.trim() || null,
     },

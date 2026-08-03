@@ -67,7 +67,27 @@ export async function marcarMensalidade(alunoId: string, pago: boolean) {
     throw new Error("Aluno sem matrícula ativa para registrar mensalidade.");
   }
 
+  if (pago && matricula) {
+    const meses =
+      matricula.plano.periodicidade === "MENSAL" ? 1
+      : matricula.plano.periodicidade === "TRIMESTRAL" ? 3
+      : matricula.plano.periodicidade === "SEMESTRAL" ? 6
+      : 12;
+    const novoVencimento = new Date(matricula.dataVencimento);
+    novoVencimento.setMonth(novoVencimento.getMonth() + meses);
+    await prisma.matriculaAluno.update({
+      where: { id: matricula.id },
+      data: { dataVencimento: novoVencimento, status: "ATIVA" },
+    });
+    await prisma.aluno.update({
+      where: { id: alunoId },
+      data: { status: "ATIVO" },
+    });
+  }
+
   revalidatePath("/alunos");
+  revalidatePath("/cobrancas");
+  revalidatePath("/dashboard/academia");
 }
 
 // ─── Alunos ───────────────────────────────────────────────────────────────────
@@ -154,7 +174,7 @@ export async function criarAluno(data: {
         telefone: data.telefone.replace(/\D/g, ""),
         email: data.email?.trim() || null,
         cpf: data.cpf?.replace(/\D/g, "") || null,
-        dataNascimento: data.dataNascimento ? new Date(data.dataNascimento) : null,
+        dataNascimento: data.dataNascimento ? new Date(data.dataNascimento + "T12:00:00") : null,
         observacoes: data.observacoes?.trim() || null,
       },
     });
@@ -195,7 +215,7 @@ export async function atualizarAluno(
       ...(data.email !== undefined && { email: data.email?.trim() || null }),
       ...(data.cpf !== undefined && { cpf: data.cpf?.replace(/\D/g, "") || null }),
       ...(data.dataNascimento !== undefined && {
-        dataNascimento: data.dataNascimento ? new Date(data.dataNascimento) : null,
+        dataNascimento: data.dataNascimento ? new Date(data.dataNascimento + "T12:00:00") : null,
       }),
       ...(data.observacoes !== undefined && { observacoes: data.observacoes?.trim() || null }),
       ...(data.status !== undefined && { status: data.status }),
@@ -211,7 +231,7 @@ export async function atualizarVencimentoMatricula(matriculaId: string, novaData
 
   await prisma.matriculaAluno.updateMany({
     where: { id: matriculaId, tenantId },
-    data: { dataVencimento: new Date(novaDataVencimento) },
+    data: { dataVencimento: new Date(novaDataVencimento + "T12:00:00") },
   });
 
   revalidatePath("/alunos");
@@ -300,7 +320,18 @@ export async function enviarLembrete(alunoId: string) {
   }
 
   try {
-    await evolutionService.sendTextMessage(aluno.telefone, mensagem);
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { evolutionInstanceName: true, evolutionApiKey: true },
+    });
+    if (tenant?.evolutionInstanceName && aluno.telefone) {
+      await evolutionService.sendTextMessage(
+        tenant.evolutionInstanceName,
+        aluno.telefone,
+        mensagem,
+        tenant.evolutionApiKey,
+      );
+    }
   } catch {
     // falha no WhatsApp não bloqueia a operação
   }
