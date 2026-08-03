@@ -1377,23 +1377,33 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
 
       {/* Segmentos + busca */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 rounded-xl border border-line bg-surface/60 p-1">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface/60 p-1">
           {[
-            { key: "todos", label: "Todos", count: totais.todos },
-            { key: "ATIVO", label: "Ativos", count: totais.ATIVO },
-            { key: "NOVO", label: "Novos", count: totais.NOVO },
-            { key: "INATIVO", label: "Inativos", count: totais.INATIVO },
-          ].map(({ key, label, count }) => (
+            { key: "todos",        label: "Todos",        count: totais.todos,         danger: false },
+            { key: "ATIVO",        label: "Ativos",       count: totais.ATIVO,         danger: false },
+            { key: "NOVO",         label: "Novos",        count: totais.NOVO,          danger: false },
+            { key: "VENCENDO",     label: "Vencendo",     count: totais.VENCENDO,      danger: true  },
+            { key: "INADIMPLENTE", label: "Inadimplentes",count: totais.INADIMPLENTE,  danger: true  },
+            { key: "INATIVO",      label: "Inativos",     count: totais.INATIVO,       danger: false },
+          ].map(({ key, label, count, danger }) => (
             <button
               key={key}
               type="button"
               onClick={() => setFiltroStatus(key)}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                filtroStatus === key ? "bg-white/[0.07] text-white" : "text-muted hover:text-foreground"
+                filtroStatus === key
+                  ? danger
+                    ? "bg-red-500/15 text-red-400"
+                    : "bg-white/[0.07] text-white"
+                  : "text-muted hover:text-foreground"
               }`}
             >
               {label}
-              <span className={`font-mono text-[11px] ${filtroStatus === key ? "text-brand" : "text-muted"}`}>
+              <span className={`font-mono text-[11px] ${
+                filtroStatus === key
+                  ? danger ? "text-red-400" : "text-brand"
+                  : count > 0 && danger ? "text-red-400/60" : "text-muted"
+              }`}>
                 {count}
               </span>
             </button>
