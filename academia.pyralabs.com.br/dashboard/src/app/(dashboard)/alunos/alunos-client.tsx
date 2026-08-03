@@ -75,6 +75,8 @@ type Aluno = {
   status: string;
   precisaLiberacaoMedica: boolean;
   createdAt: Date;
+  dataNascimento: Date | null;
+  observacoes: string | null;
   matriculas: Matricula[];
   cobrancas: Cobranca[];
   frequencias: { data: Date }[];
@@ -165,6 +167,43 @@ function calcularIdade(dataNascimento: Date | string | null | undefined): number
 function isVencendo(dataVencimento: Date) {
   const diff = new Date(dataVencimento).getTime() - Date.now();
   return diff > 0 && diff < 7 * 24 * 60 * 60 * 1000;
+}
+
+// Dias até o próximo aniversário (0 = hoje). null se sem data.
+function diasAteAniversario(dataNascimento: Date | null | undefined): number | null {
+  if (!dataNascimento) return null;
+  const nasc = new Date(dataNascimento);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const prox = new Date(hoje.getFullYear(), nasc.getMonth(), nasc.getDate());
+  if (prox < hoje) prox.setFullYear(hoje.getFullYear() + 1);
+  return Math.round((prox.getTime() - hoje.getTime()) / 86400000);
+}
+
+function labelAniversario(dias: number | null): string | null {
+  if (dias === null) return null;
+  if (dias === 0) return "🎂 hoje";
+  if (dias === 1) return "🎂 amanhã";
+  if (dias <= 7) return `🎂 em ${dias}d`;
+  return null;
+}
+
+// Aluno "novo" = cadastrado nos últimos 30 dias
+function ehNovo(createdAt: Date): boolean {
+  return Date.now() - new Date(createdAt).getTime() < 30 * 86400000;
+}
+
+// "há 1a 2m" a partir da data de entrada
+function tempoDeCasa(createdAt: Date): string {
+  const meses = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(createdAt).getTime()) / (30.4 * 86400000)),
+  );
+  if (meses < 1) return "novo";
+  if (meses < 12) return `há ${meses}m`;
+  const anos = Math.floor(meses / 12);
+  const resto = meses % 12;
+  return resto ? `há ${anos}a ${resto}m` : `há ${anos}a`;
 }
 
 function calcVencimento(inicio: string, periodicidade: string): string {
@@ -1159,7 +1198,7 @@ function avatarColor(nome: string): string {
 export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [ordenacao, setOrdenacao] = useState<"urgencia" | "nome">("urgencia");
+  const [ordenacao, setOrdenacao] = useState<"urgencia" | "nome">("nome");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [modalAberto, setModalAberto] = useState(false);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
@@ -1176,7 +1215,9 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
         a.telefone.includes(busca) ||
         (a.email ?? "").toLowerCase().includes(busca.toLowerCase());
       let matchStatus = true;
-      if (filtroStatus === "VENCENDO") {
+      if (filtroStatus === "NOVO") {
+        matchStatus = ehNovo(a.createdAt);
+      } else if (filtroStatus === "VENCENDO") {
         matchStatus = !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
       } else if (filtroStatus !== "todos") {
         matchStatus = a.status === filtroStatus;
@@ -1191,10 +1232,18 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
   const totais = {
     todos: alunos.length,
     ATIVO: alunos.filter((a) => a.status === "ATIVO").length,
+    NOVO: alunos.filter((a) => ehNovo(a.createdAt)).length,
     INADIMPLENTE: alunos.filter((a) => a.status === "INADIMPLENTE").length,
     INATIVO: alunos.filter((a) => a.status === "INATIVO").length,
     VENCENDO: alunos.filter((a) => !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento)).length,
   };
+
+  // "Pra fazer hoje" — relacionamento manual (sem cobrança/automação)
+  const aniversariantes = alunos.filter((a) => {
+    const d = diasAteAniversario(a.dataNascimento);
+    return d !== null && d <= 7;
+  });
+  const parqPendentes = alunos.filter((a) => a.precisaLiberacaoMedica);
 
   const todosSelecionados =
     alunosFiltrados.length > 0 && alunosFiltrados.every((a) => selecionados.has(a.id));
@@ -1228,8 +1277,9 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Academia</p>
-          <h1 className="mt-1 text-2xl font-semibold text-white">Alunos</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">Academia</p>
+          <h1 className="font-display mt-1 text-2xl font-bold uppercase tracking-tight text-white">Alunos</h1>
+          <p className="mt-1 text-sm text-muted">Seus alunos organizados — um alô no WhatsApp a um clique.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -1251,106 +1301,76 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
         </div>
       </div>
 
-      {/* Cards de stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => setFiltroStatus(filtroStatus === "VENCENDO" ? "todos" : "VENCENDO")}
-          className={`rounded-2xl border p-4 text-left transition ${
-            filtroStatus === "VENCENDO"
-              ? "border-amber-500/50 bg-amber-500/10"
-              : "border-amber-500/20 bg-surface/60 hover:border-amber-500/40"
-          }`}
-        >
-          <div className="flex items-center gap-2 text-amber-400">
-            <Clock size={14} />
-            <span className="text-xs font-medium">Vencendo em 7 dias</span>
+      {/* Pra fazer hoje — relacionamento manual */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-4"
+          style={{ borderLeft: "3px solid var(--warning-text)" }}>
+          <span className="font-mono text-2xl font-bold tabular-nums" style={{ color: "var(--warning-text)" }}>
+            {aniversariantes.length}
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-white">Aniversariantes da semana</p>
+            <p className="text-[11px] text-muted">mande os parabéns</p>
           </div>
-          <p className="mt-2 text-3xl font-bold text-white">{stats.vencendo7d}</p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFiltroStatus(filtroStatus === "INADIMPLENTE" ? "todos" : "INADIMPLENTE")}
-          className={`rounded-2xl border p-4 text-left transition ${
-            filtroStatus === "INADIMPLENTE"
-              ? "border-red-500/50 bg-red-500/10"
-              : "border-red-500/20 bg-surface/60 hover:border-red-500/40"
-          }`}
-        >
-          <div className="flex items-center gap-2 text-red-400">
-            <AlertTriangle size={14} />
-            <span className="text-xs font-medium">Inadimplentes</span>
-          </div>
-          <p className="mt-2 text-3xl font-bold text-white">{stats.inadimplentes}</p>
-        </button>
-      </div>
-
-      {/* Busca + ordenação */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            className="w-full rounded-xl border border-line bg-surface/60 py-2.5 pl-9 pr-4 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
-            placeholder="Buscar por nome, telefone ou e-mail..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-          />
         </div>
         <button
           type="button"
-          onClick={() => setOrdenacao(ordenacao === "urgencia" ? "nome" : "urgencia")}
-          className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
-            ordenacao === "urgencia"
-              ? "border-brand/50 bg-brand/10 text-brand"
-              : "border-line bg-surface/60 text-muted hover:text-foreground"
-          }`}
+          onClick={() => setFiltroStatus(filtroStatus === "NOVO" ? "todos" : "NOVO")}
+          className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-4 text-left transition hover:border-white/15"
+          style={{ borderLeft: "3px solid var(--accent)" }}
         >
-          <AlertTriangle size={13} />
-          Urgência
+          <span className="font-mono text-2xl font-bold tabular-nums" style={{ color: "var(--accent)" }}>
+            {totais.NOVO}
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-white">Novos este mês</p>
+            <p className="text-[11px] text-muted">dê as boas-vindas</p>
+          </div>
         </button>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setFiltrosAberto((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
-              filtroStatus !== "todos"
-                ? "border-brand/50 bg-brand/10 text-brand"
-                : "border-line bg-surface/60 text-muted hover:text-foreground"
-            }`}
-          >
-            <ChevronDown size={13} />
-            Filtros
-            {filtroStatus !== "todos" && (
-              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-[9px] font-bold text-white">
-                1
-              </span>
-            )}
-          </button>
+        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-4"
+          style={{ borderLeft: "3px solid var(--success-text)" }}>
+          <span className="font-mono text-2xl font-bold tabular-nums" style={{ color: "var(--success-text)" }}>
+            {parqPendentes.length}
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-white">PAR-Q pendente</p>
+            <p className="text-[11px] text-muted">avaliação não assinada</p>
+          </div>
+        </div>
+      </div>
 
-          {filtrosAberto && (
-            <div className="absolute right-0 top-full z-50 mt-1.5 w-48 overflow-hidden rounded-xl border border-line bg-surface shadow-xl">
-              {[
-                { key: "todos", label: "Todos", count: totais.todos },
-                { key: "ATIVO", label: "Ativos", count: totais.ATIVO },
-                { key: "INADIMPLENTE", label: "Inadimplentes", count: totais.INADIMPLENTE },
-                { key: "INATIVO", label: "Inativos", count: totais.INATIVO },
-                { key: "VENCENDO", label: "Vencendo", count: totais.VENCENDO },
-              ].map(({ key, label, count }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setFiltroStatus(key); setFiltrosAberto(false); }}
-                  className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition hover:bg-white/5 ${
-                    filtroStatus === key ? "text-brand" : "text-foreground"
-                  }`}
-                >
-                  <span>{label}</span>
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-muted">{count}</span>
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Segmentos + busca */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1 rounded-xl border border-line bg-surface/60 p-1">
+          {[
+            { key: "todos", label: "Todos", count: totais.todos },
+            { key: "ATIVO", label: "Ativos", count: totais.ATIVO },
+            { key: "NOVO", label: "Novos", count: totais.NOVO },
+            { key: "INATIVO", label: "Inativos", count: totais.INATIVO },
+          ].map(({ key, label, count }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFiltroStatus(key)}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                filtroStatus === key ? "bg-white/[0.07] text-white" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {label}
+              <span className={`font-mono text-[11px] ${filtroStatus === key ? "text-brand" : "text-muted"}`}>
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="relative ml-auto min-w-[220px] flex-1 sm:flex-none">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            className="w-full rounded-xl border border-line bg-surface/60 py-2.5 pl-9 pr-4 text-sm text-white placeholder-muted focus:border-brand/50 focus:outline-none"
+            placeholder="Buscar aluno, telefone…"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
         </div>
       </div>
 
@@ -1367,97 +1387,101 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-surface/60">
           {/* Header da tabela */}
-          <div className="flex items-center gap-4 border-b border-line/50 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
-            <input
-              type="checkbox"
-              checked={todosSelecionados}
-              onChange={toggleSelecionarTodos}
-              className="h-3.5 w-3.5 rounded border-line accent-brand"
-            />
+          <div className="flex items-center gap-3 border-b border-line/50 px-5 py-3 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
             <span className="flex-1">Aluno</span>
-            <span className="hidden w-40 lg:block">Vencimento</span>
-            <span className="hidden w-28 lg:block">Ações</span>
+            <span className="hidden w-24 md:block">Plano</span>
+            <span className="hidden w-24 lg:block">Aluno desde</span>
+            <span className="hidden w-28 lg:block">Aniversário</span>
+            <span className="hidden flex-1 xl:block">Observação</span>
+            <span className="w-24">Status</span>
+            <span className="w-14 text-right">Whats</span>
           </div>
 
           <div className="divide-y divide-line/30">
             {alunosFiltrados.map((aluno) => {
               const matriculaAtiva = aluno.matriculas[0];
+              const anivLabel = labelAniversario(diasAteAniversario(aluno.dataNascimento));
+              const st = aluno.status;
+              const chip =
+                st === "ATIVO"
+                  ? { t: "Ativo", c: "var(--success-text)", bg: "rgba(37,211,102,.10)" }
+                  : st === "INADIMPLENTE"
+                    ? { t: "Atrasado", c: "var(--warning-text)", bg: "rgba(224,179,65,.10)" }
+                    : { t: st === "SUSPENSO" ? "Suspenso" : "Inativo", c: "var(--text-tertiary)", bg: "rgba(255,255,255,.05)" };
 
               return (
                 <div
                   key={aluno.id}
                   onClick={() => setAlunoSelecionadoId(aluno.id)}
-                  className="flex cursor-pointer items-center gap-4 px-5 py-3.5 transition hover:bg-white/[0.02]"
+                  className="flex cursor-pointer items-center gap-3 px-5 py-3 transition hover:bg-white/[0.02]"
                 >
-                  {/* Checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={selecionados.has(aluno.id)}
-                    onChange={() => toggleSelecionado(aluno.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="h-3.5 w-3.5 rounded border-line accent-brand"
-                  />
-
-                  {/* Avatar */}
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarColor(aluno.nome)}`}
-                  >
-                    {avatarInitials(aluno.nome)}
-                  </div>
-
-                  {/* Nome + info */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-medium text-white">{aluno.nome}</span>
-                      {aluno.precisaLiberacaoMedica && (
-                        <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
-                          av. médica
-                        </span>
-                      )}
+                  {/* Aluno */}
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${avatarColor(aluno.nome)}`}>
+                      {avatarInitials(aluno.nome)}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted">
-                      <span>{aluno.telefone}</span>
-                      {matriculaAtiva && (
-                        <>
-                          <span className="text-line">·</span>
-                          <span>{matriculaAtiva.plano.periodicidade.charAt(0) + matriculaAtiva.plano.periodicidade.slice(1).toLowerCase()}</span>
-                        </>
-                      )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-medium text-white">{aluno.nome}</span>
+                        {ehNovo(aluno.createdAt) && (
+                          <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-semibold text-brand">novo</span>
+                        )}
+                      </div>
+                      <span className="font-mono text-[11px] text-muted">{aluno.telefone}</span>
                     </div>
                   </div>
 
-                  {/* Vencimento */}
-                  <div className="hidden w-36 lg:block">
+                  {/* Plano */}
+                  <div className="hidden w-24 md:block">
                     {matriculaAtiva ? (
-                      <span className="text-xs text-muted">
-                        {formatData(matriculaAtiva.dataVencimento)}
+                      <span className="rounded-md border border-line px-2 py-0.5 text-[11px] text-muted">
+                        {matriculaAtiva.plano.periodicidade.charAt(0) + matriculaAtiva.plano.periodicidade.slice(1).toLowerCase()}
                       </span>
                     ) : (
                       <span className="text-xs text-muted">—</span>
                     )}
                   </div>
 
-                  {/* Ações */}
-                  <div
-                    className="flex items-center gap-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  {/* Aluno desde */}
+                  <div className="hidden w-24 font-mono text-[12px] text-muted lg:block">{tempoDeCasa(aluno.createdAt)}</div>
+
+                  {/* Aniversário */}
+                  <div className="hidden w-28 lg:block">
+                    {anivLabel ? (
+                      <span className="font-mono text-[11.5px]" style={{ color: "var(--warning-text)" }}>{anivLabel}</span>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
+                  </div>
+
+                  {/* Observação */}
+                  <div className="hidden flex-1 truncate text-[12.5px] text-muted xl:block">
+                    {aluno.observacoes || "—"}
+                  </div>
+
+                  {/* Status */}
+                  <div className="w-24">
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+                      style={{ color: chip.c, background: chip.bg }}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: chip.c }} />
+                      {chip.t}
+                    </span>
+                  </div>
+
+                  {/* WhatsApp */}
+                  <div className="flex w-14 justify-end" onClick={(e) => e.stopPropagation()}>
                     <a
                       href={`https://wa.me/${aluno.telefone.replace(/\D/g, "")}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title="Abrir WhatsApp"
-                      className="rounded-lg border border-line p-1.5 text-muted/60 transition hover:border-brand/50 hover:text-brand"
+                      title="Abrir conversa no WhatsApp"
+                      className="rounded-lg border p-1.5 transition hover:brightness-110"
+                      style={{ color: "var(--accent)", borderColor: "rgba(37,211,102,.28)" }}
                     >
                       <MessageCircle size={14} />
                     </a>
-                    <button
-                      type="button"
-                      onClick={() => setAlunoSelecionadoId(aluno.id)}
-                      className="rounded-lg border border-line p-1.5 text-muted/60 transition hover:border-line/80 hover:text-foreground"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
                   </div>
                 </div>
               );
@@ -1506,14 +1530,9 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
             onClick: () => setModalImportarAberto(true),
           },
           {
-            label: `Inadimplentes (${totais.INADIMPLENTE})`,
-            Icon: <AlertTriangle size={14} />,
-            onClick: () => setFiltroStatus("INADIMPLENTE"),
-          },
-          {
-            label: `Vencendo esta semana (${totais.VENCENDO})`,
-            Icon: <Clock size={14} />,
-            onClick: () => setFiltroStatus("VENCENDO"),
+            label: `Aniversariantes (${aniversariantes.length})`,
+            Icon: <Users size={14} />,
+            onClick: () => {},
           },
         ]}
       />
