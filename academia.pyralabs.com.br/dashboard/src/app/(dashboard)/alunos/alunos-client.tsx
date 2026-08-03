@@ -40,6 +40,7 @@ import {
   excluirAluno,
   buscarAluno,
   enviarLembrete,
+  marcarMensalidade,
 } from "@/actions/alunos.actions";
 import { matricularAluno, criarPlanoAcademia, listarPlanosAcademia } from "@/actions/planos-academia.actions";
 import { validarComprovante, rejeitarComprovante } from "@/actions/cobrancas.actions";
@@ -683,6 +684,14 @@ function ModalDetalheAluno({
     });
   }
 
+  function handleMarcarMensalidade(pago: boolean) {
+    startTransition(async () => {
+      await marcarMensalidade(alunoId, pago);
+      const data = await buscarAluno(alunoId);
+      if (data) setAluno(data as unknown as AlunoDetalhe);
+    });
+  }
+
   function carregarFormDeAluno(a: AlunoDetalhe) {
     setNome(a.nome);
     setTelefone(a.telefone);
@@ -891,6 +900,15 @@ function ModalDetalheAluno({
             </>
           ) : (
             <>
+              <a
+                href={`https://wa.me/${aluno.telefone.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-brand-strong"
+              >
+                <MessageCircle size={16} /> Conversar no WhatsApp
+              </a>
+
               <SecaoCard icon={Phone} titulo="Contato">
                 <div className="space-y-1.5">
                   <p className="flex items-center gap-1.5 text-sm text-foreground">
@@ -978,97 +996,59 @@ function ModalDetalheAluno({
                 )}
               </SecaoCard>
 
-              <SecaoCard icon={Receipt} titulo="Cobranças">
-                {aluno.cobrancas.length === 0 ? (
-                  <p className="text-sm text-muted">Nenhuma cobrança registrada.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {aluno.cobrancas.map((c) => {
-                      const aguardando = c.status === "AGUARDANDO_VALIDACAO";
-                      const isPending = comprovantePendingId === c.id && comprovantePending;
-                      return (
-                        <div key={c.id} className="flex flex-col gap-2 text-sm">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-foreground">{formatCents(c.valorCents)}</p>
-                              <p className="text-xs text-muted">
-                                Venc. {formatData(c.dataVencimento)}
-                                {c.dataPagamento && ` · Pago em ${formatData(c.dataPagamento)}`}
-                                {aguardando && c.comprovanteEnviadoEm && (
-                                  <> · Comprovante em {formatData(c.comprovanteEnviadoEm)}</>
-                                )}
-                              </p>
-                            </div>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                COBRANCA_STATUS_COLOR[c.status] ?? "bg-slate-500/15 text-slate-400"
-                              }`}
-                            >
-                              {aguardando && <ImageIcon size={9} className="inline mr-1" />}
-                              {COBRANCA_STATUS_LABEL[c.status] ?? c.status}
-                            </span>
+              {/* Mensalidade — controle manual (Pago/Pendente, sem mensagem/automação) */}
+              {(() => {
+                const mat = aluno.matriculas.find((m) => m.status === "ATIVA");
+                const estaPago = aluno.cobrancas[0]?.status === "PAGO";
+                return (
+                  <SecaoCard icon={Receipt} titulo="Mensalidade">
+                    {mat ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <div>
+                            <p className="text-foreground">
+                              {mat.plano.nome} · <span className="font-mono">{formatCents(mat.plano.valorCents)}</span>
+                            </p>
+                            <p className="text-xs text-muted">Vence {formatData(mat.dataVencimento)}</p>
                           </div>
-
-                          {aguardando && (
-                            <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 space-y-2">
-                              {c.comprovanteUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={c.comprovanteUrl}
-                                  alt="Comprovante de pagamento"
-                                  onClick={() => setComprovanteAmpliado(c.comprovanteUrl)}
-                                  className="h-32 w-full rounded-lg border border-line/50 object-contain bg-black/20 cursor-zoom-in"
-                                />
-                              ) : (
-                                <p className="text-xs text-muted text-center py-2">
-                                  Comprovante sem imagem disponível.
-                                </p>
-                              )}
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => handleValidarComprovante(c.id)}
-                                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand py-1.5 text-xs font-semibold text-white hover:bg-brand-strong disabled:opacity-50"
-                                >
-                                  <Check size={11} />
-                                  {isPending ? "Confirmando..." : "Confirmar"}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => handleRejeitarComprovante(c.id)}
-                                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/30 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                                >
-                                  <X size={11} />
-                                  {isPending ? "Rejeitando..." : "Rejeitar"}
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </SecaoCard>
-
-              <SecaoCard icon={ClipboardList} titulo="Frequência recente">
-                {aluno.frequencias.length === 0 ? (
-                  <p className="text-sm text-muted">Nenhum check-in registrado.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {aluno.frequencias.map((f) => (
-                      <div key={f.id} className="flex items-center justify-between text-sm">
-                        <span className="text-foreground">{formatData(f.data)}</span>
-                        <span className="text-xs text-muted">
-                          {f.horaEntrada ?? "—"} {f.horaSaida ? `→ ${f.horaSaida}` : ""}
-                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => handleMarcarMensalidade(false)}
+                            className={`flex-1 rounded-lg py-2 text-xs font-semibold transition disabled:opacity-60 ${
+                              !estaPago
+                                ? "text-[var(--danger-text)]"
+                                : "border border-line text-muted hover:text-foreground"
+                            }`}
+                            style={!estaPago ? { background: "rgba(224,106,84,.15)" } : undefined}
+                          >
+                            ● Pendente
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => handleMarcarMensalidade(true)}
+                            className={`flex-1 rounded-lg py-2 text-xs font-semibold transition disabled:opacity-60 ${
+                              estaPago
+                                ? "bg-brand text-[var(--accent-text)]"
+                                : "border border-line text-muted hover:text-foreground"
+                            }`}
+                          >
+                            ✓ Pago
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-muted">
+                          Você marca na mão quando o aluno paga — sem cobrança nem mensagem automática.
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </SecaoCard>
+                    ) : (
+                      <p className="text-sm text-muted">Sem matrícula ativa.</p>
+                    )}
+                  </SecaoCard>
+                );
+              })()}
             </>
           )}
         </div>

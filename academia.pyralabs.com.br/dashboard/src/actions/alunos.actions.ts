@@ -23,6 +23,53 @@ async function getAuthenticatedTenantId(): Promise<string> {
   return tenant.id;
 }
 
+// ─── Mensalidade manual (marca Pago/Pendente, SEM enviar mensagem) ─────────────
+export async function marcarMensalidade(alunoId: string, pago: boolean) {
+  const tenantId = await getAuthenticatedTenantId();
+  const aluno = await prisma.aluno.findFirst({
+    where: { id: alunoId, tenantId },
+    include: {
+      matriculas: {
+        where: { status: "ATIVA" },
+        orderBy: { dataVencimento: "desc" },
+        take: 1,
+        include: { plano: true },
+      },
+      cobrancas: { orderBy: { dataVencimento: "desc" }, take: 1 },
+    },
+  });
+  if (!aluno) throw new Error("Aluno não encontrado.");
+
+  const cobranca = aluno.cobrancas[0];
+  const matricula = aluno.matriculas[0];
+
+  if (cobranca) {
+    await prisma.cobrancaAluno.update({
+      where: { id: cobranca.id },
+      data: {
+        status: pago ? "PAGO" : "PENDENTE",
+        dataPagamento: pago ? new Date() : null,
+      },
+    });
+  } else if (matricula) {
+    await prisma.cobrancaAluno.create({
+      data: {
+        tenantId,
+        alunoId,
+        matriculaId: matricula.id,
+        valorCents: matricula.plano.valorCents,
+        dataVencimento: matricula.dataVencimento,
+        status: pago ? "PAGO" : "PENDENTE",
+        dataPagamento: pago ? new Date() : null,
+      },
+    });
+  } else {
+    throw new Error("Aluno sem matrícula ativa para registrar mensalidade.");
+  }
+
+  revalidatePath("/alunos");
+}
+
 // ─── Alunos ───────────────────────────────────────────────────────────────────
 
 export async function listarAlunos(filtroStatus?: string) {
