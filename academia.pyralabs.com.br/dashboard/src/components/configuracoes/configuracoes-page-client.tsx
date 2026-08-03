@@ -237,7 +237,13 @@ function Textarea({ ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO }) {
+export function ConfiguracoesPageClient({
+  tenant,
+  temFinanceiro,
+}: {
+  tenant: TenantConfigDTO;
+  temFinanceiro: boolean;
+}) {
   const isSchedulingNiche = tenant.niche === "CLINICA";
   const isAcademia = tenant.subNicho === "academia";
   const ocultarModalidadesPagamento = tenant.ocultarModalidadesPagamento;
@@ -511,8 +517,8 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
           )}
         </SectionCard>
 
-        {/* ── 2. ACADEMIA / COBRANÇAS ── */}
-        {isAcademia && (
+        {/* ── 2. ACADEMIA / COBRANÇAS ── (só com módulo Financeiro) */}
+        {isAcademia && temFinanceiro && (
           <SectionCard
             icon={<Dumbbell size={18} />}
             label="Seção 2"
@@ -546,7 +552,8 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
           </SectionCard>
         )}
 
-        {/* ── Avançado: personalização de IA (só entra em ação quando o fluxo padrão não reconhece a mensagem) ── */}
+        {/* ── Avançado: personalização de IA (só com módulo Financeiro) ── */}
+        {temFinanceiro && (
         <details className="group rounded-2xl border border-line bg-white/4 backdrop-blur">
           <summary className="cursor-pointer select-none px-6 py-4 text-sm font-medium text-foreground/90">
             Configurações avançadas
@@ -597,6 +604,7 @@ export function ConfiguracoesPageClient({ tenant }: { tenant: TenantConfigDTO })
             </div>
           </div>
         </details>
+        )}
 
         {/* ── Preview do prompt ── */}
         <details className="group rounded-2xl border border-dashed border-line bg-white/2">

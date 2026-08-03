@@ -1,10 +1,17 @@
 import { getTenantConfig } from "@/actions/config.actions";
+import { getModulosAtivos } from "@/services/modulos.service";
 import { ConfiguracoesPageClient } from "@/components/configuracoes/configuracoes-page-client";
 
 export default async function ConfiguracoesPage() {
   try {
     const tenant = await getTenantConfig();
-    return <ConfiguracoesPageClient tenant={tenant} />;
+    const modulosAtivos = await getModulosAtivos(tenant.id);
+    return (
+      <ConfiguracoesPageClient
+        tenant={tenant}
+        temFinanceiro={modulosAtivos.includes("financeiro")}
+      />
+    );
   } catch (err) {
     return (
       <section className="space-y-4">
