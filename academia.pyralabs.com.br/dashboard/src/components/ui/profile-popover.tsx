@@ -127,7 +127,7 @@ export function ProfilePopover({
         <div
           style={{
             position: "absolute",
-            top: "calc(100% + 6px)",
+            bottom: "calc(100% + 6px)",
             left: "10px",
             right: "10px",
             background: "var(--card-bg)",

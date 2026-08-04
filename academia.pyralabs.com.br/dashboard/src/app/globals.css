@@ -178,7 +178,10 @@ html {
     display: flex !important;
     flex-direction: column !important;
     width: 240px !important;
-    min-height: 100vh !important;
+    height: 100vh !important;
+    position: sticky !important;
+    top: 0 !important;
+    overflow-y: auto !important;
     flex-shrink: 0 !important;
   }
 }
@@ -201,6 +204,7 @@ html {
   .dashboard-layout {
     display: grid !important;
     grid-template-columns: 240px 1fr !important;
+    align-items: start !important;
   }
 }
 
