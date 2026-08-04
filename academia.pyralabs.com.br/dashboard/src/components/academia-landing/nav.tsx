@@ -44,7 +44,7 @@ export function Nav() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <Button variant="ghost" size="md" href="https://pyralabs.com.br" external>
+          <Button variant="ghost" size="md" href="/login">
             Entrar
           </Button>
           <Button variant="secondary" size="md" href={whatsappLink()} external>
@@ -75,7 +75,7 @@ export function Nav() {
               </a>
             ))}
             <div className="mt-2 flex flex-col gap-2">
-              <Button variant="secondary" size="md" href="https://pyralabs.com.br" external>
+              <Button variant="secondary" size="md" href="/login">
                 Entrar
               </Button>
               <Button variant="wpp" size="md" href={whatsappLink()} external>

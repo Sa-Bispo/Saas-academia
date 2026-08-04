@@ -6,7 +6,7 @@ export const site = {
   whatsapp: "5599999999999",
   whatsappMessage:
     "Olá! Quero saber como o PyraLabs pode automatizar a gestão da minha academia.",
-  appUrl: "https://pyralabs.com.br",
+  appUrl: "/login",
   email: "contato@pyralabs.com.br",
 };
 
