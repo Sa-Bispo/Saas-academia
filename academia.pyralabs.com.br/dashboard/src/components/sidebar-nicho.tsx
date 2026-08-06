@@ -39,6 +39,10 @@ type SidebarNichoProps = {
   userName?: string;
   subNicho?: string;
   modulosAtivos?: ModuloChave[];
+  // Hrefs escondidos do menu para este tenant específico (ex: pedido pontual
+  // de um cliente), sem afetar o módulo/dados por trás (ex: coluna Mensalidade
+  // em Alunos continua funcionando mesmo com "/cobrancas" escondido aqui).
+  hiddenNavLinks?: string[];
 };
 
 const BOT_STATUS_POLL_INTERVAL_MS = 10000;
@@ -76,6 +80,7 @@ export function SidebarNicho({
   userName,
   subNicho,
   modulosAtivos,
+  hiddenNavLinks,
 }: SidebarNichoProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -118,8 +123,10 @@ export function SidebarNicho({
     return modulosAtivos.includes(modulo);
   }
 
-  const operationalLinks: LinkItem[] = ALL_OPERATIONAL_LINKS.filter((l) =>
-    isModuloVisivel(l.href),
+  const isLinkEscondido = (href: string) => Boolean(hiddenNavLinks?.includes(href));
+
+  const operationalLinks: LinkItem[] = ALL_OPERATIONAL_LINKS.filter(
+    (l) => isModuloVisivel(l.href) && !isLinkEscondido(l.href),
   ).map((l) => {
     if (l.href === "/cobrancas" && notificacoes.comprovantes > 0)
       return { ...l, badge: notificacoes.comprovantes };
@@ -130,7 +137,7 @@ export function SidebarNicho({
 
   const settingsLinks = SETTINGS_LINKS.filter((l) => {
     if (l.href === "/bot" && isAcademia) return false;
-    return isModuloVisivel(l.href);
+    return isModuloVisivel(l.href) && !isLinkEscondido(l.href);
   });
 
   const isAdmin =
