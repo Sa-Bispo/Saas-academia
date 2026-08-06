@@ -27,6 +27,16 @@ function isPublicAuth(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Rotas públicas (ex: /parq/[tenantId]) não precisam de sessão Supabase.
+  // Chamar getUser() aqui força uma tentativa de refresh de token a cada
+  // acesso, o que incha o Set-Cookie da resposta e pode estourar o buffer
+  // de headers do nginx (502) quando o visitante carrega cookies antigos.
+  if (!isProtected(pathname) && !isPublicAuth(pathname)) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -50,8 +60,6 @@ export async function proxy(request: NextRequest) {
 
   // IMPORTANTE: não remover este getUser() — ele renova o token de sessão.
   const { data: { user } } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
 
   if (!user && isProtected(pathname)) {
     const loginUrl = request.nextUrl.clone();
