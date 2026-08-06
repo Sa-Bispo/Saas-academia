@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
 import { AlunosPageClient } from "./alunos-client";
 import { getStatsAlunos } from "@/actions/alunos.actions";
+import { getModulosAtivos } from "@/services/modulos.service";
 import { prisma } from "@/lib/prisma";
 
 export default async function AlunosPage() {
@@ -22,7 +23,7 @@ export default async function AlunosPage() {
   const tenantId = tenant.id;
 
   try {
-    const [alunos, planos, stats] = await Promise.all([
+    const [alunos, planos, stats, modulosAtivos] = await Promise.all([
       prisma.aluno.findMany({
         where: { tenantId, status: { not: "SEM_MATRICULA" } },
         orderBy: { nome: "asc" },
@@ -50,9 +51,18 @@ export default async function AlunosPage() {
         orderBy: { valorCents: "asc" },
       }),
       getStatsAlunos(),
+      getModulosAtivos(tenantId),
     ]);
 
-    return <AlunosPageClient alunos={alunos} planos={planos} tenantId={tenantId} stats={stats} />;
+    return (
+      <AlunosPageClient
+        alunos={alunos}
+        planos={planos}
+        tenantId={tenantId}
+        stats={stats}
+        temFinanceiro={modulosAtivos.includes("financeiro")}
+      />
+    );
   } catch {
     return (
       <AlunosPageClient
@@ -60,6 +70,7 @@ export default async function AlunosPage() {
         planos={[]}
         tenantId={tenantId}
         stats={{ vencendo7d: 0, inadimplentes: 0, semFrequencia7d: 0 }}
+        temFinanceiro={false}
       />
     );
   }

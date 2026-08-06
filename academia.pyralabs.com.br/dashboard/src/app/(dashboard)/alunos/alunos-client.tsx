@@ -94,6 +94,7 @@ type Props = {
   planos: Plano[];
   tenantId: string;
   stats: Stats;
+  temFinanceiro: boolean;
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -1209,6 +1210,28 @@ function diasParaVencer(dataVencimento: Date): number {
   return Math.ceil((new Date(dataVencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
+// Dias até o vencimento — comparação DATE-ONLY (evita off-by-one por hora/timezone).
+// Negativo = vencido; 0 = vence hoje.
+function diasAteVencimento(dataVencimento: Date | string): number {
+  const v = new Date(dataVencimento);
+  const venc = new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  const h = new Date();
+  const hoje = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+  return Math.round((venc.getTime() - hoje.getTime()) / 86400000);
+}
+
+// Situação da mensalidade DERIVADA da data (não do status guardado — corrige o "Em dia" errado)
+function mensalidadeInfo(
+  dataVencimento: Date | string | null | undefined,
+): { texto: string; sub: string | null; cor: string } {
+  if (!dataVencimento) return { texto: "Sem plano", sub: null, cor: "var(--text-tertiary)" };
+  const dias = diasAteVencimento(dataVencimento);
+  if (dias < 0) return { texto: `Vencido há ${-dias}d`, sub: formatData(dataVencimento), cor: "var(--danger-text)" };
+  if (dias === 0) return { texto: "Vence hoje", sub: formatData(dataVencimento), cor: "var(--warning-text)" };
+  if (dias <= 7) return { texto: `Vence em ${dias}d`, sub: formatData(dataVencimento), cor: "var(--warning-text)" };
+  return { texto: "Em dia", sub: `vence ${formatData(dataVencimento)}`, cor: "var(--success-text)" };
+}
+
 function avatarInitials(nome: string): string {
   const partes = nome.trim().split(/\s+/);
   if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
@@ -1231,10 +1254,10 @@ function avatarColor(nome: string): string {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
+export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceiro }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [ordenacao, setOrdenacao] = useState<"urgencia" | "nome">("nome");
+  const [ordenacao, setOrdenacao] = useState<"urgencia" | "nome" | "vencimento">("nome");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [modalAberto, setModalAberto] = useState(false);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
@@ -1262,6 +1285,14 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
     })
     .sort((a, b) => {
       if (ordenacao === "urgencia") return urgencyScore(b) - urgencyScore(a);
+      if (ordenacao === "vencimento") {
+        const va = a.matriculas[0]?.dataVencimento;
+        const vb = b.matriculas[0]?.dataVencimento;
+        if (!va && !vb) return a.nome.localeCompare(b.nome, "pt-BR");
+        if (!va) return 1; // sem matrícula vai pro fim
+        if (!vb) return -1;
+        return new Date(va).getTime() - new Date(vb).getTime(); // mais próximo/vencido primeiro
+      }
       return a.nome.localeCompare(b.nome, "pt-BR");
     });
 
@@ -1385,7 +1416,9 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
             { key: "VENCENDO",     label: "Vencendo",     count: totais.VENCENDO,      danger: true  },
             { key: "INADIMPLENTE", label: "Inadimplentes",count: totais.INADIMPLENTE,  danger: true  },
             { key: "INATIVO",      label: "Inativos",     count: totais.INATIVO,       danger: false },
-          ].map(({ key, label, count, danger }) => (
+          ]
+            .filter((s) => temFinanceiro || !s.danger)
+            .map(({ key, label, count, danger }) => (
             <button
               key={key}
               type="button"
@@ -1418,6 +1451,20 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
             onChange={(e) => setBusca(e.target.value)}
           />
         </div>
+        {temFinanceiro && (
+          <button
+            type="button"
+            onClick={() => setOrdenacao(ordenacao === "vencimento" ? "nome" : "vencimento")}
+            className={`whitespace-nowrap rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+              ordenacao === "vencimento"
+                ? "border-brand/50 bg-brand/10 text-brand"
+                : "border-line bg-surface/60 text-muted hover:text-foreground"
+            }`}
+            title="Ordenar por data de vencimento"
+          >
+            ↕ Por vencimento
+          </button>
+        )}
       </div>
 
       {/* Lista de alunos */}
@@ -1439,6 +1486,7 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
             <span className="hidden w-24 lg:block">Aluno desde</span>
             <span className="hidden w-28 lg:block">Aniversário</span>
             <span className="hidden flex-1 xl:block">Observação</span>
+            {temFinanceiro && <span className="hidden w-36 lg:block">Mensalidade</span>}
             <span className="w-24">Status</span>
             <span className="w-14 text-right">Whats</span>
           </div>
@@ -1504,6 +1552,25 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats }: Props) {
                   <div className="hidden flex-1 truncate text-[12.5px] text-muted xl:block">
                     {aluno.observacoes || "—"}
                   </div>
+
+                  {/* Mensalidade — derivada ao vivo da data (gated no Financeiro) */}
+                  {temFinanceiro && (
+                    <div className="hidden w-36 lg:block">
+                      {(() => {
+                        const info = mensalidadeInfo(matriculaAtiva?.dataVencimento);
+                        return (
+                          <>
+                            <span className="font-mono text-[12px] font-semibold" style={{ color: info.cor }}>
+                              {info.texto}
+                            </span>
+                            {info.sub && (
+                              <span className="block font-mono text-[10px] text-muted">{info.sub}</span>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* Status */}
                   <div className="w-24">
