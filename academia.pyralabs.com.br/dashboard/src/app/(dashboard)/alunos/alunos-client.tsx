@@ -63,6 +63,7 @@ type Cobranca = {
 
 type Matricula = {
   id: string;
+  dataInicio: Date;
   dataVencimento: Date;
   status: string;
   plano: Plano;
@@ -196,22 +197,26 @@ function labelAniversario(dias: number | null): string | null {
   return null;
 }
 
-// Aluno "novo" = cadastrado nos últimos 30 dias
-function ehNovo(createdAt: Date): boolean {
-  return Date.now() - new Date(createdAt).getTime() < 30 * 86400000;
+// Aluno "novo" = matriculado hoje (compara dia local, não só 24h corridas)
+function ehNovo(dataMatricula: Date | string): boolean {
+  const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: BRT });
+  const dia = new Date(dataMatricula).toLocaleDateString("pt-BR", { timeZone: BRT });
+  return hoje === dia;
 }
 
-// "há 1a 2m" a partir da data de entrada
-function tempoDeCasa(createdAt: Date): string {
-  const meses = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(createdAt).getTime()) / (30.4 * 86400000)),
-  );
-  if (meses < 1) return "novo";
-  if (meses < 12) return `há ${meses}m`;
-  const anos = Math.floor(meses / 12);
-  const resto = meses % 12;
-  return resto ? `há ${anos}a ${resto}m` : `há ${anos}a`;
+// "novo" no dia da matrícula; dos dias seguintes em diante, mostra a data real
+function tempoDeCasa(dataMatricula: Date | string): string {
+  if (ehNovo(dataMatricula)) return "novo";
+  return formatData(dataMatricula);
+}
+
+// Data de referência do aluno: matrícula ativa mais recente, ou data de
+// cadastro se ele ainda não tem matrícula ativa (ex: lead sem plano).
+function dataEntrada(a: {
+  matriculas: { status: string; dataInicio: Date | string }[];
+  createdAt: Date | string;
+}): Date | string {
+  return a.matriculas.find((m) => m.status === "ATIVA")?.dataInicio ?? a.createdAt;
 }
 
 function calcVencimento(inicio: string, periodicidade: string): string {
@@ -948,7 +953,7 @@ function ModalDetalheAluno({
                       : "—"}
                   </p>
                 </div>
-                <p className="mt-2 text-xs text-muted">Aluno desde {formatData(aluno.createdAt)}</p>
+                <p className="mt-2 text-xs text-muted">Aluno desde {formatData(dataEntrada(aluno))}</p>
               </SecaoCard>
 
               {aluno.observacoes && (
@@ -1281,7 +1286,7 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
         (a.email ?? "").toLowerCase().includes(busca.toLowerCase());
       let matchStatus = true;
       if (filtroStatus === "NOVO") {
-        matchStatus = ehNovo(a.createdAt);
+        matchStatus = ehNovo(dataEntrada(a));
       } else if (filtroStatus === "VENCENDO") {
         matchStatus = !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
       } else if (filtroStatus !== "todos") {
@@ -1319,7 +1324,7 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
   const totais = {
     todos: alunos.length,
     ATIVO: alunos.filter((a) => a.status === "ATIVO").length,
-    NOVO: alunos.filter((a) => ehNovo(a.createdAt)).length,
+    NOVO: alunos.filter((a) => ehNovo(dataEntrada(a))).length,
     INADIMPLENTE: alunos.filter((a) => a.status === "INADIMPLENTE").length,
     INATIVO: alunos.filter((a) => a.status === "INATIVO").length,
     VENCENDO: alunos.filter((a) => !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento)).length,
@@ -1566,7 +1571,7 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-medium text-white">{aluno.nome}</span>
-                        {ehNovo(aluno.createdAt) && (
+                        {ehNovo(matriculaAtiva?.dataInicio ?? aluno.createdAt) && (
                           <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-semibold text-brand">novo</span>
                         )}
                       </div>
@@ -1586,7 +1591,9 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
                   </div>
 
                   {/* Aluno desde */}
-                  <div className="hidden w-24 font-mono text-[12px] text-muted lg:block">{tempoDeCasa(aluno.createdAt)}</div>
+                  <div className="hidden w-24 font-mono text-[12px] text-muted lg:block">
+                    {tempoDeCasa(matriculaAtiva?.dataInicio ?? aluno.createdAt)}
+                  </div>
 
                   {/* Aniversário */}
                   <div className="hidden w-28 lg:block">
