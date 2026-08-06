@@ -11,21 +11,14 @@ import {
   UserX,
   UserCheck,
   Dumbbell,
-  AlertTriangle,
   Cake,
-  Activity,
-  Target,
   ArrowUpRight,
-  Trophy,
-  CheckCircle2,
-  XCircle,
   ImageIcon,
 } from "lucide-react";
 
 import {
   ReceitaMensalChart,
   DistribuicaoPlanoChart,
-  FrequenciaSemanalChart,
 } from "@/components/academia/academia-dashboard-charts";
 import type { AcademiaDashboardData } from "@/actions/academia-dashboard.actions";
 
@@ -121,72 +114,6 @@ function KpiCard({
   );
 }
 
-// ─── Cartão pequeno de métrica ────────────────────────────────────────────────
-
-function MetricaCard({
-  label, value, desc, icon: Icon,
-}: {
-  label: string;
-  value: string;
-  desc: string;
-  icon: React.ElementType;
-}) {
-  return (
-    <div style={{
-      background: "var(--card-bg)",
-      border: "1px solid var(--card-border)",
-      borderRadius: 12, padding: "18px 20px",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
-        <Icon size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-        <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
-          {label}
-        </p>
-      </div>
-      <p style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
-        {value}
-      </p>
-      <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 5 }}>{desc}</p>
-    </div>
-  );
-}
-
-// ─── Progress ring para meta de receita ──────────────────────────────────────
-
-function MetaProgressRing({ pct, label }: { pct: number; label: string }) {
-  const R = 26;
-  const circ = 2 * Math.PI * R;
-  const offset = circ * (1 - Math.min(pct, 100) / 100);
-  const cor = pct >= 100 ? "#4ade80" : "var(--accent)";
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-      <svg width={64} height={64} viewBox="0 0 64 64" style={{ flexShrink: 0 }}>
-        <circle cx="32" cy="32" r={R} fill="none" stroke="var(--border-color)" strokeWidth={5} />
-        <circle
-          cx="32" cy="32" r={R}
-          fill="none"
-          stroke={cor}
-          strokeWidth={5}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          transform="rotate(-90 32 32)"
-          style={{ transition: "stroke-dashoffset 1s ease" }}
-        />
-        <text x="32" y="32" textAnchor="middle" dominantBaseline="middle"
-          fontSize="11" fontWeight="600" fill="var(--text-primary)" fontFamily="inherit">
-          {Math.round(Math.min(pct, 100))}%
-        </text>
-      </svg>
-      <div>
-        <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>Meta do mês</p>
-        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", marginTop: 3 }}>{label}</p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main UI ──────────────────────────────────────────────────────────────────
 
 const PERIODOS = ["Mensal", "Trimestral", "Anual"] as const;
@@ -203,31 +130,19 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
     novosEsseMes,
     receitaMesCents,
     receitaVariacaoPct,
-    renovacoesProximas,
-    renovacoesValorCents,
     cobrancasPendentes,
     aguardandoValidacao,
-    taxaChurnPct,
-    ltvMedioCents,
-    frequenciaMediaSemanal,
     receitaMensal,
     distribuicaoPlanos,
-    frequenciaSemanal,
-    alunosEmRisco,
     aniversariantes,
     cobrancasVencendo,
     ultimosAlunos,
-    rankingAlunos,
   } = data;
 
   const baseTotal = totalAtivos + totalInadimplentes;
   const pctInadimplente = baseTotal > 0
     ? ((totalInadimplentes / baseTotal) * 100).toFixed(1)
     : "0.0";
-
-  // Meta de receita = última entrada de meta no histórico mensal (em reais)
-  const metaMensalCents = (receitaMensal[receitaMensal.length - 1]?.meta ?? 0) * 100;
-  const pctMeta = metaMensalCents > 0 ? (receitaMesCents / metaMensalCents) * 100 : 0;
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -324,47 +239,6 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
           href="/cobrancas"
           icon={TrendingUp}
         />
-        <KpiCard
-          label="Renovações em 7 dias"
-          value={renovacoesProximas}
-          sub={renovacoesProximas > 0 ? `${formatCents(renovacoesValorCents)} em jogo` : undefined}
-          subPositivo={null}
-          href="/cobrancas"
-          icon={CalendarClock}
-        />
-      </div>
-
-      {/* ── Métricas secundárias + Meta ── */}
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
-        <MetricaCard
-          label="Churn"
-          value={`${taxaChurnPct}%`}
-          desc="Inadimplentes / base"
-          icon={Activity}
-        />
-        <MetricaCard
-          label="LTV médio"
-          value={formatCents(ltvMedioCents)}
-          desc="Por aluno, histórico"
-          icon={Target}
-        />
-        <MetricaCard
-          label="Frequência"
-          value={`${frequenciaMediaSemanal}×/sem`}
-          desc="Média de treinos"
-          icon={Dumbbell}
-        />
-        <div style={{
-          background: "var(--card-bg)",
-          border: "1px solid var(--card-border)",
-          borderRadius: 12, padding: "18px 20px",
-          display: "flex", alignItems: "center",
-        }}>
-          <MetaProgressRing
-            pct={pctMeta}
-            label={`${formatCents(receitaMesCents)} / ${formatCents(metaMensalCents)}`}
-          />
-        </div>
       </div>
 
       {/* ── Alertas ── */}
@@ -440,103 +314,8 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
         <DistribuicaoPlanoChart data={distribuicaoPlanos} />
       </div>
 
-      {/* ── Ranking + Frequência semanal ── */}
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>
-        {/* Ranking */}
-        <div style={{
-          background: "var(--card-bg)",
-          border: "1px solid var(--card-border)",
-          borderRadius: 16, padding: "20px 24px",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Trophy size={14} color="var(--text-tertiary)" />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Ranking</div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>LTV · Frequência · Meta</div>
-              </div>
-            </div>
-            <Link href="/alunos" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-              Ver todos
-            </Link>
-          </div>
-
-          {rankingAlunos.length === 0 ? (
-            <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "24px 0" }}>
-              Nenhum aluno ativo ainda
-            </p>
-          ) : (
-            <>
-              <div style={{
-                display: "grid", gridTemplateColumns: "28px 1fr 90px 64px 36px",
-                gap: 8, padding: "0 4px 8px",
-                borderBottom: "1px solid var(--border-color)",
-                fontSize: 10, fontWeight: 700,
-                color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em",
-              }}>
-                <span style={{ textAlign: "center" }}>#</span>
-                <span>Aluno</span>
-                <span style={{ textAlign: "right" }}>LTV</span>
-                <span style={{ textAlign: "right" }}>Freq.</span>
-                <span style={{ textAlign: "center" }}>Meta</span>
-              </div>
-              {rankingAlunos.map((aluno, idx) => (
-                <div
-                  key={aluno.id}
-                  style={{
-                    display: "grid", gridTemplateColumns: "28px 1fr 90px 64px 36px",
-                    gap: 8, alignItems: "center",
-                    padding: "10px 4px",
-                    borderBottom: idx < rankingAlunos.length - 1 ? "1px solid var(--border-color)" : "none",
-                  }}
-                >
-                  <div style={{
-                    fontSize: idx < 3 ? 13 : 11, fontWeight: 700, textAlign: "center",
-                    color: idx === 0 ? "#fbbf24" : idx === 1 ? "#94a3b8" : idx === 2 ? "#cd7f32" : "var(--text-tertiary)",
-                  }}>
-                    {idx < 3 ? ["🥇", "🥈", "🥉"][idx] : idx + 1}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                      background: AVATAR_COLORS[idx % AVATAR_COLORS.length] + "20",
-                      border: `1.5px solid ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}40`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 11, fontWeight: 700,
-                      color: AVATAR_COLORS[idx % AVATAR_COLORS.length],
-                    }}>
-                      {initials(aluno.nome)}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {aluno.nome}
-                      </p>
-                      <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{aluno.plano}</p>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", textAlign: "right" }}>
-                    {formatCents(aluno.ltv)}
-                  </p>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary)", textAlign: "right" }}>
-                    {aluno.frequencia}x/sem
-                  </p>
-                  <div style={{ display: "flex", justifyContent: "center" }}>
-                    {aluno.meta
-                      ? <CheckCircle2 size={15} color="#34d399" />
-                      : <XCircle size={15} color="#f87171" />
-                    }
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-
-        <FrequenciaSemanalChart data={frequenciaSemanal} />
-      </div>
-
-      {/* ── Cobranças vencendo + Alunos em risco ── */}
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>
+      {/* ── Próximos vencimentos ── */}
+      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr" }}>
         {/* Cobranças vencendo */}
         <div style={{
           background: "var(--card-bg)",
@@ -547,8 +326,8 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <CalendarClock size={14} color="var(--text-tertiary)" />
               <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Vencendo em 7 dias</p>
-                <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{cobrancasVencendo.length} cobranças</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Próximos vencimentos</p>
+                <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>vencidas ou a vencer em 7 dias</p>
               </div>
             </div>
             <Link href="/cobrancas" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
@@ -557,7 +336,7 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
           </div>
           {cobrancasVencendo.length === 0 ? (
             <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "20px 0" }}>
-              Nenhuma cobrança vencendo em 7 dias
+              Nenhuma cobrança vencida ou a vencer em 7 dias
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -575,7 +354,18 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                     <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {c.aluno}
                     </p>
-                    <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{c.plano} · vence {c.vencimento}</p>
+                    <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                      {c.plano} · vence {c.vencimento} ·{" "}
+                      <span style={{ fontWeight: 700, color: c.dias < 0 ? "var(--danger-text)" : "var(--warning-text)" }}>
+                        {c.dias < 0
+                          ? `vencido há ${Math.abs(c.dias)} ${Math.abs(c.dias) === 1 ? "dia" : "dias"}`
+                          : c.dias === 0
+                            ? "vence hoje"
+                            : c.dias === 1
+                              ? "falta 1 dia"
+                              : `faltam ${c.dias} dias`}
+                      </span>
+                    </p>
                   </div>
                   <span style={{
                     flexShrink: 0, fontSize: 11, fontWeight: 700,
@@ -583,61 +373,6 @@ export function AcademiaDashboardUI({ data }: { data: AcademiaDashboardData }) {
                     background: "rgba(251,191,36,0.12)", color: "#fbbf24",
                   }}>
                     {formatCents(c.valor)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Alunos em risco */}
-        <div style={{
-          background: "var(--card-bg)",
-          border: "1px solid var(--card-border)",
-          borderRadius: 16, padding: "20px 24px",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <AlertTriangle size={14} color="var(--text-tertiary)" />
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Risco de churn</p>
-                <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Baixa frequência</p>
-              </div>
-            </div>
-            <Link href="/alunos" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
-              Ver todos
-            </Link>
-          </div>
-          {alunosEmRisco.length === 0 ? (
-            <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "20px 0" }}>
-              Todos os alunos estão frequentando regularmente 💪
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {alunosEmRisco.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "10px 12px", borderRadius: 10,
-                    border: "1px solid var(--border-color)",
-                    background: "var(--bg-secondary)",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {a.nome}
-                    </p>
-                    <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
-                      {a.plano} · {a.frequencia}x/sem · {a.diasSemVir}d sem treinar
-                    </p>
-                  </div>
-                  <span style={{
-                    flexShrink: 0, fontSize: 11, fontWeight: 700,
-                    padding: "3px 10px", borderRadius: 20,
-                    background: "rgba(248,113,113,0.1)", color: "#f87171",
-                  }}>
-                    Risco
                   </span>
                 </div>
               ))}

@@ -46,7 +46,7 @@ export type AcademiaDashboardData = {
     ltv: number; frequencia: number; meta: boolean;
   }[];
   cobrancasVencendo: {
-    id: string; aluno: string; valor: number; vencimento: string; plano: string;
+    id: string; aluno: string; valor: number; vencimento: string; plano: string; dias: number;
   }[];
   ultimosAlunos: {
     id: string; nome: string; plano: string; status: string;
@@ -228,7 +228,7 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
     LIMIT 5
   `;
 
-  // Cobranças vencendo em 7 dias
+  // Cobranças vencidas ou a vencer em até 7 dias
   type CobVencRow = { id: string; aluno_nome: string; valor_cents: bigint; data_vencimento: Date; plano_nome: string | null };
   const cobVencendoRaw = await prisma.$queryRaw<CobVencRow[]>`
     SELECT
@@ -244,10 +244,9 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
     JOIN alunos a ON a.id = cb.aluno_id
     WHERE cb.tenant_id = ${tenantId}::uuid
       AND cb.status = 'PENDENTE'
-      AND cb.data_vencimento >= ${now}
       AND cb.data_vencimento <= ${em7Dias}
     ORDER BY cb.data_vencimento ASC
-    LIMIT 5
+    LIMIT 8
   `;
 
   // Últimos alunos cadastrados
@@ -373,14 +372,21 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
     };
   });
 
-  // Cobranças vencendo
-  const cobrancasVencendo = cobVencendoRaw.map((r) => ({
-    id: r.id,
-    aluno: r.aluno_nome,
-    valor: Number(r.valor_cents),
-    vencimento: new Date(r.data_vencimento).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
-    plano: r.plano_nome ?? "—",
-  }));
+  // Cobranças vencidas ou a vencer
+  const hojeMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const cobrancasVencendo = cobVencendoRaw.map((r) => {
+    const venc = new Date(r.data_vencimento);
+    const vencMid = new Date(venc.getFullYear(), venc.getMonth(), venc.getDate());
+    const dias = Math.round((vencMid.getTime() - hojeMid.getTime()) / 86400000);
+    return {
+      id: r.id,
+      aluno: r.aluno_nome,
+      valor: Number(r.valor_cents),
+      vencimento: venc.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      plano: r.plano_nome ?? "—",
+      dias,
+    };
+  });
 
   // Últimos alunos
   const ultimosAlunos = ultimosAlunosRaw.map((r) => ({
