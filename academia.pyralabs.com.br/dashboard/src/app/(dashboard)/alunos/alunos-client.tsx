@@ -653,6 +653,8 @@ function ModalDetalheAluno({
   const [pending, startTransition] = useTransition();
   const [comprovantePending, startComprovanteTransition] = useTransition();
   const [comprovantePendingId, setComprovantePendingId] = useState<string | null>(null);
+  // null = ocioso · true = marcando Pago · false = marcando Pendente
+  const [mensalidadeSalvando, setMensalidadeSalvando] = useState<null | boolean>(null);
   const [comprovanteAmpliado, setComprovanteAmpliado] = useState<string | null>(null);
   // undefined = ainda carregando | null = não encontrado | AlunoDetalhe = carregado
   const [aluno, setAluno] = useState<AlunoDetalhe | null | undefined>(undefined);
@@ -692,10 +694,15 @@ function ModalDetalheAluno({
   }
 
   function handleMarcarMensalidade(pago: boolean) {
+    setMensalidadeSalvando(pago);
     startTransition(async () => {
-      await marcarMensalidade(alunoId, pago);
-      const data = await buscarAluno(alunoId);
-      if (data) setAluno(data as unknown as AlunoDetalhe);
+      try {
+        await marcarMensalidade(alunoId, pago);
+        const data = await buscarAluno(alunoId);
+        if (data) setAluno(data as unknown as AlunoDetalhe);
+      } finally {
+        setMensalidadeSalvando(null);
+      }
     });
   }
 
@@ -1022,33 +1029,48 @@ function ModalDetalheAluno({
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            disabled={pending}
+                            disabled={mensalidadeSalvando !== null}
                             onClick={() => handleMarcarMensalidade(false)}
-                            className={`flex-1 rounded-lg py-2 text-xs font-semibold transition disabled:opacity-60 ${
+                            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                               !estaPago
                                 ? "text-[var(--danger-text)]"
                                 : "border border-line text-muted hover:text-foreground"
                             }`}
                             style={!estaPago ? { background: "rgba(224,106,84,.15)" } : undefined}
                           >
-                            ● Pendente
+                            {mensalidadeSalvando === false ? (
+                              <><Loader2 size={13} className="animate-spin" /> Processando…</>
+                            ) : (
+                              "● Pendente"
+                            )}
                           </button>
                           <button
                             type="button"
-                            disabled={pending}
+                            disabled={mensalidadeSalvando !== null}
                             onClick={() => handleMarcarMensalidade(true)}
-                            className={`flex-1 rounded-lg py-2 text-xs font-semibold transition disabled:opacity-60 ${
+                            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                               estaPago
                                 ? "bg-brand text-[var(--accent-text)]"
                                 : "border border-line text-muted hover:text-foreground"
                             }`}
                           >
-                            ✓ Pago
+                            {mensalidadeSalvando === true ? (
+                              <><Loader2 size={13} className="animate-spin" /> Processando…</>
+                            ) : (
+                              "✓ Pago"
+                            )}
                           </button>
                         </div>
-                        <p className="text-[11px] text-muted">
-                          Você marca na mão quando o aluno paga — sem cobrança nem mensagem automática.
-                        </p>
+                        {mensalidadeSalvando !== null ? (
+                          <p className="flex items-center gap-1.5 text-[11px] font-medium text-brand">
+                            <Loader2 size={11} className="animate-spin" />
+                            Salvando alteração… não feche esta janela.
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-muted">
+                            Você marca na mão quando o aluno paga — sem cobrança nem mensagem automática.
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-muted">Sem matrícula ativa.</p>
@@ -1190,26 +1212,6 @@ function ModalDetalheAluno({
   );
 }
 
-// ─── Helpers de urgência ─────────────────────────────────────────────────────
-
-function diasSemFrequencia(frequencias: { data: Date }[]): number | null {
-  if (!frequencias.length) return null;
-  const ultima = new Date(frequencias[0].data);
-  return Math.floor((Date.now() - ultima.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function urgencyScore(aluno: Aluno): number {
-  if (aluno.status === "INADIMPLENTE") return 3;
-  if (aluno.matriculas[0] && isVencendo(aluno.matriculas[0].dataVencimento)) return 2;
-  const dias = diasSemFrequencia(aluno.frequencias);
-  if (dias !== null && dias >= 7) return 1;
-  return 0;
-}
-
-function diasParaVencer(dataVencimento: Date): number {
-  return Math.ceil((new Date(dataVencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-}
-
 // Dias até o vencimento — comparação DATE-ONLY (evita off-by-one por hora/timezone).
 // Negativo = vencido; 0 = vence hoje.
 function diasAteVencimento(dataVencimento: Date | string): number {
@@ -1227,7 +1229,8 @@ function mensalidadeInfo(
   if (!dataVencimento) return { texto: "Sem plano", sub: null, cor: "var(--text-tertiary)" };
   const dias = diasAteVencimento(dataVencimento);
   if (dias < 0) return { texto: `Vencido há ${-dias}d`, sub: formatData(dataVencimento), cor: "var(--danger-text)" };
-  if (dias === 0) return { texto: "Vence hoje", sub: formatData(dataVencimento), cor: "var(--warning-text)" };
+  if (dias === 0) return { texto: "Vence hoje", sub: formatData(dataVencimento), cor: "var(--danger-text)" };
+  if (dias < 3) return { texto: `Vence em ${dias}d`, sub: formatData(dataVencimento), cor: "var(--danger-text)" };
   if (dias <= 7) return { texto: `Vence em ${dias}d`, sub: formatData(dataVencimento), cor: "var(--warning-text)" };
   return { texto: "Em dia", sub: `vence ${formatData(dataVencimento)}`, cor: "var(--success-text)" };
 }
@@ -1254,10 +1257,13 @@ function avatarColor(nome: string): string {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+type SortKey = "nome" | "desde" | "aniversario" | "vencimento";
+
 export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceiro }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [ordenacao, setOrdenacao] = useState<"urgencia" | "nome" | "vencimento">("nome");
+  const [sortKey, setSortKey] = useState<SortKey>("nome");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [modalAberto, setModalAberto] = useState(false);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
@@ -1284,16 +1290,30 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
       return matchBusca && matchStatus;
     })
     .sort((a, b) => {
-      if (ordenacao === "urgencia") return urgencyScore(b) - urgencyScore(a);
-      if (ordenacao === "vencimento") {
+      let cmp = 0;
+      if (sortKey === "nome") {
+        cmp = a.nome.localeCompare(b.nome, "pt-BR");
+      } else if (sortKey === "desde") {
+        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortKey === "aniversario") {
+        const da = diasAteAniversario(a.dataNascimento);
+        const db = diasAteAniversario(b.dataNascimento);
+        // sem data de nascimento sempre vai pro fim, em qualquer direção
+        if (da == null && db == null) cmp = 0;
+        else if (da == null) return 1;
+        else if (db == null) return -1;
+        else cmp = da - db;
+      } else if (sortKey === "vencimento") {
         const va = a.matriculas[0]?.dataVencimento;
         const vb = b.matriculas[0]?.dataVencimento;
-        if (!va && !vb) return a.nome.localeCompare(b.nome, "pt-BR");
-        if (!va) return 1; // sem matrícula vai pro fim
-        if (!vb) return -1;
-        return new Date(va).getTime() - new Date(vb).getTime(); // mais próximo/vencido primeiro
+        // sem matrícula sempre vai pro fim, em qualquer direção
+        if (!va && !vb) cmp = 0;
+        else if (!va) return 1;
+        else if (!vb) return -1;
+        else cmp = new Date(va).getTime() - new Date(vb).getTime();
       }
-      return a.nome.localeCompare(b.nome, "pt-BR");
+      if (cmp === 0) cmp = a.nome.localeCompare(b.nome, "pt-BR"); // desempate estável por nome
+      return sortDir === "asc" ? cmp : -cmp;
     });
 
   const totais = {
@@ -1339,6 +1359,31 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
     });
   }
 
+  // Cabeçalho de coluna clicável (ordena; clica de novo inverte a direção)
+  const sortHeader = (label: string, col: SortKey, className: string) => {
+    const active = sortKey === col;
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          if (active) setSortDir(sortDir === "asc" ? "desc" : "asc");
+          else {
+            setSortKey(col);
+            setSortDir("asc");
+          }
+        }}
+        className={`items-center gap-1 uppercase tracking-wider transition hover:text-foreground ${
+          active ? "text-foreground" : "text-muted"
+        } ${className}`}
+      >
+        {label}
+        <span className={`text-[9px] leading-none ${active ? "text-brand" : "text-muted/40"}`}>
+          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    );
+  };
+
   return (
     <section className="space-y-5">
       {/* Header */}
@@ -1370,39 +1415,57 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
 
       {/* Pra fazer hoje — relacionamento manual */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-4"
-          style={{ borderLeft: "3px solid var(--warning-text)" }}>
-          <span className="font-mono text-2xl font-bold tabular-nums" style={{ color: "var(--warning-text)" }}>
-            {aniversariantes.length}
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-white">Aniversariantes da semana</p>
-            <p className="text-[11px] text-muted">mande os parabéns</p>
+        {/* Aniversariantes da semana */}
+        <div className="rounded-2xl border border-line bg-surface/60 p-4">
+          <div className="flex items-center gap-2">
+            <Cake size={14} className="text-muted" />
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Aniversariantes</p>
+            {aniversariantes.length > 0 && (
+              <span className="ml-auto h-1.5 w-1.5 rounded-full" style={{ background: "var(--warning-text)" }} />
+            )}
           </div>
+          <p className="font-display mt-2.5 text-[28px] font-bold leading-none tabular-nums text-white">
+            {aniversariantes.length}
+          </p>
+          <p className="mt-1.5 text-[11px] text-muted">na semana · mande os parabéns</p>
         </div>
+
+        {/* Novos este mês — clicável, filtra a lista */}
         <button
           type="button"
           onClick={() => setFiltroStatus(filtroStatus === "NOVO" ? "todos" : "NOVO")}
-          className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-4 text-left transition hover:border-white/15"
-          style={{ borderLeft: "3px solid var(--accent)" }}
+          className={`rounded-2xl border bg-surface/60 p-4 text-left transition hover:border-white/15 ${
+            filtroStatus === "NOVO" ? "border-brand/40" : "border-line"
+          }`}
         >
-          <span className="font-mono text-2xl font-bold tabular-nums" style={{ color: "var(--accent)" }}>
+          <div className="flex items-center gap-2">
+            <UserPlus size={14} className="text-muted" />
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Novos este mês</p>
+            {totais.NOVO > 0 && (
+              <span className="ml-auto h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+            )}
+          </div>
+          <p className="font-display mt-2.5 text-[28px] font-bold leading-none tabular-nums text-white">
             {totais.NOVO}
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-white">Novos este mês</p>
-            <p className="text-[11px] text-muted">dê as boas-vindas</p>
-          </div>
+          </p>
+          <p className="mt-1.5 text-[11px] text-muted">
+            {filtroStatus === "NOVO" ? "filtrando · clique p/ limpar" : "dê as boas-vindas · filtrar"}
+          </p>
         </button>
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-4"
-          style={{ borderLeft: "3px solid var(--success-text)" }}>
-          <span className="font-mono text-2xl font-bold tabular-nums" style={{ color: "var(--success-text)" }}>
-            {parqPendentes.length}
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-white">PAR-Q pendente</p>
-            <p className="text-[11px] text-muted">avaliação não assinada</p>
+
+        {/* PAR-Q pendente */}
+        <div className="rounded-2xl border border-line bg-surface/60 p-4">
+          <div className="flex items-center gap-2">
+            <FileText size={14} className="text-muted" />
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">PAR-Q pendente</p>
+            {parqPendentes.length > 0 && (
+              <span className="ml-auto h-1.5 w-1.5 rounded-full" style={{ background: "var(--warning-text)" }} />
+            )}
           </div>
+          <p className="font-display mt-2.5 text-[28px] font-bold leading-none tabular-nums text-white">
+            {parqPendentes.length}
+          </p>
+          <p className="mt-1.5 text-[11px] text-muted">avaliação não assinada</p>
         </div>
       </div>
 
@@ -1451,20 +1514,6 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
             onChange={(e) => setBusca(e.target.value)}
           />
         </div>
-        {temFinanceiro && (
-          <button
-            type="button"
-            onClick={() => setOrdenacao(ordenacao === "vencimento" ? "nome" : "vencimento")}
-            className={`whitespace-nowrap rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
-              ordenacao === "vencimento"
-                ? "border-brand/50 bg-brand/10 text-brand"
-                : "border-line bg-surface/60 text-muted hover:text-foreground"
-            }`}
-            title="Ordenar por data de vencimento"
-          >
-            ↕ Por vencimento
-          </button>
-        )}
       </div>
 
       {/* Lista de alunos */}
@@ -1480,13 +1529,13 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-surface/60">
           {/* Header da tabela */}
-          <div className="flex items-center gap-3 border-b border-line/50 px-5 py-3 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
-            <span className="flex-1">Aluno</span>
+          <div className="flex items-center gap-3 border-b border-line/50 bg-white/[0.015] px-5 py-3 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
+            {sortHeader("Aluno", "nome", "flex flex-1")}
             <span className="hidden w-24 md:block">Plano</span>
-            <span className="hidden w-24 lg:block">Aluno desde</span>
-            <span className="hidden w-28 lg:block">Aniversário</span>
+            {sortHeader("Aluno desde", "desde", "hidden w-24 lg:flex")}
+            {sortHeader("Aniversário", "aniversario", "hidden w-28 lg:flex")}
             <span className="hidden flex-1 xl:block">Observação</span>
-            {temFinanceiro && <span className="hidden w-36 lg:block">Mensalidade</span>}
+            {temFinanceiro && sortHeader("Mensalidade", "vencimento", "hidden w-36 lg:flex")}
             <span className="w-24">Status</span>
             <span className="w-14 text-right">Whats</span>
           </div>
@@ -1604,7 +1653,9 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
           {/* Footer */}
           <div className="border-t border-line/30 px-5 py-2.5 text-xs text-muted">
             Mostrando {alunosFiltrados.length} de {alunos.length} alunos
-            {ordenacao === "urgencia" && " · ordenado por urgência"}
+            {" · ordenado por "}
+            {{ nome: "nome", desde: "aluno desde", aniversario: "aniversário", vencimento: "vencimento" }[sortKey]}
+            {sortDir === "asc" ? " ↑" : " ↓"}
             {selecionados.size > 0 && (
               <span className="ml-2 text-brand">· {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}</span>
             )}
