@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
+import { getAdminSession } from "@/lib/admin-auth";
 
 function isMissingSupportTableError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2021";
@@ -26,21 +27,11 @@ async function getAuthenticatedTenant() {
   });
 }
 
-function getAdminEmail() {
-  return process.env.ADMIN_EMAIL ?? process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-}
-
 async function assertAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user || user.email !== getAdminEmail()) {
+  const isAdmin = await getAdminSession();
+  if (!isAdmin) {
     throw new Error("Nao autorizado");
   }
-
-  return user;
 }
 
 export async function abrirChamado(data: {
