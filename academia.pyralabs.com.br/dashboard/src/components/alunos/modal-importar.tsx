@@ -55,7 +55,10 @@ function autoMapear(header: string): Campo {
     .replace(/[̀-ͯ]/g, "")
     .trim();
   if (/\b(nome|name|aluno|cliente|pessoa)\b/.test(h)) return "nome";
-  if (/\b(tel|cel|celular|phone|whatsapp|fone|contato|numero|wpp)\b/.test(h)) return "telefone";
+  // "tel" e "fone" isolados não batem dentro de "telefone" (\b exige fronteira
+  // dos dois lados, e "telefone" continua com letras depois de "tel"/antes de
+  // "fone") — por isso "telefone" precisa estar listado por extenso também.
+  if (/\b(tel|telefone|cel|celular|phone|whatsapp|fone|contato|numero|wpp)\b/.test(h)) return "telefone";
   if (/\bcpf\b/.test(h)) return "cpf";
   if (/\b(email|e-mail|mail|correio)\b/.test(h)) return "email";
   if (/\b(nasc|aniversario|birthday|nascimento)\b/.test(h)) return "dataNascimento";
