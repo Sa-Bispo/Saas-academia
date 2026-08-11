@@ -7,17 +7,26 @@ import { ensureTenantForUser } from "@/services/tenant.service";
 import { prisma } from "@/lib/prisma";
 import { normalizeTelefone } from "@/lib/importar-utils";
 
+// "YYYY-MM-DD" -> Date ancorado ao meio-dia (mesmo padrão de matricularAluno()
+// em planos-academia.actions.ts). Sem isso, "2026-06-02" vira meia-noite UTC,
+// que exibida em BRT (-3h) cai no dia anterior.
+function parseDataImportada(dataStr: string | undefined): Date | undefined {
+  if (!dataStr) return undefined;
+  const d = new Date(`${dataStr}T12:00:00`);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
 export type ImportRow = {
   _linha: number;
   nome: string;
   telefone: string;
   cpf?: string;
   email?: string;
-  dataNascimento?: string; // ISO string
+  dataNascimento?: string; // "YYYY-MM-DD"
   observacoes?: string;
   planoNome?: string;
-  dataVencimento?: string; // ISO string
-  dataInicio?: string; // ISO string
+  dataVencimento?: string; // "YYYY-MM-DD"
+  dataInicio?: string; // "YYYY-MM-DD"
 };
 
 export type ImportResult = {
@@ -126,7 +135,7 @@ async function processarLinha(
           nome: nomeLimpo,
           ...(row.email?.trim() && { email: row.email.trim() }),
           ...(cpfLimpo && { cpf: cpfLimpo }),
-          ...(row.dataNascimento && { dataNascimento: new Date(row.dataNascimento) }),
+          ...(row.dataNascimento && { dataNascimento: parseDataImportada(row.dataNascimento) }),
           ...(row.observacoes?.trim() && { observacoes: row.observacoes.trim() }),
           ...(temMatricula && { status: "ATIVO" }),
         },
@@ -141,7 +150,7 @@ async function processarLinha(
           telefone: telefoneLimpo,
           email: row.email?.trim() || null,
           cpf: cpfLimpo,
-          dataNascimento: row.dataNascimento ? new Date(row.dataNascimento) : null,
+          dataNascimento: parseDataImportada(row.dataNascimento) ?? null,
           observacoes: row.observacoes?.trim() || null,
           status: temMatricula ? "ATIVO" : "SEM_MATRICULA",
         },
@@ -151,8 +160,8 @@ async function processarLinha(
     }
 
     if (temMatricula && planoId && row.dataVencimento) {
-      const dataVencimento = new Date(row.dataVencimento);
-      const dataInicio = row.dataInicio ? new Date(row.dataInicio) : new Date();
+      const dataVencimento = parseDataImportada(row.dataVencimento)!;
+      const dataInicio = parseDataImportada(row.dataInicio) ?? new Date();
 
       // Cancela matrículas ativas anteriores (mesmo comportamento do matricularAluno())
       await tx.matriculaAluno.updateMany({

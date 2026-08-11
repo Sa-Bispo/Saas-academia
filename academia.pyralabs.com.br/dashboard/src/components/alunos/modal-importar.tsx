@@ -100,9 +100,13 @@ async function parseExcel(file: File): Promise<{ headers: string[]; rows: string
   const stringify = (v: string | number | Date | null): string => {
     if (v === null || v === undefined) return "";
     if (v instanceof Date) {
-      const d = String(v.getDate()).padStart(2, "0");
-      const m = String(v.getMonth() + 1).padStart(2, "0");
-      return `${d}/${m}/${v.getFullYear()}`;
+      // xlsx (cellDates: true) converte data-serial do Excel pra Date usando
+      // meia-noite UTC, sem timezone — não é um instante local. Ler com
+      // getDate()/getMonth() (getters locais) em fuso atrás de UTC (BRT, -3h)
+      // arredonda pro dia anterior. Por isso os getters aqui têm que ser UTC.
+      const d = String(v.getUTCDate()).padStart(2, "0");
+      const m = String(v.getUTCMonth() + 1).padStart(2, "0");
+      return `${d}/${m}/${v.getUTCFullYear()}`;
     }
     return String(v).trim();
   };
@@ -114,6 +118,17 @@ async function parseExcel(file: File): Promise<{ headers: string[]; rows: string
     .filter((row) => row.some((c) => c.length > 0));
 
   return { headers, rows };
+}
+
+// Date -> "YYYY-MM-DD" usando os getters locais (o dia que o navegador realmente
+// mostra), em vez de toISOString() (que converte pra UTC e pode cair no dia
+// anterior perto da meia-noite, dependendo do fuso).
+function toDateOnlyString(d: Date | null): string | null {
+  if (!d) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 type MappedRow = ImportRow & {
@@ -146,9 +161,12 @@ function buildMappedRow(rawRow: string[], linha: number, map: Record<number, Cam
     email: get("email") || undefined,
     observacoes: get("observacoes") || undefined,
     planoNome: get("planoNome") || undefined,
-    dataNascimento: dataNascimento?.toISOString() ?? undefined,
-    dataVencimento: dataVencimento?.toISOString() ?? undefined,
-    dataInicio: dataInicio?.toISOString() ?? undefined,
+    // "YYYY-MM-DD" (dia local do navegador), não .toISOString(): um instante UTC
+    // de meia-noite vira o dia anterior quando o servidor exibe em BRT. O server
+    // ancora esse texto ao meio-dia antes de salvar (ver importarAlunos()).
+    dataNascimento: toDateOnlyString(dataNascimento) ?? undefined,
+    dataVencimento: toDateOnlyString(dataVencimento) ?? undefined,
+    dataInicio: toDateOnlyString(dataInicio) ?? undefined,
     _dataVencimentoDisplay: dataVencimento
       ? `vence ${formatDateBR(dataVencimento)}`
       : vencimentoRaw
