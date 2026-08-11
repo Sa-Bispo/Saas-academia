@@ -120,8 +120,27 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
     novosEsseMes,
     aguardandoValidacao,
   ] = await Promise.all([
-    prisma.aluno.count({ where: { tenantId, status: "ATIVO" } }),
-    prisma.aluno.count({ where: { tenantId, status: "INADIMPLENTE" } }),
+    // "Ativo" e "Inadimplente" não podem confiar só no status gravado: nada atualiza
+    // esse campo automaticamente quando a mensalidade vence (só a ação manual em
+    // /cobrancas). Por isso um aluno com status="ATIVO" mas matrícula vencida entra
+    // na contagem de inadimplentes, e sai da de ativos — mesmo critério usado em
+    // /alunos (ver estaInadimplente() em alunos-client.tsx).
+    prisma.aluno.count({
+      where: {
+        tenantId,
+        status: "ATIVO",
+        NOT: { matriculas: { some: { status: "ATIVA", dataVencimento: { lt: now } } } },
+      },
+    }),
+    prisma.aluno.count({
+      where: {
+        tenantId,
+        OR: [
+          { status: "INADIMPLENTE" },
+          { status: "ATIVO", matriculas: { some: { status: "ATIVA", dataVencimento: { lt: now } } } },
+        ],
+      },
+    }),
     prisma.cobrancaAluno.aggregate({
       where: { tenantId, status: "PAGO", dataPagamento: { gte: inicioMes, lte: fimMes } },
       _sum: { valorCents: true },
