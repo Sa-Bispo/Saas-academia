@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle, Info, Loader2, RotateCcw } from "lucide-react";
+import { useRef, useState, useTransition, useCallback } from "react";
+import { AlertTriangle, Camera, CheckCircle, Info, Loader2, RotateCcw, X } from "lucide-react";
 import { SignaturePad, SignaturePadHandle } from "@/components/parq/signature-pad";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
 import { TextoInformativo } from "@/lib/parq-texto-informativo";
@@ -32,6 +32,7 @@ function maskPhone(value: string) {
 
 export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
   const sigRef = useRef<SignaturePadHandle>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
 
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
@@ -40,6 +41,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
   const [respostas, setRespostas] = useState<Record<number, "S" | "N">>({});
   const [aceitaResponsabilidade, setAceitaResponsabilidade] = useState(false);
   const [lgpd, setLgpd] = useState(false);
+  const [foto, setFoto] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
   const [tentouEnviar, setTentouEnviar] = useState(false);
@@ -52,6 +54,28 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
   function handleResposta(id: number, valor: "S" | "N") {
     setRespostas((prev) => ({ ...prev, [id]: valor }));
   }
+
+  const handleFotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+        else { width = Math.round((width * MAX) / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      setFoto(canvas.toDataURL("image/jpeg", 0.8));
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }, []);
 
   function handleSubmit() {
     setErro(null);
@@ -77,6 +101,10 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
       setErro("É necessário aceitar o termo de consentimento LGPD.");
       return;
     }
+    if (!foto) {
+      setErro("A foto de identificação é obrigatória.");
+      return;
+    }
     if (!sigRef.current || sigRef.current.isEmpty()) {
       setErro("A assinatura é obrigatória. Assine no campo acima antes de enviar.");
       return;
@@ -89,7 +117,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
         const res = await fetch(`/api/parq/${tenantId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nome, cpf, telefone, dataNascimento: dataNascimento || undefined, respostas, assinatura, consentimentoLgpd: lgpd }),
+          body: JSON.stringify({ nome, cpf, telefone, dataNascimento: dataNascimento || undefined, respostas, assinatura, foto, consentimentoLgpd: lgpd }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({})) as { error?: string; detail?: string };
@@ -295,6 +323,54 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
             </label>
           </div>
         )}
+
+        {/* Foto de identificação */}
+        <div className={`rounded-2xl border p-5 space-y-3 ${tentouEnviar && !foto ? "border-red-500/50 bg-red-500/[0.04]" : "border-white/10 bg-white/[0.04]"}`}>
+          <p className={`text-xs font-semibold uppercase tracking-widest ${tentouEnviar && !foto ? "text-red-400" : "text-white/40"}`}>
+            Foto de identificação *
+          </p>
+          <p className="text-xs text-white/30">Tire uma selfie ou escolha uma foto da galeria.</p>
+
+          <input
+            ref={fotoInputRef}
+            type="file"
+            accept="image/*"
+            capture="user"
+            className="hidden"
+            onChange={handleFotoChange}
+          />
+
+          {foto ? (
+            <div className="flex items-center gap-4">
+              <img
+                src={foto}
+                alt="Foto de identificação"
+                className="h-20 w-20 rounded-full object-cover border-2 border-white/20"
+              />
+              <button
+                type="button"
+                onClick={() => { setFoto(null); if (fotoInputRef.current) fotoInputRef.current.value = ""; }}
+                className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition"
+              >
+                <X size={13} />
+                Trocar foto
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fotoInputRef.current?.click()}
+              className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm transition ${
+                tentouEnviar && !foto
+                  ? "border-red-500/50 text-red-400 hover:border-red-400/70"
+                  : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/80"
+              }`}
+            >
+              <Camera size={16} />
+              Escolher foto
+            </button>
+          )}
+        </div>
 
         {/* Assinatura */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 space-y-3">

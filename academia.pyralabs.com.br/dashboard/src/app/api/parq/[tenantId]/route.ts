@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Fonte da verdade para assinatura: assinatura_base64 no banco (coluna da tabela
 // fichas_parq). O campo assinatura_url existe no schema mas não é preenchido —
@@ -51,6 +52,7 @@ async function handlePost(
     dataNascimento?: string;
     respostas: Record<string, "S" | "N">;
     assinatura: string | null;
+    foto: string | null;
     consentimentoLgpd: boolean;
   };
 
@@ -60,13 +62,16 @@ async function handlePost(
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
   }
 
-  const { nome, cpf, telefone, dataNascimento, respostas, assinatura, consentimentoLgpd } = body;
+  const { nome, cpf, telefone, dataNascimento, respostas, assinatura, foto, consentimentoLgpd } = body;
 
   if (!nome?.trim() || !cpf?.trim() || !telefone?.trim()) {
     return NextResponse.json({ error: "Nome, CPF e telefone são obrigatórios." }, { status: 422 });
   }
   if (!consentimentoLgpd) {
     return NextResponse.json({ error: "É necessário aceitar o termo LGPD." }, { status: 422 });
+  }
+  if (!foto || typeof foto !== "string" || !foto.startsWith("data:image/")) {
+    return NextResponse.json({ error: "Foto de identificação obrigatória." }, { status: 422 });
   }
   if (!assinatura || typeof assinatura !== "string" || !assinatura.startsWith("data:image/")) {
     return NextResponse.json({ error: "Assinatura obrigatória.", detail: "O documento não pode ser salvo sem assinatura." }, { status: 422 });
@@ -128,6 +133,25 @@ async function handlePost(
     if (Object.keys(updates).length > 0) {
       await prisma.aluno.update({ where: { id: aluno.id }, data: updates });
     }
+  }
+
+  // Upload da foto para Supabase Storage
+  try {
+    const base64Data = foto.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    const supabase = createAdminClient();
+    const path = `${tenantId}/${aluno.id}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from("fotos-alunos")
+      .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
+    if (uploadError) {
+      console.error("[PARQ] Erro ao fazer upload da foto:", uploadError.message);
+    } else {
+      const { data: urlData } = supabase.storage.from("fotos-alunos").getPublicUrl(path);
+      await prisma.aluno.update({ where: { id: aluno.id }, data: { fotoUrl: urlData.publicUrl } });
+    }
+  } catch (err) {
+    console.error("[PARQ] Falha no upload da foto:", err);
   }
 
   await prisma.fichaParq.create({
