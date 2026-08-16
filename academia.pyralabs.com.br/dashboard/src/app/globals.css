@@ -439,6 +439,17 @@ a {
   backdrop-filter: blur(1px) !important;
 }
 
+/* iOS Safari: cliques só chegam aos handlers delegados do React (que ficam no
+   nível do document) quando o elemento tem cursor: pointer. Sem isso, botões e
+   labels ficam "mortos" ao toque no iPhone. Garante ponteiro nos controles. */
+button:not(:disabled),
+[role="button"],
+label[for],
+summary,
+a {
+  cursor: pointer;
+}
+
 /* Highlight do elemento selecionado */
 .driver-active-element,
 .driver-highlighted-element {

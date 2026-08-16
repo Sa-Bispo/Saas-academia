@@ -39,6 +39,7 @@ export async function listarFichasParq() {
           telefone: true,
           cpf: true,
           status: true,
+          fotoUrl: true,
           matriculas: {
             where: { status: "ATIVA" },
             take: 1,

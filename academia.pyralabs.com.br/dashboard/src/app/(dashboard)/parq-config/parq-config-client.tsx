@@ -33,6 +33,7 @@ import {
 } from "@/actions/parq.actions";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
 import { TextoInformativo } from "@/lib/parq-texto-informativo";
+import { FotoViewer } from "@/components/ui/foto-viewer";
 
 const ParqPdfButton = dynamic(
   () => import("@/components/parq/parq-pdf-button").then((m) => m.ParqPdfButton),
@@ -59,6 +60,7 @@ type Aluno = {
   telefone: string;
   cpf: string | null;
   status: string;
+  fotoUrl: string | null;
   matriculas: MatriculaAtiva[];
 };
 
@@ -196,7 +198,22 @@ function ModalFicha({
           className="flex items-start justify-between gap-4 px-5 py-4 shrink-0"
           style={{ borderBottom: "1px solid var(--border-color)" }}
         >
-          <div className="space-y-1">
+          <div className="flex items-start gap-3">
+            {ficha.aluno.fotoUrl ? (
+              <FotoViewer
+                src={ficha.aluno.fotoUrl}
+                alt={`Foto de ${ficha.aluno.nome}`}
+                className="h-12 w-12 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
+              >
+                {ficha.aluno.nome.trim().charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="space-y-1">
             <p className="text-base font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
               {ficha.aluno.nome}
             </p>
@@ -221,6 +238,7 @@ function ModalFicha({
                 Lead · aguardando matrícula
               </span>
             )}
+            </div>
           </div>
           <button
             type="button"

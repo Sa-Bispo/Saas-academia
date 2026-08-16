@@ -58,6 +58,18 @@ const s = StyleSheet.create({
   cellLabel: { fontSize: 7, color: "#9ca3af", marginBottom: 2 },
   cellValue: { fontSize: 9, fontWeight: "bold", color: "#111827" },
 
+  // ─── Foto de identificação ───────────────────────────────────────────────────
+  fotoBox: {
+    width: 64,
+    height: 64,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 4,
+    overflow: "hidden",
+    backgroundColor: "#f9fafb",
+  },
+  fotoImage: { width: 64, height: 64, objectFit: "cover" },
+
   // ─── Pergunta item ─────────────────────────────────────────────────────────
   perguntaRow: {
     flexDirection: "row",
@@ -162,6 +174,7 @@ type Ficha = {
   respostas: Record<string, string>;
   precisaLiberacaoMedica: boolean;
   assinaturaUrl: string | null; // base64 data URL já resolvido pelo botão
+  fotoBase64?: string | null; // foto de identificação (base64 já resolvido pelo botão)
   termoHash: string;
   ip: string | null;
   consentimentoLgpd: boolean;
@@ -204,19 +217,30 @@ export function ParqPdfDocument({ ficha, perguntas, academiaName, termoTexto }: 
         {/* ── Dados pessoais ── */}
         <View style={s.section}>
           <Text style={s.sectionLabel}>Dados Pessoais</Text>
-          <View style={s.grid2}>
-            <View style={s.gridCell}>
-              <Text style={s.cellLabel}>Nome completo</Text>
-              <Text style={s.cellValue}>{ficha.assinanteNome}</Text>
+          <View style={{ flexDirection: "row", gap: 6, alignItems: "stretch" }}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <View style={s.grid2}>
+                <View style={s.gridCell}>
+                  <Text style={s.cellLabel}>Nome completo</Text>
+                  <Text style={s.cellValue}>{ficha.assinanteNome}</Text>
+                </View>
+              </View>
+              <View style={s.grid2}>
+                <View style={s.gridCell}>
+                  <Text style={s.cellLabel}>CPF</Text>
+                  <Text style={s.cellValue}>{formatCpf(ficha.assinanteCpf)}</Text>
+                </View>
+                <View style={s.gridCell}>
+                  <Text style={s.cellLabel}>Telefone</Text>
+                  <Text style={s.cellValue}>{ficha.aluno.telefone}</Text>
+                </View>
+              </View>
             </View>
-            <View style={[s.gridCell, { flex: 0.6 }]}>
-              <Text style={s.cellLabel}>CPF</Text>
-              <Text style={s.cellValue}>{formatCpf(ficha.assinanteCpf)}</Text>
-            </View>
-            <View style={[s.gridCell, { flex: 0.6 }]}>
-              <Text style={s.cellLabel}>Telefone</Text>
-              <Text style={s.cellValue}>{ficha.aluno.telefone}</Text>
-            </View>
+            {ficha.fotoBase64 && (
+              <View style={s.fotoBox}>
+                <Image src={ficha.fotoBase64} style={s.fotoImage} />
+              </View>
+            )}
           </View>
         </View>
 

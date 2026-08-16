@@ -18,7 +18,7 @@ type Ficha = {
   ip: string | null;
   consentimentoLgpd: boolean;
   assinadoEm: Date | string;
-  aluno: { telefone: string };
+  aluno: { telefone: string; fotoUrl?: string | null };
 };
 
 type Props = {
@@ -58,7 +58,11 @@ export function ParqPdfButton({ ficha, perguntas, academiaName, termoTexto }: Pr
         sigBase64 = await urlToBase64(ficha.assinaturaUrl);
       }
 
-      const fichaComSig = { ...ficha, assinaturaUrl: sigBase64 };
+      // Foto de identificação é uma URL pública do Supabase Storage — converte
+      // para base64 antes de renderizar, evitando problema de CORS no react-pdf.
+      const fotoBase64 = ficha.aluno.fotoUrl ? await urlToBase64(ficha.aluno.fotoUrl) : null;
+
+      const fichaComSig = { ...ficha, assinaturaUrl: sigBase64, fotoBase64 };
 
       const blob = await pdf(
         <ParqPdfDocument

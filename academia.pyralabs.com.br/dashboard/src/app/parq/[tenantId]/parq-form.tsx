@@ -12,6 +12,8 @@ type Props = {
   tenantId: string;
   academiaName: string;
   perguntas: Pergunta[];
+  cpfInicial?: string;
+  dataNascimentoInicial?: string;
 };
 
 function maskCpf(value: string) {
@@ -30,14 +32,14 @@ function maskPhone(value: string) {
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3").trim();
 }
 
-export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
+export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, dataNascimentoInicial }: Props) {
   const sigRef = useRef<SignaturePadHandle>(null);
-  const fotoInputRef = useRef<HTMLInputElement>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null); // usado para resetar o value ao trocar foto
 
   const [nome, setNome] = useState("");
-  const [cpf, setCpf] = useState("");
+  const [cpf, setCpf] = useState(cpfInicial ?? "");
   const [telefone, setTelefone] = useState("");
-  const [dataNascimento, setDataNascimento] = useState("");
+  const [dataNascimento, setDataNascimento] = useState(dataNascimentoInicial ?? "");
   const [respostas, setRespostas] = useState<Record<number, "S" | "N">>({});
   const [aceitaResponsabilidade, setAceitaResponsabilidade] = useState(false);
   const [lgpd, setLgpd] = useState(false);
@@ -58,21 +60,46 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
   const handleFotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setErro(null);
+
+    // Fallback: lê o arquivo original direto (sem canvas). Usado quando o
+    // redimensionamento via canvas falha — comum no iOS com fotos HEIC grandes.
+    const lerDireto = () => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFoto(typeof reader.result === "string" ? reader.result : null);
+      };
+      reader.onerror = () => setErro("Não foi possível carregar a foto. Tente tirar outra.");
+      reader.readAsDataURL(file);
+    };
+
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 600;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
-        else { width = Math.round((width * MAX) / height); height = MAX; }
+      try {
+        const MAX = 512;
+        let { width, height } = img;
+        if (!width || !height) { URL.revokeObjectURL(url); lerDireto(); return; }
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+          else { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { lerDireto(); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        setFoto(canvas.toDataURL("image/jpeg", 0.62));
+      } catch {
+        lerDireto();
+      } finally {
+        URL.revokeObjectURL(url);
       }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-      setFoto(canvas.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = () => {
       URL.revokeObjectURL(url);
+      lerDireto();
     };
     img.src = url;
   }, []);
@@ -325,50 +352,66 @@ export function ParqFormClient({ tenantId, academiaName, perguntas }: Props) {
         )}
 
         {/* Foto de identificação */}
-        <div className={`rounded-2xl border p-5 space-y-3 ${tentouEnviar && !foto ? "border-red-500/50 bg-red-500/[0.04]" : "border-white/10 bg-white/[0.04]"}`}>
-          <p className={`text-xs font-semibold uppercase tracking-widest ${tentouEnviar && !foto ? "text-red-400" : "text-white/40"}`}>
+        <div className={`rounded-2xl border p-5 space-y-3 transition-colors ${
+          foto
+            ? "border-emerald-500/40 bg-emerald-500/[0.04]"
+            : tentouEnviar
+            ? "border-red-500/50 bg-red-500/[0.04]"
+            : "border-white/10 bg-white/[0.04]"
+        }`}>
+          <p className={`text-xs font-semibold uppercase tracking-widest ${
+            foto ? "text-emerald-400" : tentouEnviar ? "text-red-400" : "text-white/40"
+          }`}>
             Foto de identificação *
           </p>
-          <p className="text-xs text-white/30">Tire uma selfie ou escolha uma foto da galeria.</p>
+          {!foto && (
+            <p className="text-xs text-white/30">Tire uma selfie ou escolha uma foto da galeria.</p>
+          )}
 
           <input
             ref={fotoInputRef}
+            id="foto-input"
             type="file"
             accept="image/*"
-            capture="user"
             className="hidden"
             onChange={handleFotoChange}
           />
 
           {foto ? (
             <div className="flex items-center gap-4">
-              <img
-                src={foto}
-                alt="Foto de identificação"
-                className="h-20 w-20 rounded-full object-cover border-2 border-white/20"
-              />
-              <button
-                type="button"
-                onClick={() => { setFoto(null); if (fotoInputRef.current) fotoInputRef.current.value = ""; }}
-                className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition"
-              >
-                <X size={13} />
-                Trocar foto
-              </button>
+              <div className="relative shrink-0">
+                <img
+                  src={foto}
+                  alt="Foto de identificação"
+                  className="h-20 w-20 rounded-full object-cover border-2 border-emerald-500/50"
+                />
+                <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 shadow-lg">
+                  <CheckCircle size={14} className="text-white" />
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-medium text-emerald-400">Foto adicionada!</p>
+                <label
+                  htmlFor="foto-input"
+                  className="flex cursor-pointer items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition"
+                >
+                  <X size={12} />
+                  Trocar foto
+                </label>
+              </div>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fotoInputRef.current?.click()}
-              className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm transition ${
-                tentouEnviar && !foto
+            <label
+              htmlFor="foto-input"
+              className={`flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 text-sm transition ${
+                tentouEnviar
                   ? "border-red-500/50 text-red-400 hover:border-red-400/70"
                   : "border-white/10 text-white/50 hover:border-white/20 hover:text-white/80"
               }`}
             >
               <Camera size={16} />
               Escolher foto
-            </button>
+            </label>
           )}
         </div>
 

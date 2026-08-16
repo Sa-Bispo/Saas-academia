@@ -32,6 +32,7 @@ import {
   Upload,
 } from "lucide-react";
 import FloatingActionMenu from "@/components/ui/floating-action-menu";
+import { FotoViewer } from "@/components/ui/foto-viewer";
 
 import {
   criarAluno,
@@ -75,6 +76,7 @@ type Aluno = {
   telefone: string;
   email: string | null;
   status: string;
+  fotoUrl: string | null;
   precisaLiberacaoMedica: boolean;
   createdAt: Date;
   dataNascimento: Date | null;
@@ -594,6 +596,7 @@ type AlunoDetalhe = {
   telefone: string;
   email: string | null;
   cpf: string | null;
+  fotoUrl: string | null;
   dataNascimento: Date | string | null;
   observacoes: string | null;
   status: string;
@@ -781,7 +784,15 @@ function ModalDetalheAluno({
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-line bg-surface shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <div>
+          <div className="flex items-center gap-3">
+            {aluno?.fotoUrl && (
+              <FotoViewer
+                src={aluno.fotoUrl}
+                alt={aluno.nome}
+                className="h-10 w-10 shrink-0 rounded-full border border-line object-cover"
+              />
+            )}
+            <div>
             <h2 className="text-sm font-semibold text-white">
               {aluno === undefined ? "Carregando..." : aluno?.nome ?? "Aluno"}
             </h2>
@@ -801,6 +812,7 @@ function ModalDetalheAluno({
                 )}
               </div>
             )}
+            </div>
           </div>
           <button
             type="button"
@@ -1565,9 +1577,18 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
                 >
                   {/* Aluno */}
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${avatarColor(aluno.nome)}`}>
-                      {avatarInitials(aluno.nome)}
-                    </div>
+                    {aluno.fotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={aluno.fotoUrl}
+                        alt={aluno.nome}
+                        className="h-9 w-9 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${avatarColor(aluno.nome)}`}>
+                        {avatarInitials(aluno.nome)}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-medium text-white">{aluno.nome}</span>

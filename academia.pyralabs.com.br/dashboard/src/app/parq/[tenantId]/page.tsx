@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { ParqFormClient } from "./parq-form";
+import { ParqEntryClient } from "./parq-entry-client";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +56,7 @@ export default async function ParqPage({ params }: Props) {
   if (!tenant) notFound();
 
   return (
-    <ParqFormClient
+    <ParqEntryClient
       tenantId={tenant.id}
       academiaName={tenant.companyName || tenant.nome}
       perguntas={perguntas.map((p) => ({ id: p.id, texto: p.texto, tipo: p.tipo }))}
