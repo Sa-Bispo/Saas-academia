@@ -32,6 +32,36 @@ function maskPhone(value: string) {
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3").trim();
 }
 
+// Digitação livre "DDMMAAAA" -> exibe "DD/MM/AAAA". Evita o seletor nativo de
+// data no mobile, que abre no dia de hoje e obriga rolar década a década até o
+// ano de nascimento — difícil de usar, foi reclamação de quem respondeu pelo
+// celular.
+function maskDataNascimento(value: string) {
+  const d = value.replace(/\D/g, "").slice(0, 8);
+  const dia = d.slice(0, 2);
+  const mes = d.slice(2, 4);
+  const ano = d.slice(4, 8);
+  return [dia, mes, ano].filter(Boolean).join("/");
+}
+
+// "DD/MM/AAAA" -> "AAAA-MM-DD" (formato que a API espera), validando data real.
+// Retorna null se o campo estiver vazio (é opcional); string de erro se estiver
+// preenchido mas inválido/incompleto.
+function parseDataNascimento(value: string): { iso: string } | { erro: string } | null {
+  if (!value.replace(/\D/g, "")) return null;
+  const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return { erro: "Data de nascimento incompleta. Use o formato DD/MM/AAAA." };
+  const [, dd, mm, yyyy] = m;
+  const dia = Number(dd);
+  const mes = Number(mm);
+  const ano = Number(yyyy);
+  const data = new Date(ano, mes - 1, dia);
+  const valida = data.getFullYear() === ano && data.getMonth() === mes - 1 && data.getDate() === dia;
+  if (!valida || ano < 1900) return { erro: "Data de nascimento inválida." };
+  if (data.getTime() > Date.now()) return { erro: "Data de nascimento não pode ser no futuro." };
+  return { iso: `${yyyy}-${mm}-${dd}` };
+}
+
 export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, dataNascimentoInicial }: Props) {
   const sigRef = useRef<SignaturePadHandle>(null);
   const fotoInputRef = useRef<HTMLInputElement>(null); // usado para resetar o value ao trocar foto
@@ -136,6 +166,11 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
       setErro("A assinatura é obrigatória. Assine no campo acima antes de enviar.");
       return;
     }
+    const nascimento = parseDataNascimento(dataNascimento);
+    if (nascimento && "erro" in nascimento) {
+      setErro(nascimento.erro);
+      return;
+    }
 
     const assinatura = sigRef.current.toDataURL();
 
@@ -144,7 +179,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
         const res = await fetch(`/api/parq/${tenantId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nome, cpf, telefone, dataNascimento: dataNascimento || undefined, respostas, assinatura, foto, consentimentoLgpd: lgpd }),
+          body: JSON.stringify({ nome, cpf, telefone, dataNascimento: nascimento?.iso, respostas, assinatura, foto, consentimentoLgpd: lgpd }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({})) as { error?: string; detail?: string };
@@ -237,11 +272,11 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-white/60">Data de nascimento</label>
             <input
-              type="date"
-              className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white focus:border-emerald-500/50 focus:outline-none [color-scheme:dark]"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-emerald-500/50 focus:outline-none"
+              placeholder="DD/MM/AAAA"
               value={dataNascimento}
-              onChange={(e) => setDataNascimento(e.target.value)}
-              max={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setDataNascimento(maskDataNascimento(e.target.value))}
+              inputMode="numeric"
             />
           </div>
         </div>

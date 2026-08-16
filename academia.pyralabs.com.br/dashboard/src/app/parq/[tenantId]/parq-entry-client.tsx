@@ -21,6 +21,27 @@ function maskCpf(value: string) {
     .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
 }
 
+// Data digitada como texto "DD/MM/AAAA" (mesmo padrão do formulário PAR-Q).
+// Evita o seletor nativo de data, ruim no mobile.
+function maskDataNascimento(value: string) {
+  const d = value.replace(/\D/g, "").slice(0, 8);
+  return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join("/");
+}
+
+// "DD/MM/AAAA" -> "AAAA-MM-DD" (formato que a API espera), validando data real.
+function parseDataNascimento(value: string): { iso: string } | { erro: string } | null {
+  if (!value.replace(/\D/g, "")) return null;
+  const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return { erro: "Data de nascimento incompleta. Use o formato DD/MM/AAAA." };
+  const [, dd, mm, yyyy] = m;
+  const dia = Number(dd), mes = Number(mm), ano = Number(yyyy);
+  const data = new Date(ano, mes - 1, dia);
+  const valida = data.getFullYear() === ano && data.getMonth() === mes - 1 && data.getDate() === dia;
+  if (!valida || ano < 1900) return { erro: "Data de nascimento inválida." };
+  if (data.getTime() > Date.now()) return { erro: "Data de nascimento não pode ser no futuro." };
+  return { iso: `${yyyy}-${mm}-${dd}` };
+}
+
 type Etapa = "identificar" | "novo" | "foto" | "fotoEnviada" | "completo";
 
 export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
@@ -51,8 +72,13 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
       setErro("Informe os 11 dígitos do CPF.");
       return;
     }
-    if (!dataNascimento) {
+    const nasc = parseDataNascimento(dataNascimento);
+    if (!nasc) {
       setErro("Informe sua data de nascimento.");
+      return;
+    }
+    if ("erro" in nasc) {
+      setErro(nasc.erro);
       return;
     }
     startTransition(async () => {
@@ -60,7 +86,7 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
         const res = await fetch(`/api/parq/${tenantId}/lookup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cpf, dataNascimento }),
+          body: JSON.stringify({ cpf, dataNascimento: nasc.iso }),
         });
         const data = (await res.json().catch(() => ({}))) as {
           status?: string; primeiroNome?: string; error?: string;
@@ -142,11 +168,11 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
             <div>
               <label className="mb-1.5 block text-xs font-medium text-white/60">Data de nascimento</label>
               <input
-                type="date"
-                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white focus:border-emerald-500/50 focus:outline-none [color-scheme:dark]"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-emerald-500/50 focus:outline-none"
+                placeholder="DD/MM/AAAA"
+                inputMode="numeric"
                 value={dataNascimento}
-                onChange={(e) => setDataNascimento(e.target.value)}
-                max={new Date().toISOString().split("T")[0]}
+                onChange={(e) => setDataNascimento(maskDataNascimento(e.target.value))}
               />
             </div>
 

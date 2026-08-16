@@ -1239,6 +1239,16 @@ function diasAteVencimento(dataVencimento: Date | string): number {
   return Math.round((venc.getTime() - hoje.getTime()) / 86400000);
 }
 
+// Inadimplente = mensalidade vencida (data), OU status gravado como INADIMPLENTE
+// (ex.: marcado manualmente em /cobrancas). Nenhum job automático atualiza o status
+// guardado quando a data vence, então não dá pra confiar só nele — mesmo motivo da
+// correção em mensalidadeInfo() abaixo.
+function estaInadimplente(a: Aluno): boolean {
+  if (a.status === "INADIMPLENTE") return true;
+  const venc = a.matriculas[0]?.dataVencimento;
+  return !!venc && diasAteVencimento(venc) < 0;
+}
+
 // Situação da mensalidade DERIVADA da data (não do status guardado — corrige o "Em dia" errado)
 function mensalidadeInfo(
   dataVencimento: Date | string | null | undefined,
@@ -1301,6 +1311,8 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
         matchStatus = ehNovo(dataEntrada(a));
       } else if (filtroStatus === "VENCENDO") {
         matchStatus = !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
+      } else if (filtroStatus === "INADIMPLENTE") {
+        matchStatus = estaInadimplente(a);
       } else if (filtroStatus !== "todos") {
         matchStatus = a.status === filtroStatus;
       }
@@ -1337,7 +1349,7 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
     todos: alunos.length,
     ATIVO: alunos.filter((a) => a.status === "ATIVO").length,
     NOVO: alunos.filter((a) => ehNovo(dataEntrada(a))).length,
-    INADIMPLENTE: alunos.filter((a) => a.status === "INADIMPLENTE").length,
+    INADIMPLENTE: alunos.filter(estaInadimplente).length,
     INATIVO: alunos.filter((a) => a.status === "INATIVO").length,
     VENCENDO: alunos.filter((a) => !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento)).length,
   };
@@ -1563,10 +1575,10 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
               const anivLabel = labelAniversario(diasAteAniversario(aluno.dataNascimento));
               const st = aluno.status;
               const chip =
-                st === "ATIVO"
-                  ? { t: "Ativo", c: "var(--success-text)", bg: "rgba(37,211,102,.10)" }
-                  : st === "INADIMPLENTE"
-                    ? { t: "Atrasado", c: "var(--warning-text)", bg: "rgba(224,179,65,.10)" }
+                estaInadimplente(aluno)
+                  ? { t: "Atrasado", c: "var(--warning-text)", bg: "rgba(224,179,65,.10)" }
+                  : st === "ATIVO"
+                    ? { t: "Ativo", c: "var(--success-text)", bg: "rgba(37,211,102,.10)" }
                     : { t: st === "SUSPENSO" ? "Suspenso" : "Inativo", c: "var(--text-tertiary)", bg: "rgba(255,255,255,.05)" };
 
               return (
