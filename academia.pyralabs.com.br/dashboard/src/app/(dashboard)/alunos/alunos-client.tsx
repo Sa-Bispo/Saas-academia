@@ -260,9 +260,13 @@ function ModalNovoAluno({
 
   // Form matrícula
   const [planoId, setPlanoId] = useState(planosProp[0]?.id ?? "");
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().split("T")[0]);
+  // "Hoje" em BRT explícito, não toISOString() (que dá o dia UTC — errado
+  // entre 21h e meia-noite no horário de Brasília, mostraria amanhã).
+  const [dataInicio, setDataInicio] = useState(() =>
+    new Date().toLocaleDateString("en-CA", { timeZone: BRT })
+  );
   const [dataVencimento, setDataVencimento] = useState(() => {
-    const d = new Date();
+    const d = new Date(`${new Date().toLocaleDateString("en-CA", { timeZone: BRT })}T12:00:00`);
     d.setMonth(d.getMonth() + 1);
     return d.toISOString().split("T")[0];
   });

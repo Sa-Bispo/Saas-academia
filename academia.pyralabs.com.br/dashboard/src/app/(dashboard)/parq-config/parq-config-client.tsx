@@ -429,8 +429,10 @@ const MESES_POR_PERIODICIDADE: Record<string, number> = {
   ANUAL: 12,
 };
 
+// Ancorado ao meio-dia (mesmo padrão de calcVencimento() em alunos-client.tsx)
+// — "YYYY-MM-DD" puro vira meia-noite UTC, que cai no dia anterior em BRT.
 function calcVencimento(inicio: string, periodicidade: string): string {
-  const d = new Date(inicio);
+  const d = new Date(`${inicio}T12:00:00`);
   if (Number.isNaN(d.getTime())) return "";
   d.setMonth(d.getMonth() + (MESES_POR_PERIODICIDADE[periodicidade] ?? 1));
   return d.toISOString().split("T")[0];
@@ -449,7 +451,9 @@ function ModalMatricular({
   planos: Plano[];
   onClose: () => void;
 }) {
-  const hoje = new Date().toISOString().split("T")[0];
+  // "Hoje" em BRT explícito, não toISOString() (que dá o dia UTC — errado
+  // entre 21h e meia-noite no horário de Brasília).
+  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const [planoId, setPlanoId] = useState(planos[0]?.id ?? "");
   const [dataInicio, setDataInicio] = useState(hoje);
   const [pending, startTransition] = useTransition();

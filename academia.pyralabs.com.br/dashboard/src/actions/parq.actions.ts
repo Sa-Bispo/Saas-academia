@@ -185,8 +185,11 @@ export async function matricularLeadParq(data: {
       tenantId,
       alunoId: data.alunoId,
       planoId: data.planoId,
-      dataInicio: new Date(data.dataInicio),
-      dataVencimento: new Date(data.dataVencimento),
+      // Ancorado ao meio-dia — "YYYY-MM-DD" puro vira meia-noite UTC, que cai no
+      // dia anterior quando exibido em BRT. Mesmo padrão de matricularAluno()
+      // em planos-academia.actions.ts e do fix de importar-alunos.actions.ts.
+      dataInicio: new Date(`${data.dataInicio}T12:00:00`),
+      dataVencimento: new Date(`${data.dataVencimento}T12:00:00`),
     },
     include: { plano: true },
   });
