@@ -8,6 +8,7 @@ import {
   Activity,
   Bot,
   ClipboardList,
+  Clock,
   CreditCard,
   Dumbbell,
   LayoutDashboard,
@@ -87,6 +88,15 @@ export function SidebarNicho({
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [botAtivoLive, setBotAtivoLive] = useState(botAtivo);
   const notificacoes = useNotificacoes();
+
+  // Relógio do rodapé — null até o primeiro tick do client pra não dar
+  // hydration mismatch (server e client renderizariam um "agora" diferente).
+  const [agora, setAgora] = useState<Date | null>(null);
+  useEffect(() => {
+    setAgora(new Date());
+    const tick = setInterval(() => setAgora(new Date()), 1000);
+    return () => clearInterval(tick);
+  }, []);
 
   // Mantém o indicador de bot no rodapé em sincronia mesmo sem navegar
   // entre páginas (ex: usuário conecta o WhatsApp em outra aba).
@@ -243,27 +253,37 @@ export function SidebarNicho({
         )}
       </nav>
 
-      {/* ── Footer: bot status + profile ── */}
+      {/* ── Footer: relógio + profile ── */}
       <div style={{ borderTop: "1px solid var(--sidebar-border)" }}>
-        {/* Bot status */}
+        {/* Relógio (data/hora em tempo real, horário de Brasília) */}
         <div className="flex items-center gap-2 px-4 py-3">
-          <span
-            className="relative flex h-2 w-2 shrink-0"
-          >
-            {botAtivoLive && (
-              <span
-                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-                style={{ background: "var(--accent)" }}
-              />
+          <Clock size={14} className="shrink-0" style={{ color: "var(--sidebar-text-muted)" }} />
+          <div className="leading-tight">
+            <div className="text-xs font-medium tabular-nums" style={{ color: "var(--sidebar-text)" }}>
+              {isSigningOut
+                ? "Saindo..."
+                : agora
+                  ? agora.toLocaleTimeString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })
+                  : "—"}
+            </div>
+            {!isSigningOut && (
+              <div className="text-[10px] tabular-nums" style={{ color: "var(--sidebar-text-muted)" }}>
+                {agora
+                  ? agora.toLocaleDateString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </div>
             )}
-            <span
-              className="relative inline-flex h-2 w-2 rounded-full"
-              style={{ background: botAtivoLive ? "var(--accent)" : "#ef4444" }}
-            />
-          </span>
-          <span className="text-xs" style={{ color: "var(--sidebar-text-muted)" }}>
-            {isSigningOut ? "Saindo..." : botAtivoLive ? "Bot conectado" : "Bot desconectado"}
-          </span>
+          </div>
         </div>
 
         {/* Profile */}
