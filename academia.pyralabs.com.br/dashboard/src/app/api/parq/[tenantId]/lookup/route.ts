@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Triagem do fluxo PAR-Q: o aluno começa por CPF + data de nascimento e o
-// sistema decide o caminho — cadastro novo, só foto, já completo ou data errada.
+// Triagem do fluxo PAR-Q: o aluno começa só pelo CPF e o sistema decide o
+// caminho — cadastro novo, só foto, ou já completo. Não confere data de
+// nascimento: muita gente na base tem a data errada (cadastro antigo/planilha),
+// e isso travava gente que deveria simplesmente continuar o cadastro.
 
 function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] ?? nome;
-}
-
-function mesmaData(salvo: Date | null, informado: string): boolean {
-  if (!salvo) return false;
-  const d = new Date(salvo);
-  const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-  return iso === informado;
 }
 
 export async function POST(
@@ -27,7 +22,7 @@ export async function POST(
       return NextResponse.json({ error: "Academia não encontrada." }, { status: 404 });
     }
 
-    let body: { cpf?: string; dataNascimento?: string };
+    let body: { cpf?: string };
     try {
       body = await req.json();
     } catch {
@@ -35,18 +30,14 @@ export async function POST(
     }
 
     const cpfLimpo = (body.cpf ?? "").replace(/\D/g, "");
-    const dataNascimento = body.dataNascimento ?? "";
 
     if (cpfLimpo.length !== 11) {
       return NextResponse.json({ error: "Informe os 11 dígitos do CPF." }, { status: 422 });
     }
-    if (!dataNascimento) {
-      return NextResponse.json({ error: "Informe a data de nascimento." }, { status: 422 });
-    }
 
     const aluno = await prisma.aluno.findFirst({
       where: { tenantId, cpf: cpfLimpo },
-      select: { id: true, nome: true, dataNascimento: true, fotoUrl: true },
+      select: { id: true, nome: true, fotoUrl: true },
     });
 
     // CPF não está na base → aluno novo, segue o formulário completo.
@@ -54,13 +45,7 @@ export async function POST(
       return NextResponse.json({ status: "novo" });
     }
 
-    // CPF existe mas a data não bate → bloqueia (não cria duplicado, não deixa
-    // um estranho mexer no cadastro alheio). Não devolve o nome de propósito.
-    if (!mesmaData(aluno.dataNascimento, dataNascimento)) {
-      return NextResponse.json({ status: "data_errada" });
-    }
-
-    // CPF + data conferem → só falta a foto, ou já está completo.
+    // CPF já cadastrado → só falta a foto, ou já está completo.
     if (!aluno.fotoUrl) {
       return NextResponse.json({ status: "foto", primeiroNome: primeiroNome(aluno.nome) });
     }

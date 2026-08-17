@@ -21,27 +21,6 @@ function maskCpf(value: string) {
     .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
 }
 
-// Data digitada como texto "DD/MM/AAAA" (mesmo padrão do formulário PAR-Q).
-// Evita o seletor nativo de data, ruim no mobile.
-function maskDataNascimento(value: string) {
-  const d = value.replace(/\D/g, "").slice(0, 8);
-  return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join("/");
-}
-
-// "DD/MM/AAAA" -> "AAAA-MM-DD" (formato que a API espera), validando data real.
-function parseDataNascimento(value: string): { iso: string } | { erro: string } | null {
-  if (!value.replace(/\D/g, "")) return null;
-  const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return { erro: "Data de nascimento incompleta. Use o formato DD/MM/AAAA." };
-  const [, dd, mm, yyyy] = m;
-  const dia = Number(dd), mes = Number(mm), ano = Number(yyyy);
-  const data = new Date(ano, mes - 1, dia);
-  const valida = data.getFullYear() === ano && data.getMonth() === mes - 1 && data.getDate() === dia;
-  if (!valida || ano < 1900) return { erro: "Data de nascimento inválida." };
-  if (data.getTime() > Date.now()) return { erro: "Data de nascimento não pode ser no futuro." };
-  return { iso: `${yyyy}-${mm}-${dd}` };
-}
-
 type Etapa = "identificar" | "novo" | "foto" | "fotoEnviada" | "completo";
 
 export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
@@ -49,7 +28,6 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
 
   const [etapa, setEtapa] = useState<Etapa>("identificar");
   const [cpf, setCpf] = useState("");
-  const [dataNascimento, setDataNascimento] = useState("");
   const [primeiroNome, setPrimeiroNome] = useState("");
   const [foto, setFoto] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -72,21 +50,12 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
       setErro("Informe os 11 dígitos do CPF.");
       return;
     }
-    const nasc = parseDataNascimento(dataNascimento);
-    if (!nasc) {
-      setErro("Informe sua data de nascimento.");
-      return;
-    }
-    if ("erro" in nasc) {
-      setErro(nasc.erro);
-      return;
-    }
     startTransition(async () => {
       try {
         const res = await fetch(`/api/parq/${tenantId}/lookup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cpf, dataNascimento: nasc.iso }),
+          body: JSON.stringify({ cpf }),
         });
         const data = (await res.json().catch(() => ({}))) as {
           status?: string; primeiroNome?: string; error?: string;
@@ -99,9 +68,6 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
         if (data.status === "novo") setEtapa("novo");
         else if (data.status === "foto") setEtapa("foto");
         else if (data.status === "completo") setEtapa("completo");
-        else if (data.status === "data_errada") {
-          setErro("Encontramos esse CPF, mas a data de nascimento não confere. Confira e tente de novo.");
-        }
       } catch {
         setErro("Sem conexão. Verifique sua internet e tente novamente.");
       }
@@ -116,7 +82,7 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
         const res = await fetch(`/api/foto/${tenantId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "enviar", cpf, dataNascimento, foto }),
+          body: JSON.stringify({ action: "enviar", cpf, foto }),
         });
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (!res.ok) { setErro(data.error ?? "Não foi possível enviar a foto."); return; }
@@ -127,7 +93,7 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
     });
   }
 
-  // Aluno novo → formulário PAR-Q completo, com CPF e data já preenchidos.
+  // Aluno novo → formulário PAR-Q completo, com CPF já preenchido.
   if (etapa === "novo") {
     return (
       <ParqFormClient
@@ -135,7 +101,6 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
         academiaName={academiaName}
         perguntas={perguntas}
         cpfInicial={cpf}
-        dataNascimentoInicial={dataNascimento}
       />
     );
   }
@@ -152,7 +117,7 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
         {/* ── Etapa 1: identificar ── */}
         {etapa === "identificar" && (
           <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <p className="text-sm text-white/50">Comece confirmando seu CPF e data de nascimento.</p>
+            <p className="text-sm text-white/50">Comece confirmando seu CPF.</p>
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-white/60">CPF</label>
@@ -162,17 +127,6 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
                 value={cpf}
                 onChange={(e) => setCpf(maskCpf(e.target.value))}
                 inputMode="numeric"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-white/60">Data de nascimento</label>
-              <input
-                className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder-white/20 focus:border-emerald-500/50 focus:outline-none"
-                placeholder="DD/MM/AAAA"
-                inputMode="numeric"
-                value={dataNascimento}
-                onChange={(e) => setDataNascimento(maskDataNascimento(e.target.value))}
               />
             </div>
 

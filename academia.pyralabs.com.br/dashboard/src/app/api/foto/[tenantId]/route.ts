@@ -2,29 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Telinha pública de auto-atendimento: o aluno se identifica por CPF + data de
-// nascimento e envia a própria foto. Reaproveita o bucket "fotos-alunos".
+// Telinha pública de auto-atendimento: o aluno se identifica pelo CPF e envia
+// a própria foto. Reaproveita o bucket "fotos-alunos". Não confere data de
+// nascimento — muita gente na base tem a data errada (ver lookup/route.ts).
 
 function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] ?? nome;
 }
 
-// Compara só a parte de data (ignora hora/timezone) entre o dataNascimento salvo
-// e o "YYYY-MM-DD" enviado pelo aluno.
-function mesmaData(salvo: Date | null, informado: string): boolean {
-  if (!salvo) return false;
-  const d = new Date(salvo);
-  const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-  return iso === informado;
-}
-
-async function acharAluno(tenantId: string, cpf: string, dataNascimento: string) {
+async function acharAluno(tenantId: string, cpf: string) {
   const cpfLimpo = cpf.replace(/\D/g, "");
   if (cpfLimpo.length !== 11) return null;
-  const aluno = await prisma.aluno.findFirst({ where: { tenantId, cpf: cpfLimpo } });
-  if (!aluno) return null;
-  if (!mesmaData(aluno.dataNascimento, dataNascimento)) return null;
-  return aluno;
+  return prisma.aluno.findFirst({ where: { tenantId, cpf: cpfLimpo } });
 }
 
 export async function POST(
@@ -39,24 +28,24 @@ export async function POST(
       return NextResponse.json({ error: "Academia não encontrada." }, { status: 404 });
     }
 
-    let body: { action?: string; cpf?: string; dataNascimento?: string; foto?: string | null };
+    let body: { action?: string; cpf?: string; foto?: string | null };
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
     }
 
-    const { action, cpf, dataNascimento, foto } = body;
+    const { action, cpf, foto } = body;
 
-    if (!cpf || !dataNascimento) {
-      return NextResponse.json({ error: "Informe CPF e data de nascimento." }, { status: 422 });
+    if (!cpf) {
+      return NextResponse.json({ error: "Informe o CPF." }, { status: 422 });
     }
 
-    const aluno = await acharAluno(tenantId, cpf, dataNascimento);
+    const aluno = await acharAluno(tenantId, cpf);
     // Mensagem genérica de propósito: não revela se o CPF existe (evita enumeração).
     if (!aluno) {
       return NextResponse.json(
-        { error: "Não encontramos um cadastro com esse CPF e data de nascimento." },
+        { error: "Não encontramos um cadastro com esse CPF." },
         { status: 404 }
       );
     }
