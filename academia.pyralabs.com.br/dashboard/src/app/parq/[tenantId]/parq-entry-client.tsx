@@ -10,6 +10,7 @@ type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "TEXTO" };
 type Props = {
   tenantId: string;
   academiaName: string;
+  logoUrl?: string | null;
   perguntas: Pergunta[];
 };
 
@@ -23,7 +24,7 @@ function maskCpf(value: string) {
 
 type Etapa = "identificar" | "novo" | "foto" | "fotoEnviada" | "completo";
 
-export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
+export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: Props) {
   const fotoInputRef = useRef<HTMLInputElement>(null);
 
   const [etapa, setEtapa] = useState<Etapa>("identificar");
@@ -99,6 +100,7 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
       <ParqFormClient
         tenantId={tenantId}
         academiaName={academiaName}
+        logoUrl={logoUrl}
         perguntas={perguntas}
         cpfInicial={cpf}
       />
@@ -110,6 +112,10 @@ export function ParqEntryClient({ tenantId, academiaName, perguntas }: Props) {
       <div className="w-full max-w-sm space-y-6">
         {/* Header */}
         <div className="text-center">
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={academiaName} className="mx-auto mb-3 h-16 w-16 rounded-2xl object-contain" />
+          )}
           <p className="text-xs font-semibold uppercase tracking-widest text-white/40">{academiaName}</p>
           <h1 className="mt-2 text-2xl font-bold text-white">Ficha de cadastro</h1>
         </div>

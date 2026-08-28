@@ -5,7 +5,7 @@ import { pdf } from "@react-pdf/renderer";
 import { Download, Loader2 } from "lucide-react";
 import { ParqPdfDocument } from "./parq-pdf";
 
-type Pergunta = { id: number; texto: string };
+type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "TEXTO"; ordem: number };
 type Ficha = {
   id: string;
   assinanteNome: string;

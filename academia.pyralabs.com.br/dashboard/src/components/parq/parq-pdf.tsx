@@ -94,6 +94,21 @@ const s = StyleSheet.create({
   badgeSim: { backgroundColor: "#fef3c7", color: "#92400e" },
   badgeNao: { backgroundColor: "#ecfdf5", color: "#065f46" },
 
+  // ─── Bloco informativo (regulamento, avisos etc.) ─────────────────────────
+  infoBox: {
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 6,
+  },
+  infoTitulo: { fontSize: 9, fontWeight: "bold", color: "#065f46", marginBottom: 4 },
+  infoParagraph: { fontSize: 8, color: "#374151", lineHeight: 1.5, marginBottom: 4 },
+  infoBulletRow: { flexDirection: "row", gap: 5, marginBottom: 3 },
+  infoBulletMark: { fontSize: 8, color: "#9ca3af" },
+  infoBulletText: { flex: 1, fontSize: 8, color: "#374151", lineHeight: 1.5 },
+
   // ─── Alerta médico ─────────────────────────────────────────────────────────
   alertBox: {
     backgroundColor: "#fffbeb",
@@ -150,6 +165,31 @@ const s = StyleSheet.create({
   pageNum: { fontSize: 7, color: "#9ca3af" },
 });
 
+// Mesma regra de leitura do TextoInformativo (web): linha "- "/"* "/"• " vira
+// bullet, o resto vira parágrafo. Precisa de versão própria aqui porque o
+// react-pdf usa primitivas (View/Text) em vez de HTML.
+function linhasInfo(texto: string): { tipo: "bullet" | "paragrafo"; texto: string }[] {
+  return texto
+    .split("\n")
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+    .map((linha) => {
+      const bulletMatch = linha.match(/^[*\-•]\s+(.*)/);
+      return bulletMatch
+        ? { tipo: "bullet" as const, texto: bulletMatch[1] }
+        : { tipo: "paragrafo" as const, texto: linha };
+    });
+}
+
+// Mesma convenção do RegulamentoAccordion (web): a primeira linha do bloco é
+// o título da seção, o resto é o corpo.
+function separarTitulo(texto: string): { titulo: string; corpo: string } {
+  const linhas = texto.split("\n");
+  const idx = linhas.findIndex((l) => l.trim());
+  if (idx === -1) return { titulo: "", corpo: "" };
+  return { titulo: linhas[idx].trim(), corpo: linhas.slice(idx + 1).join("\n") };
+}
+
 function formatCpf(cpf: string) {
   const d = cpf.replace(/\D/g, "");
   if (d.length !== 11) return cpf;
@@ -166,7 +206,7 @@ function formatDate(date: Date | string) {
   });
 }
 
-type Pergunta = { id: number; texto: string };
+type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "TEXTO"; ordem: number };
 type Ficha = {
   id: string;
   assinanteNome: string;
@@ -194,6 +234,13 @@ export function ParqPdfDocument({ ficha, perguntas, academiaName, termoTexto }: 
   const respostasOrdenadas = Object.entries(ficha.respostas).sort(
     ([a], [b]) => Number(a) - Number(b)
   );
+
+  // Blocos informativos (regulamento, avisos etc.) na mesma ordem em que
+  // aparecem no formulário — ficam de fora de ficha.respostas porque não são
+  // perguntas com resposta Sim/Não.
+  const blocosInformativos = perguntas
+    .filter((p) => p.tipo === "TEXTO")
+    .sort((a, b) => a.ordem - b.ordem);
 
   return (
     <Document
@@ -243,6 +290,33 @@ export function ParqPdfDocument({ ficha, perguntas, academiaName, termoTexto }: 
             )}
           </View>
         </View>
+
+        {/* ── Regulamento e avisos ── */}
+        {blocosInformativos.length > 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>Regulamento e Informacoes</Text>
+            {blocosInformativos.map((bloco) => {
+              const { titulo, corpo } = separarTitulo(bloco.texto);
+              return (
+                <View key={bloco.id} style={s.infoBox}>
+                  {titulo && <Text style={s.infoTitulo}>{titulo}</Text>}
+                  {linhasInfo(corpo).map((linha, i) =>
+                    linha.tipo === "bullet" ? (
+                      <View key={i} style={s.infoBulletRow}>
+                        <Text style={s.infoBulletMark}>•</Text>
+                        <Text style={s.infoBulletText}>{linha.texto}</Text>
+                      </View>
+                    ) : (
+                      <Text key={i} style={s.infoParagraph}>
+                        {linha.texto}
+                      </Text>
+                    )
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* ── Perguntas PAR-Q ── */}
         <View style={s.section}>

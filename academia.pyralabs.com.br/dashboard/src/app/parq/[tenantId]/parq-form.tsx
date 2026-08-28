@@ -1,16 +1,17 @@
 "use client";
 
 import { useRef, useState, useTransition, useCallback } from "react";
-import { AlertTriangle, Camera, CheckCircle, Info, Loader2, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle, Loader2, RotateCcw, X } from "lucide-react";
 import { SignaturePad, SignaturePadHandle } from "@/components/parq/signature-pad";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
-import { TextoInformativo } from "@/lib/parq-texto-informativo";
+import { RegulamentoAccordion } from "@/components/parq/regulamento-accordion";
 
 type Pergunta = { id: number; texto: string; tipo: "PERGUNTA" | "TEXTO" };
 
 type Props = {
   tenantId: string;
   academiaName: string;
+  logoUrl?: string | null;
   perguntas: Pergunta[];
   cpfInicial?: string;
   dataNascimentoInicial?: string;
@@ -62,7 +63,7 @@ function parseDataNascimento(value: string): { iso: string } | { erro: string } 
   return { iso: `${yyyy}-${mm}-${dd}` };
 }
 
-export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, dataNascimentoInicial }: Props) {
+export function ParqFormClient({ tenantId, academiaName, logoUrl, perguntas, cpfInicial, dataNascimentoInicial }: Props) {
   const sigRef = useRef<SignaturePadHandle>(null);
   const fotoInputRef = useRef<HTMLInputElement>(null); // usado para resetar o value ao trocar foto
 
@@ -80,6 +81,7 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
   const [pending, startTransition] = useTransition();
 
   const perguntasMedicas = perguntas.filter((p) => p.tipo === "PERGUNTA");
+  const blocosRegulamento = perguntas.filter((p) => p.tipo === "TEXTO");
   const todasRespondidas = perguntasMedicas.every((p) => respostas[p.id] !== undefined);
   const temAlertaMedico = Object.values(respostas).some((v) => v === "S");
 
@@ -223,6 +225,10 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
       <div className="mx-auto w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center">
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={academiaName} className="mx-auto mb-3 h-16 w-16 rounded-2xl object-contain" />
+          )}
           <p className="text-xs font-semibold uppercase tracking-widest text-white/40">
             {academiaName}
           </p>
@@ -281,6 +287,9 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
           </div>
         </div>
 
+        {/* Regulamento da academia */}
+        <RegulamentoAccordion blocos={blocosRegulamento} />
+
         {/* Questionário PAR-Q */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 space-y-4">
           <div>
@@ -292,22 +301,8 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
             </p>
           </div>
 
-          {perguntas.map((p) => {
-            if (p.tipo === "TEXTO") {
-              return (
-                <div
-                  key={p.id}
-                  className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
-                >
-                  <Info size={14} className="mt-0.5 shrink-0 text-white/30" />
-                  <TextoInformativo
-                    texto={p.texto}
-                    className="space-y-1 text-xs leading-relaxed text-white/60"
-                  />
-                </div>
-              );
-            }
-            const i = perguntasMedicas.findIndex((x) => x.id === p.id) + 1;
+          {perguntasMedicas.map((p, index) => {
+            const i = index + 1;
             const naoRespondida = tentouEnviar && respostas[p.id] === undefined;
             return (
               <div key={p.id} className="space-y-2">
@@ -484,9 +479,9 @@ export function ParqFormClient({ tenantId, academiaName, perguntas, cpfInicial, 
               className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
             />
             <span className="text-xs text-white/60">
-              Li e concordo com o termo acima e autorizo o tratamento dos meus dados
-              (incluindo dados de saúde) para fins de cadastro nesta academia, conforme a
-              LGPD (Lei 13.709/2018).
+              Li e concordo com {blocosRegulamento.length > 0 ? "o regulamento e o termo acima" : "o termo acima"} e
+              autorizo o tratamento dos meus dados (incluindo dados de saúde) para fins de
+              cadastro nesta academia, conforme a LGPD (Lei 13.709/2018).
             </span>
           </label>
         </div>

@@ -20,7 +20,7 @@ async function main() {
     const { rows } = await client.query(
       `SELECT t.id FROM tenants t
        JOIN users u ON u.id = t.user_id
-       WHERE u.email = 'teste@academia.com'
+       WHERE u.email = 'teste.parq@academiasaas.dev'
        LIMIT 1`
     );
 

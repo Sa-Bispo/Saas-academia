@@ -62,6 +62,7 @@ export default async function DashboardLayout({
       id: true,
       nome: true,
       companyName: true,
+      logoUrl: true,
       whatsappStatus: true,
       plano: true,
       configNicho: true,
@@ -95,6 +96,7 @@ export default async function DashboardLayout({
         <SidebarNicho
           tenantId={tenant.id}
           tenantName={tenant.companyName || tenant.nome}
+          logoUrl={tenant.logoUrl}
           planName={tenant.subscription.plan.name}
           botAtivo={tenant.whatsappStatus === "CONNECTED"}
           suporteNaoLidas={suporteNaoLidas}

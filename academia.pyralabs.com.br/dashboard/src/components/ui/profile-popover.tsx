@@ -12,6 +12,7 @@ type ProfilePopoverProps = {
   tenant: {
     name: string;
     plano: string;
+    logoUrl?: string | null;
   };
   onSignOut: () => Promise<void> | void;
   profileHref?: string;
@@ -76,7 +77,7 @@ export function ProfilePopover({
             width: "34px",
             height: "34px",
             borderRadius: "50%",
-            background: "var(--accent)",
+            background: tenant.logoUrl ? "var(--bg-tertiary)" : "var(--accent)",
             color: "#fff",
             display: "flex",
             alignItems: "center",
@@ -84,9 +85,19 @@ export function ProfilePopover({
             fontSize: "13px",
             fontWeight: 600,
             flexShrink: 0,
+            overflow: "hidden",
           }}
         >
-          {initials}
+          {tenant.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={tenant.logoUrl}
+              alt={tenant.name}
+              style={{ width: "100%", height: "100%", objectFit: "contain", padding: "3px" }}
+            />
+          ) : (
+            initials
+          )}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>

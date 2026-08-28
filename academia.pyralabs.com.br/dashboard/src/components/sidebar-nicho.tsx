@@ -33,6 +33,7 @@ import { ROTA_MODULO, type ModuloChave } from "@/lib/modulos";
 type SidebarNichoProps = {
   tenantId?: string;
   tenantName: string;
+  logoUrl?: string | null;
   planName: string;
   botAtivo: boolean;
   suporteNaoLidas?: number;
@@ -75,6 +76,7 @@ const SETTINGS_LINKS: LinkItem[] = [
 export function SidebarNicho({
   tenantId,
   tenantName,
+  logoUrl,
   planName,
   botAtivo,
   userEmail,
@@ -179,13 +181,18 @@ export function SidebarNicho({
         style={{ borderBottom: "1px solid var(--sidebar-border)" }}
       >
         <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl"
           style={{
             background: "var(--bg-tertiary)",
             border: "1px solid var(--border-color)",
           }}
         >
-          <Zap size={15} style={{ color: "var(--text-secondary)" }} />
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={tenantName} className="h-full w-full object-contain p-1" />
+          ) : (
+            <Zap size={15} style={{ color: "var(--text-secondary)" }} />
+          )}
         </div>
         <div className="min-w-0">
           <p
@@ -290,7 +297,7 @@ export function SidebarNicho({
         <div className="px-2 pb-3">
           <ProfilePopover
             user={{ name: userName, email: userEmail }}
-            tenant={{ name: tenantName, plano: planName }}
+            tenant={{ name: tenantName, plano: planName, logoUrl }}
             onSignOut={handleSignOut}
             profileHref="/configuracoes"
           />
@@ -311,10 +318,15 @@ export function SidebarNicho({
       >
         <div className="flex items-center gap-2">
           <div
-            className="flex h-7 w-7 items-center justify-center rounded-lg"
+            className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg"
             style={{ background: "var(--bg-secondary)" }}
           >
-            <Zap size={13} style={{ color: "var(--accent)" }} />
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={tenantName} className="h-full w-full object-contain p-0.5" />
+            ) : (
+              <Zap size={13} style={{ color: "var(--accent)" }} />
+            )}
           </div>
           <span
             className="max-w-[160px] truncate text-sm font-semibold"

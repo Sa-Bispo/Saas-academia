@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureTenantForUser } from "@/services/tenant.service";
 
 const TONE_LABELS: Record<string, string> = {
@@ -118,6 +119,7 @@ export type TenantConfigDTO = {
   whatsappAdmin: string | null;
   botName: string | null;
   companyName: string | null;
+  logoUrl: string | null;
   toneOfVoice: string | null;
   strictRules: string | null;
   botObjective: string | null;
@@ -173,6 +175,7 @@ export async function getTenantConfig(): Promise<TenantConfigDTO> {
       whatsappAdmin: true,
       botName: true,
       companyName: true,
+      logoUrl: true,
       toneOfVoice: true,
       strictRules: true,
       botObjective: true,
@@ -195,6 +198,7 @@ export async function getTenantConfig(): Promise<TenantConfigDTO> {
     whatsappAdmin: tenant.whatsappAdmin,
     botName: tenant.botName,
     companyName: tenant.companyName,
+    logoUrl: tenant.logoUrl,
     toneOfVoice: tenant.toneOfVoice,
     strictRules: tenant.strictRules,
     botObjective: tenant.botObjective,
@@ -275,4 +279,47 @@ export async function updateTenantConfig(input: UpdateTenantConfigInput) {
     message: "Configurações salvas com sucesso.",
     tenant: updated,
   };
+}
+
+// ─── Logo da academia ─────────────────────────────────────────────────────────
+
+// A logo aparece na sidebar, no rodapé (perfil) e no cabeçalho do PAR-Q.
+// Revalida o layout inteiro para que todos os pontos atualizem de uma vez.
+function revalidarLogo() {
+  revalidatePath("/", "layout");
+}
+
+export async function salvarLogoAcademia(logoBase64: string) {
+  if (!logoBase64 || !logoBase64.startsWith("data:image/")) {
+    throw new Error("Imagem inválida.");
+  }
+  const { tenant } = await getAuthenticatedTenant();
+
+  const base64Data = logoBase64.replace(/^data:image\/\w+;base64,/, "");
+  const buffer = Buffer.from(base64Data, "base64");
+  const supabase = createAdminClient();
+  const path = `${tenant.id}.png`;
+  const { error: uploadError } = await supabase.storage
+    .from("logos-academias")
+    .upload(path, buffer, { contentType: "image/png", upsert: true });
+  if (uploadError) {
+    throw new Error(`Não foi possível salvar a logo: ${uploadError.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from("logos-academias").getPublicUrl(path);
+  // Cache-buster: a URL pública é a mesma a cada troca; o timestamp força refresh.
+  const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+  await prisma.tenant.update({ where: { id: tenant.id }, data: { logoUrl: publicUrl } });
+
+  revalidarLogo();
+  return { success: true, logoUrl: publicUrl };
+}
+
+export async function removerLogoAcademia() {
+  const { tenant } = await getAuthenticatedTenant();
+  const supabase = createAdminClient();
+  await supabase.storage.from("logos-academias").remove([`${tenant.id}.png`]);
+  await prisma.tenant.update({ where: { id: tenant.id }, data: { logoUrl: null } });
+  revalidarLogo();
+  return { success: true };
 }

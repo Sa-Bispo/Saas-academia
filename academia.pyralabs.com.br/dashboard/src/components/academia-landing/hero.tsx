@@ -38,11 +38,11 @@ export function Hero() {
       <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:gap-20 lg:grid-cols-[0.88fr_1.12fr]">
         <div className="animate-fade-up">
           <h1 className="font-display text-[46px] font-extrabold uppercase leading-[0.92] tracking-[-0.015em] text-gradient sm:text-[68px]">
-            A gestão da sua
+            A GESTÃO DA SUA
             <br />
-            academia rodando
+            ACADEMIA RODANDO
             <br />
-            sozinha.
+            SOZINHA.
           </h1>
 
           <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-[var(--text-secondary)]">

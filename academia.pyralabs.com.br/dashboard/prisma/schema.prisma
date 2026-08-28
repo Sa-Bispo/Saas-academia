@@ -33,6 +33,7 @@ model Tenant {
   // Construtor de Persona (campos estruturados)
   botName          String? @db.VarChar(80)
   companyName      String? @db.VarChar(120)
+  logoUrl          String? @map("logo_url") @db.Text // logo da academia (Supabase Storage)
   toneOfVoice      String? @db.VarChar(40)
   strictRules      String? @db.Text
   botObjective     String? @db.VarChar(40)

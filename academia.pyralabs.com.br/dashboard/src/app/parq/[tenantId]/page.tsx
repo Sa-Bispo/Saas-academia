@@ -49,7 +49,7 @@ export default async function ParqPage({ params }: Props) {
   const [tenant] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { id: true, nome: true, companyName: true },
+      select: { id: true, nome: true, companyName: true, logoUrl: true },
     }),
   ]);
 
@@ -59,6 +59,7 @@ export default async function ParqPage({ params }: Props) {
     <ParqEntryClient
       tenantId={tenant.id}
       academiaName={tenant.companyName || tenant.nome}
+      logoUrl={tenant.logoUrl}
       perguntas={perguntas.map((p) => ({ id: p.id, texto: p.texto, tipo: p.tipo }))}
     />
   );

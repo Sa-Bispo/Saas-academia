@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { LogoUploader } from "@/components/configuracoes/logo-uploader";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -340,6 +341,9 @@ export function ConfiguracoesPageClient({
           {toast.message}
         </div>
       )}
+
+      {/* ── Logo da academia ── */}
+      <LogoUploader initialLogoUrl={tenant.logoUrl} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
