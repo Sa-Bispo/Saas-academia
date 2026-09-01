@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
 import { prisma } from "@/lib/prisma";
+import { uploadFotoAluno, removerFotoAluno } from "@/lib/foto-aluno";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,33 @@ export async function atualizarAluno(
 
   revalidatePath("/alunos");
   revalidatePath("/dashboard/academia");
+}
+
+// Staff troca a foto de qualquer aluno direto no painel — mesma foto que
+// aparece no PAR-Q, na listagem e no PDF (é o mesmo campo aluno.fotoUrl).
+export async function atualizarFotoAluno(alunoId: string, fotoBase64: string) {
+  if (!fotoBase64 || !fotoBase64.startsWith("data:image/")) {
+    throw new Error("Imagem inválida.");
+  }
+  const tenantId = await getAuthenticatedTenantId();
+
+  const aluno = await prisma.aluno.findFirst({ where: { id: alunoId, tenantId }, select: { id: true } });
+  if (!aluno) throw new Error("Aluno não encontrado.");
+
+  const fotoUrl = await uploadFotoAluno(tenantId, alunoId, fotoBase64);
+
+  revalidatePath("/alunos");
+  return { fotoUrl };
+}
+
+export async function removerFotoDoAluno(alunoId: string) {
+  const tenantId = await getAuthenticatedTenantId();
+
+  const aluno = await prisma.aluno.findFirst({ where: { id: alunoId, tenantId }, select: { id: true } });
+  if (!aluno) throw new Error("Aluno não encontrado.");
+
+  await removerFotoAluno(tenantId, alunoId);
+  revalidatePath("/alunos");
 }
 
 export async function atualizarVencimentoMatricula(matriculaId: string, novaDataVencimento: string) {

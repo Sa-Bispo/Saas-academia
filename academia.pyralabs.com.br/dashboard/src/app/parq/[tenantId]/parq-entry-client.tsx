@@ -31,6 +31,8 @@ export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: 
   const [cpf, setCpf] = useState("");
   const [primeiroNome, setPrimeiroNome] = useState("");
   const [foto, setFoto] = useState<string | null>(null);
+  const [fotoAtualUrl, setFotoAtualUrl] = useState<string | null>(null);
+  const [trocandoFoto, setTrocandoFoto] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -59,7 +61,7 @@ export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: 
           body: JSON.stringify({ cpf }),
         });
         const data = (await res.json().catch(() => ({}))) as {
-          status?: string; primeiroNome?: string; error?: string;
+          status?: string; primeiroNome?: string; fotoUrl?: string; error?: string;
         };
         if (!res.ok) {
           setErro(data.error ?? "Não foi possível verificar seus dados.");
@@ -67,8 +69,11 @@ export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: 
         }
         setPrimeiroNome(data.primeiroNome ?? "");
         if (data.status === "novo") setEtapa("novo");
-        else if (data.status === "foto") setEtapa("foto");
-        else if (data.status === "completo") setEtapa("completo");
+        else if (data.status === "foto") { setTrocandoFoto(false); setEtapa("foto"); }
+        else if (data.status === "completo") {
+          setFotoAtualUrl(data.fotoUrl ?? null);
+          setEtapa("completo");
+        }
       } catch {
         setErro("Sem conexão. Verifique sua internet e tente novamente.");
       }
@@ -151,11 +156,15 @@ export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: 
           </div>
         )}
 
-        {/* ── Etapa 2: falta a foto ── */}
+        {/* ── Etapa 2: falta a foto (ou trocando uma existente) ── */}
         {etapa === "foto" && (
           <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
             <div className="text-center">
-              <p className="text-sm text-white/50">Oi, {primeiroNome}! Falta só a sua foto.</p>
+              <p className="text-sm text-white/50">
+                {trocandoFoto
+                  ? `Escolha a nova foto, ${primeiroNome}.`
+                  : `Oi, ${primeiroNome}! Falta só a sua foto.`}
+              </p>
             </div>
 
             <input
@@ -195,8 +204,19 @@ export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: 
             >
               {pending ? (
                 <span className="inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Enviando...</span>
-              ) : "Enviar foto"}
+              ) : trocandoFoto ? "Salvar nova foto" : "Enviar foto"}
             </button>
+
+            {trocandoFoto && (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => { setFoto(null); setErro(null); setTrocandoFoto(false); setEtapa("completo"); }}
+                className="w-full text-center text-xs text-white/30 transition hover:text-white/60"
+              >
+                Cancelar
+              </button>
+            )}
           </div>
         )}
 
@@ -204,7 +224,9 @@ export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: 
         {etapa === "fotoEnviada" && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center">
             <CheckCircle size={48} className="mx-auto mb-4 text-emerald-400" />
-            <h2 className="mb-1 text-xl font-semibold text-white">Foto enviada!</h2>
+            <h2 className="mb-1 text-xl font-semibold text-white">
+              {trocandoFoto ? "Foto atualizada!" : "Foto enviada!"}
+            </h2>
             <p className="text-sm text-white/50">
               Prontinho{primeiroNome ? `, ${primeiroNome}` : ""}. Seu cadastro está completo.
             </p>
@@ -214,11 +236,27 @@ export function ParqEntryClient({ tenantId, academiaName, logoUrl, perguntas }: 
         {/* ── Etapa 3b: cadastro já completo ── */}
         {etapa === "completo" && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center">
-            <CheckCircle size={48} className="mx-auto mb-4 text-emerald-400" />
+            {fotoAtualUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={fotoAtualUrl}
+                alt="Sua foto"
+                className="mx-auto mb-4 h-20 w-20 rounded-full border-2 border-emerald-500/50 object-cover"
+              />
+            ) : (
+              <CheckCircle size={48} className="mx-auto mb-4 text-emerald-400" />
+            )}
             <h2 className="mb-1 text-xl font-semibold text-white">Cadastro atualizado</h2>
             <p className="text-sm text-white/50">
-              Tudo certo{primeiroNome ? `, ${primeiroNome}` : ""}! Seu cadastro já está completo, não precisa fazer nada.
+              Tudo certo{primeiroNome ? `, ${primeiroNome}` : ""}! Seu cadastro já está completo.
             </p>
+            <button
+              type="button"
+              onClick={() => { setFoto(null); setTrocandoFoto(true); setEtapa("foto"); }}
+              className="mt-4 text-xs font-medium text-emerald-400 transition hover:text-emerald-300"
+            >
+              Trocar foto
+            </button>
           </div>
         )}
 

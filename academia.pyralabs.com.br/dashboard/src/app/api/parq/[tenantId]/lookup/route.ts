@@ -45,11 +45,15 @@ export async function POST(
       return NextResponse.json({ status: "novo" });
     }
 
-    // CPF já cadastrado → só falta a foto, ou já está completo.
+    // CPF já cadastrado → só falta a foto, ou já está completo (mas pode trocar).
     if (!aluno.fotoUrl) {
       return NextResponse.json({ status: "foto", primeiroNome: primeiroNome(aluno.nome) });
     }
-    return NextResponse.json({ status: "completo", primeiroNome: primeiroNome(aluno.nome) });
+    return NextResponse.json({
+      status: "completo",
+      primeiroNome: primeiroNome(aluno.nome),
+      fotoUrl: aluno.fotoUrl,
+    });
   } catch (err) {
     console.error("[PARQ lookup] Erro:", err);
     return NextResponse.json(

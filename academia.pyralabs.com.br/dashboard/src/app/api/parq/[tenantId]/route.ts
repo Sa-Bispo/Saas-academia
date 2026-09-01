@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { PARQ_TERMO_V1 } from "@/lib/parq-termo";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { uploadFotoAluno } from "@/lib/foto-aluno";
 
 // Fonte da verdade para assinatura: assinatura_base64 no banco (coluna da tabela
 // fichas_parq). O campo assinatura_url existe no schema mas não é preenchido —
@@ -135,21 +135,9 @@ async function handlePost(
     }
   }
 
-  // Upload da foto para Supabase Storage
+  // Upload da foto para Supabase Storage — não bloqueia a ficha se falhar.
   try {
-    const base64Data = foto.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-    const supabase = createAdminClient();
-    const path = `${tenantId}/${aluno.id}.jpg`;
-    const { error: uploadError } = await supabase.storage
-      .from("fotos-alunos")
-      .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
-    if (uploadError) {
-      console.error("[PARQ] Erro ao fazer upload da foto:", uploadError.message);
-    } else {
-      const { data: urlData } = supabase.storage.from("fotos-alunos").getPublicUrl(path);
-      await prisma.aluno.update({ where: { id: aluno.id }, data: { fotoUrl: urlData.publicUrl } });
-    }
+    await uploadFotoAluno(tenantId, aluno.id, foto);
   } catch (err) {
     console.error("[PARQ] Falha no upload da foto:", err);
   }

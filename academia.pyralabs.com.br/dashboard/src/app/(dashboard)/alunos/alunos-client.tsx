@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Users,
   Plus,
@@ -33,11 +33,14 @@ import {
 } from "lucide-react";
 import FloatingActionMenu from "@/components/ui/floating-action-menu";
 import { FotoViewer } from "@/components/ui/foto-viewer";
+import { comprimirFoto } from "@/lib/comprimir-foto";
 
 import {
   criarAluno,
   atualizarAluno,
   atualizarVencimentoMatricula,
+  atualizarFotoAluno,
+  removerFotoDoAluno,
   excluirAluno,
   buscarAluno,
   enviarLembrete,
@@ -672,6 +675,9 @@ function ModalDetalheAluno({
   const [aluno, setAluno] = useState<AlunoDetalhe | null | undefined>(undefined);
   const [editando, setEditando] = useState(false);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [fotoPending, startFotoTransition] = useTransition();
+  const [erroFoto, setErroFoto] = useState<string | null>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
 
   // Form de edição
   const [nome, setNome] = useState("");
@@ -770,6 +776,40 @@ function ModalDetalheAluno({
     });
   }
 
+  async function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (fotoInputRef.current) fotoInputRef.current.value = "";
+    if (!file) return;
+    setErroFoto(null);
+    let base64: string;
+    try {
+      base64 = await comprimirFoto(file);
+    } catch {
+      setErroFoto("Não foi possível carregar a foto. Tente outra.");
+      return;
+    }
+    startFotoTransition(async () => {
+      try {
+        const { fotoUrl } = await atualizarFotoAluno(alunoId, base64);
+        setAluno((prev) => (prev ? { ...prev, fotoUrl } : prev));
+      } catch (err) {
+        setErroFoto(err instanceof Error ? err.message : "Não foi possível salvar a foto.");
+      }
+    });
+  }
+
+  function handleRemoverFoto() {
+    setErroFoto(null);
+    startFotoTransition(async () => {
+      try {
+        await removerFotoDoAluno(alunoId);
+        setAluno((prev) => (prev ? { ...prev, fotoUrl: null } : prev));
+      } catch (err) {
+        setErroFoto(err instanceof Error ? err.message : "Não foi possível remover a foto.");
+      }
+    });
+  }
+
   async function handleExcluir() {
     if (!confirmandoExclusao) {
       setConfirmandoExclusao(true);
@@ -789,12 +829,56 @@ function ModalDetalheAluno({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div className="flex items-center gap-3">
-            {aluno?.fotoUrl && (
-              <FotoViewer
-                src={aluno.fotoUrl}
-                alt={aluno.nome}
-                className="h-10 w-10 shrink-0 rounded-full border border-line object-cover"
-              />
+            {aluno && (
+              <div className="relative shrink-0">
+                <input
+                  ref={fotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFotoChange}
+                />
+                {aluno.fotoUrl ? (
+                  <FotoViewer
+                    src={aluno.fotoUrl}
+                    alt={aluno.nome}
+                    className="h-10 w-10 rounded-full border border-line object-cover"
+                  />
+                ) : (
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-line"
+                    style={{ background: "var(--bg-tertiary)" }}
+                  >
+                    <ImageIcon size={15} className="text-muted" />
+                  </div>
+                )}
+                {fotoPending ? (
+                  <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                    <Loader2 size={13} className="animate-spin text-white" />
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      title={aluno.fotoUrl ? "Trocar foto" : "Adicionar foto"}
+                      onClick={() => fotoInputRef.current?.click()}
+                      className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:text-brand"
+                    >
+                      <Pencil size={10} />
+                    </button>
+                    {aluno.fotoUrl && (
+                      <button
+                        type="button"
+                        title="Remover foto"
+                        onClick={handleRemoverFoto}
+                        className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:text-red-400"
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             )}
             <div>
             <h2 className="text-sm font-semibold text-white">
@@ -816,6 +900,7 @@ function ModalDetalheAluno({
                 )}
               </div>
             )}
+            {erroFoto && <p className="mt-1 text-[11px] text-red-400">{erroFoto}</p>}
             </div>
           </div>
           <button

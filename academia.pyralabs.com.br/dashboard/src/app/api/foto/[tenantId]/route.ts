@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { uploadFotoAluno } from "@/lib/foto-aluno";
 
 // Telinha pública de auto-atendimento: o aluno se identifica pelo CPF e envia
 // a própria foto. Reaproveita o bucket "fotos-alunos". Não confere data de
@@ -64,26 +64,16 @@ export async function POST(
       return NextResponse.json({ error: "Foto inválida." }, { status: 422 });
     }
 
-    const base64Data = foto.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-    const supabase = createAdminClient();
-    const path = `${tenantId}/${aluno.id}.jpg`;
-    const { error: uploadError } = await supabase.storage
-      .from("fotos-alunos")
-      .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
-
-    if (uploadError) {
-      console.error("[FOTO] Erro no upload:", uploadError.message);
+    try {
+      await uploadFotoAluno(tenantId, aluno.id, foto);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error("[FOTO] Erro no upload:", detail);
       return NextResponse.json(
-        { error: "Não foi possível salvar a foto. Tente novamente.", detail: uploadError.message },
+        { error: "Não foi possível salvar a foto. Tente novamente.", detail },
         { status: 502 }
       );
     }
-
-    const { data: urlData } = supabase.storage.from("fotos-alunos").getPublicUrl(path);
-    // Cache-buster: a URL pública é a mesma a cada troca; o timestamp força refresh.
-    const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
-    await prisma.aluno.update({ where: { id: aluno.id }, data: { fotoUrl: publicUrl } });
 
     return NextResponse.json({ ok: true, primeiroNome: primeiroNome(aluno.nome) });
   } catch (err) {
