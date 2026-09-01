@@ -799,6 +799,9 @@ function ModalDetalheAluno({
   }
 
   function handleRemoverFoto() {
+    if (!confirm("Apagar a foto deste aluno? Essa ação não pode ser desfeita — a imagem é removida em definitivo.")) {
+      return;
+    }
     setErroFoto(null);
     startFotoTransition(async () => {
       try {
