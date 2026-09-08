@@ -1331,12 +1331,17 @@ function diasAteVencimento(dataVencimento: Date | string): number {
   return Math.round((venc.getTime() - hoje.getTime()) / 86400000);
 }
 
-// Inadimplente = mensalidade vencida (data), OU status gravado como INADIMPLENTE
-// (ex.: marcado manualmente em /cobrancas). Nenhum job automático atualiza o status
-// guardado quando a data vence, então não dá pra confiar só nele — mesmo motivo da
-// correção em mensalidadeInfo() abaixo.
+// Inadimplente = status gravado como INADIMPLENTE, OU aluno ATIVO com a
+// mensalidade vencida pela data (nenhum job automático atualiza o status quando
+// a data passa, então não dá pra confiar só nele).
+//
+// INATIVO e SUSPENSO NÃO entram aqui: são estados definidos na mão pela recepção
+// (parou de treinar / bloqueado) e a mensalidade vencida é esperada — marcá-los
+// de "Atrasado" só porque a data passou é o bug que a Anna reportou. Mesmo
+// critério do painel (ver academia-dashboard.actions.ts: derivação só p/ ATIVO).
 function estaInadimplente(a: Aluno): boolean {
   if (a.status === "INADIMPLENTE") return true;
+  if (a.status !== "ATIVO") return false;
   const venc = a.matriculas[0]?.dataVencimento;
   return !!venc && diasAteVencimento(venc) < 0;
 }
@@ -1738,6 +1743,11 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
                   {temFinanceiro && (
                     <div className="hidden w-36 lg:block">
                       {(() => {
+                        // Aluno inativo/suspenso não "deve" mensalidade — não faz
+                        // sentido mostrar "Vencido há Xd" em vermelho pra ele.
+                        if (st === "INATIVO" || st === "SUSPENSO") {
+                          return <span className="font-mono text-[12px] text-muted">—</span>;
+                        }
                         const info = mensalidadeInfo(matriculaAtiva?.dataVencimento);
                         return (
                           <>
