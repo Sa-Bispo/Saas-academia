@@ -118,3 +118,21 @@ docker compose -f docker-compose.prod.yml up -d academia_web
 git checkout prisma/schema.prisma
 # Depois recriar as mudanças localmente com prisma migrate dev
 ```
+
+### PAR-Q dá "Erro ao enviar" só em alguns celulares (Nginx 413)
+- Causa: o server block do `pyralabs.com.br` (domínio usado no link `/parq/<tenantId>`
+  compartilhado com o aluno) não tinha `client_max_body_size`, então o Nginx usava o
+  default de 1M. Em alguns Android a foto (selfie) + assinatura em base64 passam de
+  1MB → Nginx devolve 413 antes de chegar no Next.js → o front não recebe JSON e cai
+  no fallback genérico "Erro ao enviar. Tente novamente." (não reproduz pra quem testa
+  de outro aparelho/rede com payload menor).
+- Confirmado nos logs: `grep 'api/parq' /var/log/nginx/access.log* | grep '" 413 '`
+- Correção (11/09→14/09/2026): `client_max_body_size 20M;` adicionado ao server block
+  de `pyralabs.com.br` em `/etc/nginx/sites-available/pyralabs` (mesmo valor já usado
+  nos blocks de `app.` e `academia.`), `nginx -t && systemctl reload nginx`.
+- **Atenção:** esse arquivo (`/etc/nginx/sites-available/pyralabs`) é o Nginx REAL em
+  produção e está desatualizado em relação a `nginx/pyralabs.conf` deste repo — o
+  arquivo do repo já descreve a arquitetura nova (hub estático em `pyralabs.com.br` +
+  dashboard em `academia.pyralabs.com.br`) que ainda não foi migrada. Não copiar o
+  arquivo do repo por cima do live sem revisar — eles são propositalmente diferentes
+  por enquanto.
