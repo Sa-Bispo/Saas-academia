@@ -96,6 +96,7 @@ type Props = {
   perguntas: Pergunta[];
   planos: Plano[];
   tenantId: string;
+  parqCode: string;
   academiaName: string;
 };
 
@@ -1304,7 +1305,7 @@ function PerguntasTab({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function ParqConfigClient({ fichas, perguntas: perguntasIniciais, planos, tenantId, academiaName }: Props) {
+export function ParqConfigClient({ fichas, perguntas: perguntasIniciais, planos, tenantId, parqCode, academiaName }: Props) {
   const [tab, setTab] = useState<"fichas" | "perguntas">("fichas");
   const [fichaModalId, setFichaModalId] = useState<string | null>(null);
   const [matricularFichaId, setMatricularFichaId] = useState<string | null>(null);
@@ -1315,7 +1316,7 @@ export function ParqConfigClient({ fichas, perguntas: perguntasIniciais, planos,
 
   function copiarLink() {
     navigator.clipboard
-      .writeText(`${window.location.origin}/parq/${tenantId}`)
+      .writeText(`${window.location.origin}/parq/${parqCode}`)
       .then(() => {
         setLinkCopiado(true);
         setTimeout(() => setLinkCopiado(false), 2000);
@@ -1345,7 +1346,7 @@ export function ParqConfigClient({ fichas, perguntas: perguntasIniciais, planos,
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={`/parq/${tenantId}`}
+            href={`/parq/${parqCode}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors"

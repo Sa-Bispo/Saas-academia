@@ -4,6 +4,7 @@ import { ensureTenantForUser } from "@/services/tenant.service";
 import { assertModuloAtivo } from "@/services/modulos.service";
 import { listarFichasParq, listarPerguntasParq } from "@/actions/parq.actions";
 import { prisma } from "@/lib/prisma";
+import { garantirParqCode } from "@/lib/parq-code";
 import { ParqConfigClient } from "./parq-config-client";
 
 export default async function ParqConfigPage() {
@@ -27,6 +28,7 @@ export default async function ParqConfigPage() {
     select: { companyName: true, nome: true },
   });
   const academiaName = tenantRow?.companyName || tenantRow?.nome || "Academia";
+  const parqCode = await garantirParqCode(tenant.id);
 
   try {
     const [fichas, perguntas, planos] = await Promise.all([
@@ -44,12 +46,14 @@ export default async function ParqConfigPage() {
         perguntas={perguntas}
         planos={planos}
         tenantId={tenant.id}
+        parqCode={parqCode}
         academiaName={academiaName}
       />
     );
   } catch {
     return (
-      <ParqConfigClient fichas={[]} perguntas={[]} planos={[]} tenantId={tenant.id} academiaName={academiaName} />
+      <ParqConfigClient fichas={[]} perguntas={[]} planos={[]} tenantId={tenant.id}
+        parqCode={parqCode} academiaName={academiaName} />
     );
   }
 }

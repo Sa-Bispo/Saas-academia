@@ -34,6 +34,7 @@ model Tenant {
   botName          String? @db.VarChar(80)
   companyName      String? @db.VarChar(120)
   logoUrl          String? @map("logo_url") @db.Text // logo da academia (Supabase Storage)
+  parqCode         String? @unique @map("parq_code") @db.VarChar(16) // código curto do link público do PAR-Q (UUID vira "chave Pix" no WhatsApp)
   toneOfVoice      String? @db.VarChar(40)
   strictRules      String? @db.Text
   botObjective     String? @db.VarChar(40)

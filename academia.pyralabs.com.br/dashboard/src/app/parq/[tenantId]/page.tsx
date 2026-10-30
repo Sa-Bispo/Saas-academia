@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { resolverTenantIdParq } from "@/lib/parq-code";
 import { ParqEntryClient } from "./parq-entry-client";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,9 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { tenantId } = await params;
+  const { tenantId: param } = await params;
+  const tenantId = await resolverTenantIdParq(param);
+  if (!tenantId) return {};
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -33,7 +36,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ParqPage({ params }: Props) {
-  const { tenantId } = await params;
+  const { tenantId: param } = await params;
+  const tenantId = await resolverTenantIdParq(param);
+  if (!tenantId) notFound();
 
   let perguntas = await prisma.parqPergunta.findMany({
     where: { tenantId, ativo: true },
