@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: { nome: true, companyName: true },
+    select: { nome: true, companyName: true, logoUrl: true },
   });
   if (!tenant) return {};
 
@@ -25,7 +25,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `PAR-Q — ${academiaName}`;
   const description = `Preencha o questionário PAR-Q e o termo de responsabilidade para se matricular na ${academiaName}.`;
 
-  const images = ["/py_transparent.png"];
+  // Prévia do link (WhatsApp etc.) usa a logo da academia, se tiver
+  const images = [tenant.logoUrl || "/py_transparent.png"];
 
   return {
     title,
