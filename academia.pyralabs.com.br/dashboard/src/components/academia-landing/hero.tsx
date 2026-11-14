@@ -65,15 +65,15 @@ export function Hero() {
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-[var(--text-tertiary)]">
             <span className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--wpp)]" />
-              Sem taxa de adesão
+              14 dias de teste
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-strong)]" />
-              Configuração em minutos
+              Eu configuro com você
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-tertiary)]" />
-              Cancele quando quiser
+              Sem fidelidade
             </span>
           </div>
         </div>

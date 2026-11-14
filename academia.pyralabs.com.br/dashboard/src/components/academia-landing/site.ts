@@ -3,9 +3,9 @@ export const site = {
   name: "PyraLabs",
   product: "PyraLabs Academia",
   // Número no formato internacional, só dígitos (ex.: 55 + DDD + número)
-  whatsapp: "5599999999999",
+  whatsapp: "5511927959412",
   whatsappMessage:
-    "Olá! Quero saber como o PyraLabs pode automatizar a gestão da minha academia.",
+    "Oi, Samuel! Vi o site e quero entender como funciona pra minha academia.",
   appUrl: "/login",
   email: "contato@pyralabs.com.br",
 };
