@@ -19,5 +19,5 @@ export const nav = [
   { label: "Recursos", href: "#recursos" },
   { label: "Como funciona", href: "#como-funciona" },
   { label: "Cobrança", href: "#cobranca" },
-  { label: "Planos", href: "#planos" },
+  { label: "Preço", href: "#planos" },
 ];

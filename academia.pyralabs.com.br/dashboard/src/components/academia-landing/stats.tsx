@@ -1,6 +1,6 @@
 const stats = [
-  { value: "24h", label: "atendimento sem parar" },
-  { value: "-70%", label: "menos tempo na cobrança" },
+  { value: "24h", label: "bot respondendo no WhatsApp" },
+  { value: "1 QR", label: "pro aluno se cadastrar sozinho" },
   { value: "1", label: "painel para tudo" },
   { value: "0", label: "planilha para manter" },
 ];
