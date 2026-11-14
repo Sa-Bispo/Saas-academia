@@ -48,7 +48,9 @@ services:
   # ─── Evolution API (WhatsApp) ─────────────────────────────────────────────────
 
   evolution_api:
-    image: evoapicloud/evolution-api:latest
+    # Fixado na imagem que roda em produção (v2.3.7, digest conferido na VPS em 2026-11-14).
+    # Não volte para :latest: um recreate pode puxar uma versão nova que quebra o bot.
+    image: evoapicloud/evolution-api:v2.3.7@sha256:966625532d9076a2381e973a271307d107e6f070450de3abeeea8bd18be07252
     container_name: evolution_api
     restart: unless-stopped
     ports:
