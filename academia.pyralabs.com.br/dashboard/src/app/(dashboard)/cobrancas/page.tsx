@@ -50,7 +50,7 @@ export default async function CobrancasPage() {
       // Configuração de dias de antecedência do configNicho
       prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { configNicho: true },
+        select: { configNicho: true, companyName: true },
       }),
     ]);
 
@@ -73,6 +73,8 @@ export default async function CobrancasPage() {
         resumo={resumo}
         receitaMesCents={receitaMes._sum.valorCents ?? 0}
         diasAntecedencia={diasAntecedencia}
+        nomeAcademia={config?.companyName ?? null}
+        pixChavePadrao={(configNicho?.pixChave as string | undefined) ?? null}
       />
     );
   } catch {

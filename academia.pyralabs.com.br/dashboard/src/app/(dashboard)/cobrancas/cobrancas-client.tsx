@@ -18,6 +18,7 @@ import {
   Maximize2,
   Hash,
   Copy,
+  MessageCircle,
 } from "lucide-react";
 
 import {
@@ -33,7 +34,13 @@ import {
 } from "@/actions/cobrancas.actions";
 
 type Aluno = { id: string; nome: string; telefone: string };
-type Plano = { id: string; nome: string; valorCents: number; valorCentsDinheiro?: number | null };
+type Plano = {
+  id: string;
+  nome: string;
+  valorCents: number;
+  valorCentsDinheiro?: number | null;
+  valorCentsPix?: number | null;
+};
 type Matricula = { id: string; plano: Plano } | null;
 type CodigoPagamento = { id: string; codigo: string; expiresAt: Date };
 
@@ -67,6 +74,8 @@ type Props = {
   resumo: ResumoItem[];
   receitaMesCents: number;
   diasAntecedencia: number;
+  nomeAcademia?: string | null;
+  pixChavePadrao?: string | null;
 };
 
 function formatCents(cents: number) {
@@ -88,6 +97,35 @@ const STATUS_CONFIG: Record<
     icon: ImageIcon,
   },
 };
+
+// ─── Cobrança assistida ───────────────────────────────────────────────────────
+// Abre o WhatsApp de quem está no painel (recepção/dono) com a mensagem pronta.
+// Não passa pelo bot nem pela Evolution: a pessoa revisa e envia do próprio número.
+function linkCobrancaManual(c: Cobranca, nomeAcademia?: string | null, pixChavePadrao?: string | null) {
+  let numero = c.aluno.telefone.replace(/\D/g, "");
+  if (numero.length === 10 || numero.length === 11) numero = `55${numero}`;
+
+  const primeiroNome = c.aluno.nome.trim().split(/\s+/)[0] ?? "";
+  const valorCents = c.matricula?.plano?.valorCentsPix ?? c.valorCents;
+  const vencimento = new Date(c.dataVencimento).toLocaleDateString("pt-BR");
+  const venceu = c.status === "VENCIDO" || new Date(c.dataVencimento) < new Date(new Date().toDateString());
+  const pix = c.pixChave ?? pixChavePadrao;
+
+  const texto = [
+    `Oi, ${primeiroNome}! Tudo bem? 😊`,
+    ``,
+    venceu
+      ? `Passando pra lembrar da sua mensalidade${nomeAcademia ? ` da ${nomeAcademia}` : ""}, de ${formatCents(valorCents)}, que venceu em ${vencimento}.`
+      : `Passando pra lembrar que a sua mensalidade${nomeAcademia ? ` da ${nomeAcademia}` : ""}, de ${formatCents(valorCents)}, vence em ${vencimento}.`,
+    pix ? `Se preferir pagar no Pix, a chave é: ${pix}` : null,
+    ``,
+    `Qualquer coisa, é só me chamar!`,
+  ]
+    .filter((l) => l !== null)
+    .join("\n");
+
+  return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+}
 
 function ResumoCard({
   label,
@@ -417,6 +455,8 @@ export function CobrancasPageClient({
   resumo,
   receitaMesCents,
   diasAntecedencia,
+  nomeAcademia,
+  pixChavePadrao,
 }: Props) {
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [cobrancaConfirmando, setCobrancaConfirmando] = useState<Cobranca | null>(null);
@@ -846,6 +886,17 @@ export function CobrancasPageClient({
                           <Hash size={12} />
                           {gerandoCodigoId === c.id && pending ? "..." : codigoExibir ? "Novo código" : "Código bot"}
                         </button>
+
+                        <a
+                          href={linkCobrancaManual(c, nomeAcademia, pixChavePadrao)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Abre o seu WhatsApp com a mensagem pronta para você revisar e enviar"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted transition hover:border-brand/30 hover:text-brand"
+                        >
+                          <MessageCircle size={12} />
+                          Cobrar no meu WhatsApp
+                        </a>
 
                         <button
                           type="button"
