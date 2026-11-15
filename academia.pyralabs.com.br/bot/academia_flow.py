@@ -215,6 +215,12 @@ _PATTERNS_RENOVAR = [
 _PATTERNS_OPTOUT = [
     r'\boptout\b',  # usado pelo fallback de IA (texto sintético, ver ai_intent_classifier.py)
     r'\b(para|pare|parem) de (mandar|enviar|me mandar|me enviar)\b',
+    # "parar de receber", "quero parar de receber as mensagens", "pare de me enviar"
+    r'\b(parar|para|pare|parem) de (me )?(receber|mandar|enviar)\b',
+    # "não quero mais receber" / "não quero receber" sem dizer o quê
+    r'\bnao quero (mais )?receber\b',
+    r'\bnao (me )?(mande|mandem|envie|enviem) mais\b',
+    r'\bchega de (mensagem|mensagens|cobranca|cobrancas|aviso|avisos)\b',
     r'\b(nao quero mais receber|nao quero receber mais) (mensagens?|cobrancas?|avisos?|nada)\b',
     r'\b(nao (me )?manda(m)? mais (nada|mensagem|mensagens|cobranca|cobrancas))\b',
     r'\b(remov(e|er|a) (meu )?(numero|contato|nome)( da lista)?)\b',
