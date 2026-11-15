@@ -10,5 +10,8 @@ RUN npm ci --legacy-peer-deps
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 
-# prisma db push sincroniza o schema com o banco (compatível com db push workflow)
-CMD ["npx", "prisma", "db", "push"]
+# Aplica só as migrations pendentes (registradas em _prisma_migrations).
+# Antes era `prisma db push`, que sincronizava o schema direto no banco de produção.
+# Baseline feita em 2026-11-15: prisma/migrations/00000000000000_baseline.
+# Se falhar, o deploy.sh para antes de subir o web (set -e + compose wait).
+CMD ["npx", "prisma", "migrate", "deploy"]

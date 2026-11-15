@@ -45,6 +45,18 @@ GET http://api.pyralabs.com.br/health   → {status, uptime_seconds, redis}
 - Rodar `prisma migrate deploy` com `--accept-data-loss` sem decisão explícita do dono
 - Commitar alterações de schema sem a migration gerada junto
 
+### Como as migrations funcionam (desde 2026-11-15)
+
+- O migrator (`Dockerfile.migrator`) roda `prisma migrate deploy`. Antes rodava `db push`.
+- `prisma/migrations/00000000000000_baseline` é o schema completo de quando a baseline
+  foi feita. Em produção ela foi só **marcada** como aplicada (`migrate resolve --applied`),
+  nunca executada, porque o banco já existia.
+- `prisma/migrations_legacy/` guarda as migrations antigas, que não montavam o banco do
+  zero (as tabelas base vieram de `db push`). O Prisma não lê essa pasta.
+- No banco local, o registro antigo foi renomeado para `_prisma_migrations_legacy`.
+- Banco local novo: `npx prisma migrate deploy` monta tudo do zero, incluindo os módulos
+  e os planos de academia.
+
 ### Workflow obrigatório para qualquer mudança no banco
 
 **Todo o trabalho começa localmente (Windows), nunca na VPS:**
@@ -94,6 +106,8 @@ docker compose -f docker-compose.prod.yml up -d --no-deps academia_web
 ## Problemas conhecidos e soluções
 
 ### Migração travada (P3005 — banco sem _prisma_migrations)
+(Resolvido em produção com a baseline de 2026-11-15. Só volta a acontecer num banco
+criado com `db push`.)
 ```bash
 # Dentro do container db_migrator ou academia_web:
 npx prisma migrate resolve --applied <nome_da_migration>
