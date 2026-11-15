@@ -2,7 +2,7 @@ const steps = [
   {
     n: "01",
     title: "Conecte seu WhatsApp",
-    desc: "Você lê um QR Code no painel e o número da academia vira um assistente. Sem instalar nada, sem chip novo.",
+    desc: "Você lê um QR Code no painel e o WhatsApp passa a enviar os avisos. Sem instalar nada: eu te ajudo a escolher o número certo pra isso.",
   },
   {
     n: "02",
@@ -12,7 +12,7 @@ const steps = [
   {
     n: "03",
     title: "Deixe rodar",
-    desc: "O bot passa a atender, cobrar e registrar tudo. Você acompanha pelo painel e só entra quando quiser.",
+    desc: "O sistema avisa, cobra e registra tudo. Você acompanha pelo painel e só entra quando quiser.",
   },
 ];
 

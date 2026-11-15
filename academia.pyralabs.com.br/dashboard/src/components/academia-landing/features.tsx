@@ -16,7 +16,7 @@ const features = [
   {
     icon: Wallet,
     title: "Cobrança automática via Pix",
-    desc: "Mensagens de cobrança disparadas sozinhas para quem está perto de vencer ou já atrasou. Pix gerado na conversa e baixa do pagamento no automático.",
+    desc: "Lembrete sai sozinho pra quem está perto de vencer ou já atrasou, com a chave Pix na conversa. Pagou, você dá baixa em um clique e o aluno recebe a confirmação.",
   },
   {
     icon: LayoutDashboard,

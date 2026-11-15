@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Nav } from "@/components/academia-landing/nav";
 import { Hero } from "@/components/academia-landing/hero";
 import { Stats } from "@/components/academia-landing/stats";
+import { VideoDemo } from "@/components/academia-landing/video-demo";
 import { Showcase } from "@/components/academia-landing/showcase/showcase";
 import { HowItWorks } from "@/components/academia-landing/how-it-works";
 import { CobrancaSpotlight } from "@/components/academia-landing/cobranca-spotlight";
@@ -24,6 +25,7 @@ export default function Page() {
       <main>
         <Hero />
         <Stats />
+        <VideoDemo />
         <Showcase />
         <HowItWorks />
         <CobrancaSpotlight />

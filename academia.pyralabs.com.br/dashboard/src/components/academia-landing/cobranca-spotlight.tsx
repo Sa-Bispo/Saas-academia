@@ -4,8 +4,8 @@ import { whatsappLink } from "@/components/academia-landing/site";
 
 const bullets = [
   "Dispara sozinho para quem vai vencer e para inadimplentes",
-  "Pix gerado dentro da conversa, sem app de banco",
-  "Baixa automática assim que o pagamento cai",
+  "Chave Pix direto na conversa, sem o aluno pedir",
+  "Baixa em 1 clique, e o aluno recebe a confirmação na hora",
   "Opção de pagar em dinheiro com código na recepção",
 ];
 
@@ -29,8 +29,8 @@ export function CobrancaSpotlight() {
           </h2>
           <p className="mt-4 text-[var(--text-secondary)]">
             Chega de sair atrás de aluno inadimplente. O sistema identifica quem
-            está para vencer, envia a cobrança no WhatsApp e confirma o pagamento
-            sem você mexer um dedo.
+            está para vencer, envia a cobrança no WhatsApp e, quando o aluno paga,
+            você confirma com um clique.
           </p>
 
           <ul className="mt-7 space-y-3">

@@ -57,8 +57,8 @@ export function Hero() {
               Testar no WhatsApp
               <ArrowRight size={16} />
             </Button>
-            <Button variant="secondary" size="lg" href="#como-funciona">
-              Ver como funciona
+            <Button variant="secondary" size="lg" href="#video">
+              Ver o vídeo (1 min)
             </Button>
           </div>
 
