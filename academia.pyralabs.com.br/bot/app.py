@@ -27,6 +27,7 @@ from database_api import (
     set_aluno_optout_cobranca,
 )
 from academia_flow import process_academia_message, AcademiaState, detectar_intent
+from plano_recursos import recursos_do_plano, responde_no_plano_cobranca
 from ai_intent_classifier import classify_intent as _ai_classify_intent
 from message_buffer import buffer_message
 from config import GEMINI_API_KEY, GEMINI_MODEL_NAME, REDIS_URL as _REDIS_URL
@@ -256,6 +257,14 @@ async def _fetch_media_base64(instance: str, api_key: str | None, evolution_data
         return None
 
 
+def _nota_plano(plano_code: str | None, motivo: str) -> dict:
+    """Resposta do simulador quando, no WhatsApp de verdade, o bot ficaria em silêncio
+    por causa do plano. Mostra o porquê em vez de uma bolha vazia."""
+    nome = {'academia_gestao': 'Gestão', 'academia_cobranca': 'Cobrança'}.get(plano_code or '', plano_code or '?')
+    reply = f'🔕 (simulação) Plano {nome}: {motivo}'
+    return {'reply': reply, 'response': reply, 'sale_complete': False, 'confetti': False, 'silencio_plano': True}
+
+
 async def _process_chat_message(
     tenant_id: str,
     message: str,
@@ -286,10 +295,20 @@ async def _process_chat_message(
         configs = await get_tenant_configs(tenant_id)
         logger.info('[ROUTER] sub_nicho: %s', configs.get('sub_nicho'))
         conversation_id = f'{tenant_id}:{session_id}'
-        
-        # PARTE 1: ROTEADOR — verificar intenções pré-IA
+
+        # Regras do plano (mesmas do WhatsApp, em message_buffer._handle_academia_message)
+        is_academia = str(configs.get('sub_nicho') or '').strip().lower() == 'academia'
+        plano_code = configs.get('plano_code')
+        recursos = recursos_do_plano(plano_code) if is_academia else recursos_do_plano(None)
+        if not recursos['bot']:
+            return _nota_plano(
+                plano_code,
+                'o bot não responde no WhatsApp. A equipe atende pelo celular e a cobrança é assistida.',
+            )
+
+        # PARTE 1: ROTEADOR — verificar intenções pré-IA (atendimento livre: fora do plano Cobrança)
         horarios = configs.get('horarios', [])
-        if horarios and not is_within_hours(horarios):
+        if recursos['atendimento_livre'] and horarios and not is_within_hours(horarios):
             reply = resposta_fora_horario(configs)
             return {'reply': reply, 'response': reply, 'sale_complete': False, 'confetti': False}
 
@@ -302,7 +321,7 @@ async def _process_chat_message(
             sub_nicho=str(configs.get('sub_nicho') or '').strip().lower(),
             redis_client=redis_async
         )
-        if intent:
+        if intent and recursos['atendimento_livre']:
             if intent == 'saudacao':
                 historico = get_session_history(conversation_id)
                 if not historico.messages:
@@ -409,12 +428,28 @@ async def _process_chat_message(
                     evolution_data=evolution_raw_data or {},
                 )
 
+            # Plano Cobrança: o bot só entra em conversa de pagamento de aluno cadastrado
+            if not recursos['atendimento_livre'] and not responde_no_plano_cobranca(
+                intent=detectar_intent(message),
+                texto=message,
+                estado=str(session.get('state') or 'identificando'),
+                imagem_recebida=bool(imagem_recebida),
+                aluno_identificado=aluno is not None,
+            ):
+                motivo = (
+                    'essa mensagem não é de pagamento, então fica pra equipe responder pelo celular.'
+                    if aluno is not None
+                    else 'número que não é de aluno cadastrado, então fica pra equipe responder pelo celular.'
+                )
+                return _nota_plano(plano_code, motivo)
+
             # Fallback de IA: só chama quando o regex não reconhece a mensagem
             # e o aluno já está no menu (após identificado). Custo zero no caminho feliz.
             ai_result = None
             state_atual = session.get('state', AcademiaState.IDENTIFICANDO.value)
             if (
-                state_atual == AcademiaState.MENU.value
+                recursos['atendimento_livre']
+                and state_atual == AcademiaState.MENU.value
                 and not imagem_recebida
                 and GEMINI_API_KEY
                 and detectar_intent(message) == 'desconhecido'
