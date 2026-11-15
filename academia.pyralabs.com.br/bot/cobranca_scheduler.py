@@ -13,6 +13,7 @@ Variáveis de ambiente:
 """
 from __future__ import annotations
 
+from plano_recursos import recursos_do_plano
 import asyncio
 import json
 import logging
@@ -39,7 +40,11 @@ async def _get_tenants_ativos(conn) -> list[dict]:
         SELECT
             id,
             "evolutionInstanceName" AS instance,
-            config_nicho
+            config_nicho,
+            (
+                SELECT p.code FROM subscriptions s JOIN plans p ON p.id = s.plan_id
+                WHERE s.tenant_id = tenants.id LIMIT 1
+            ) AS plano_code
         FROM tenants
         WHERE "evolutionInstanceName" IS NOT NULL
           AND "evolutionInstanceName" != ''
@@ -209,6 +214,10 @@ async def run_cobranca_scheduler(redis) -> None:
                         tenants = await _get_tenants_ativos(conn)
                         logger.info('[SCHEDULER] %d tenant(s) ativo(s)', len(tenants))
                         for t in tenants:
+                            # Plano sem cobrança automática (Gestão): não gera nem enfileira lembrete
+                            if not recursos_do_plano(t.get('plano_code'))['cobranca_automatica']:
+                                logger.info('[SCHEDULER] tenant=%s plano=%s sem cobrança automática, pulando', t['id'], t.get('plano_code'))
+                                continue
                             raw_cfg = t.get('config_nicho') or {}
                             if isinstance(raw_cfg, str):
                                 try:

@@ -19,6 +19,7 @@ Estrutura Redis:
 """
 from __future__ import annotations
 
+from plano_recursos import recursos_do_plano
 import asyncio
 import json
 import logging
@@ -192,7 +193,11 @@ async def _get_cobranca(tenant_id: str, cobranca_id: str) -> dict | None:
                 t."companyName"          AS negocio_nome,
                 t."evolutionInstanceName" AS instance,
                 t."evolutionApiKey"       AS api_key,
-                t.config_nicho AS config_nicho
+                t.config_nicho AS config_nicho,
+                (
+                    SELECT p.code FROM subscriptions s JOIN plans p ON p.id = s.plan_id
+                    WHERE s.tenant_id = t.id LIMIT 1
+                ) AS plano_code
             FROM cobrancas_alunos ca
             JOIN alunos  a ON a.id = ca.aluno_id
             JOIN tenants t ON t.id = ca.tenant_id
@@ -463,6 +468,11 @@ async def _processar_uma(redis, tenant_id: str, cobranca_id: str, daily_limit: i
     cobranca = await _get_cobranca(tenant_id, cobranca_id)
     if not cobranca:
         logger.warning('[WORKER] cobrança não encontrada: %s', cobranca_id)
+        return False
+
+    # Plano sem cobrança automática (Gestão): nunca dispara pelo bot
+    if not recursos_do_plano(cobranca.get('plano_code'))['cobranca_automatica']:
+        logger.info('[WORKER] tenant=%s plano=%s sem cobrança automática, pulando %s', tenant_id, cobranca.get('plano_code'), cobranca_id)
         return False
 
     # Limite diário: usa o do config_nicho do tenant se disponível

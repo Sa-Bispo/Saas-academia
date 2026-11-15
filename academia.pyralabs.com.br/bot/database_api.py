@@ -163,7 +163,11 @@ async def get_tenant_configs(tenant_id: str) -> dict[str, Any]:
                 "botObjective" AS bot_objective,
                 "companyName" AS nome_negocio,
                 "botName" AS nome_atendente,
-                config_nicho
+                config_nicho,
+                (
+                    SELECT p.code FROM subscriptions s JOIN plans p ON p.id = s.plan_id
+                    WHERE s.tenant_id = tenants.id LIMIT 1
+                ) AS plano_code
             FROM tenants
             WHERE id = $1
             LIMIT 1
@@ -184,6 +188,7 @@ async def get_tenant_configs(tenant_id: str) -> dict[str, Any]:
     bot_objective = ''
     nome_negocio = ''
     nome_atendente = ''
+    plano_code = ''
     config_nicho: dict[str, Any] = {}
 
     tenant: dict[str, Any] = {}
@@ -194,6 +199,7 @@ async def get_tenant_configs(tenant_id: str) -> dict[str, Any]:
         bot_objective = str(row.get('bot_objective') or '').strip().upper()
         nome_negocio = str(row.get('nome_negocio') or '').strip()
         nome_atendente = str(row.get('nome_atendente') or '').strip()
+        plano_code = str(row.get('plano_code') or '').strip()
 
         raw_cfg = row.get('config_nicho')
         if isinstance(raw_cfg, str):
@@ -245,6 +251,7 @@ async def get_tenant_configs(tenant_id: str) -> dict[str, Any]:
         'faz_delivery': faz_delivery,
         'faz_retirada': faz_retirada,
         'config_nicho': config_nicho,
+        'plano_code': plano_code,
     }
 
 

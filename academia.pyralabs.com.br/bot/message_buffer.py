@@ -807,6 +807,14 @@ async def _handle_academia_message(
     )
 
     import re as _re
+    from plano_recursos import recursos_do_plano, responde_no_plano_cobranca
+
+    recursos = recursos_do_plano(configs.get('plano_code'))
+    if not recursos['bot']:
+        # Plano sem bot (Gestão): não responde nada; a equipe atende pelo celular.
+        log(f'[ACADEMIA] plano={configs.get("plano_code")} sem bot — mensagem de {chat_id} ignorada')
+        return ''
+
     session_key = f'academia_session:{tenant_id}:{chat_id}'
     try:
         session_raw = await redis_client.get(session_key)
@@ -897,6 +905,23 @@ async def _handle_academia_message(
         learned_patterns = await load_learned_patterns('academia', redis_client)
     except Exception as e:
         log(f'[ACADEMIA] erro ao carregar learned_patterns: {e}')
+
+    # Plano Cobrança: o bot só entra em conversa de pagamento; o resto fica pro humano
+    if not recursos['atendimento_livre']:
+        try:
+            from academia_flow import detectar_intent as _detectar_intent
+            _intent = _detectar_intent(full_message, learned_patterns)
+        except Exception:
+            _intent = 'desconhecido'
+        if not responde_no_plano_cobranca(
+            intent=_intent,
+            texto=full_message,
+            estado=str(session.get('state') or 'identificando'),
+            imagem_recebida=imagem_recebida,
+            aluno_identificado=aluno is not None,
+        ):
+            log(f'[ACADEMIA] plano={configs.get("plano_code")} — "{full_message[:60]}" fica pro atendimento humano')
+            return ''
 
     # Mantém histórico de conversa na sessão (últimos 20 turnos)
     history: list[dict] = session.get('history', [])
