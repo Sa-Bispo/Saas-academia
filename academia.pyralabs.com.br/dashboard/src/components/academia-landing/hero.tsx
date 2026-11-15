@@ -5,7 +5,7 @@ import { whatsappLink } from "@/components/academia-landing/site";
 
 export function Hero() {
   return (
-    <section className="relative flex min-h-[100svh] items-center overflow-hidden pt-28 pb-20 sm:pt-32 sm:pb-24">
+    <section className="relative flex items-center overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:min-h-[100svh]">
       {/* Foto da academia sangrando pela direita (lg+) */}
       <div
         className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[54%] bg-cover bg-center lg:block"
@@ -40,7 +40,7 @@ export function Hero() {
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-12 px-5 sm:px-8 lg:gap-20 lg:grid-cols-[0.88fr_1.12fr]">
         <div className="animate-fade-up">
-          <h1 className="font-display -mt-[0.18em] pt-[0.18em] text-[46px] font-extrabold uppercase leading-[0.92] tracking-[-0.015em] text-gradient sm:text-[68px]">
+          <h1 className="font-display -mt-[0.18em] pt-[0.18em] text-[44px] font-extrabold uppercase leading-[0.92] tracking-[-0.015em] text-gradient sm:text-[68px]">
             A GESTÃO DA SUA
             <br />
             ACADEMIA RODANDO
@@ -48,24 +48,26 @@ export function Hero() {
             SOZINHA.
           </h1>
 
-          <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-[var(--text-secondary)]">
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--text-secondary)] sm:mt-6 sm:text-[17px]">
             Um bot de WhatsApp que atende seus alunos 24 horas, cobra as
             mensalidades no automático via Pix e organiza matrícula, frequência e
-            financeiro num painel único. Você foca no treino — o resto acontece
-            sozinho.
+            financeiro num painel único.
+            <span className="hidden sm:inline"> Você foca no treino — o resto acontece sozinho.</span>
           </p>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-7 grid grid-cols-[1.15fr_1fr] gap-2.5 sm:mt-8 sm:flex sm:gap-3">
             <Button variant="wpp" size="lg" href={whatsappLink()} external>
-              Testar no WhatsApp
+              <span className="sm:hidden">Testar grátis</span>
+              <span className="hidden sm:inline">Testar no WhatsApp</span>
               <ArrowRight size={16} />
             </Button>
             <Button variant="secondary" size="lg" href="#como-funciona">
-              Ver como funciona
+              <span className="sm:hidden">Como funciona</span>
+              <span className="hidden sm:inline">Ver como funciona</span>
             </Button>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-[var(--text-tertiary)]">
+          <div className="mt-6 flex flex-wrap items-center gap-x-2.5 gap-y-2 whitespace-nowrap text-[12px] text-[var(--text-tertiary)] sm:mt-8 sm:gap-x-6 sm:text-[13px]">
             <span className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--wpp)]" />
               14 dias de teste

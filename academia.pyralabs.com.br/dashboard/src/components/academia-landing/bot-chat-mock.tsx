@@ -286,7 +286,7 @@ export function BotChatMock({ bare = false }: { bare?: boolean }) {
     : "overflow-hidden rounded-[26px] border border-[var(--border-strong)] bg-[#0e0d11] shadow-[0_24px_70px_-24px_rgba(0,0,0,0.85)]";
 
   const messagesCls = bare
-    ? "wa-wallpaper flex flex-1 flex-col px-3.5 py-3"
+    ? "wa-wallpaper flex min-h-0 flex-1 flex-col overflow-hidden px-3.5 py-3"
     : "wa-wallpaper flex min-h-[372px] flex-col px-3.5 py-3";
 
   const inner = (
@@ -319,7 +319,7 @@ export function BotChatMock({ bare = false }: { bare?: boolean }) {
           </span>
         </div>
 
-        <div className="flex flex-1 flex-col justify-end gap-2">
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-2">
           {conv.steps.slice(0, count).map((step, i) =>
             step.from === "bot" ? (
               <BotBubble key={`${idx}-${i}`} time={step.time}>

@@ -6,8 +6,16 @@ export function HeroVisual() {
   return (
     <>
       {/* mobile: só o celular */}
-      <div className="flex justify-center lg:hidden">
-        <PhoneMock />
+      {/* mobile: celular menor sobre a foto da academia, que some nas bordas */}
+      <div className="relative -mx-5 flex justify-center pt-2 sm:-mx-8 lg:hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-60 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_45%,#000_30%,transparent_75%)]"
+          style={{ backgroundImage: "url(/academia_fundo.png)" }}
+        />
+        <div className="relative w-[268px]">
+          <PhoneMock width={268} />
+        </div>
       </div>
 
       {/* desktop: celular à esquerda + laptop à direita (conjunto escalado como um todo) */}
