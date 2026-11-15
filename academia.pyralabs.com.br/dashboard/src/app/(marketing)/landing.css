@@ -154,3 +154,12 @@
     transform: translate(-50%, -50%);
   }
 }
+
+/* scroll suave nas âncoras (o elemento que rola é o <html>, não o .landing-scope) */
+html:has(.landing-scope) {
+  scroll-behavior: smooth;
+  scroll-padding-top: 64px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.landing-scope) { scroll-behavior: auto; }
+}

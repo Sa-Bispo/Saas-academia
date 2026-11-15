@@ -5,7 +5,7 @@ import { whatsappLink } from "@/components/academia-landing/site";
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
+    <section className="relative flex min-h-[100svh] items-center overflow-hidden pt-28 pb-20 sm:pt-32 sm:pb-24">
       {/* Foto da academia sangrando pela direita (lg+) */}
       <div
         className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[54%] bg-cover bg-center lg:block"
@@ -16,7 +16,7 @@ export function Hero() {
         {/* funde no fundo pela esquerda — some só na borda esquerda */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#0b0b0d] via-[#0b0b0d]/40 to-transparent" />
         {/* funde topo e base bem de leve */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0b0b0d]/50 via-transparent to-[#0b0b0d]/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0b0b0d]/50 via-transparent via-60% to-[#0b0b0d]" />
       </div>
 
       {/* Fundo abstrato à esquerda — formas suaves escuras (profundidade, sem neon) */}
@@ -35,9 +35,12 @@ export function Hero() {
       <div className="pointer-events-none absolute inset-0 z-0 bg-grid" />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[520px] hero-glow" />
 
-      <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:gap-20 lg:grid-cols-[0.88fr_1.12fr]">
+      {/* fade na base: funde todo o fundo do hero (foto, grade, formas) no fundo da página */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-64 bg-gradient-to-b from-transparent to-[var(--bg)]" />
+
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-12 px-5 sm:px-8 lg:gap-20 lg:grid-cols-[0.88fr_1.12fr]">
         <div className="animate-fade-up">
-          <h1 className="font-display text-[46px] font-extrabold uppercase leading-[0.92] tracking-[-0.015em] text-gradient sm:text-[68px]">
+          <h1 className="font-display -mt-[0.18em] pt-[0.18em] text-[46px] font-extrabold uppercase leading-[0.92] tracking-[-0.015em] text-gradient sm:text-[68px]">
             A GESTÃO DA SUA
             <br />
             ACADEMIA RODANDO
@@ -57,8 +60,8 @@ export function Hero() {
               Testar no WhatsApp
               <ArrowRight size={16} />
             </Button>
-            <Button variant="secondary" size="lg" href="#video">
-              Ver o vídeo (1 min)
+            <Button variant="secondary" size="lg" href="#como-funciona">
+              Ver como funciona
             </Button>
           </div>
 

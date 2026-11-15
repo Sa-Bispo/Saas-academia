@@ -2,15 +2,11 @@ import type { Metadata } from "next";
 
 import { Nav } from "@/components/academia-landing/nav";
 import { Hero } from "@/components/academia-landing/hero";
-import { Stats } from "@/components/academia-landing/stats";
-import { VideoDemo } from "@/components/academia-landing/video-demo";
 import { Showcase } from "@/components/academia-landing/showcase/showcase";
-import { HowItWorks } from "@/components/academia-landing/how-it-works";
-import { CobrancaSpotlight } from "@/components/academia-landing/cobranca-spotlight";
-import { Proof } from "@/components/academia-landing/proof";
+import { BentoFunciona } from "@/components/academia-landing/bento-funciona";
 import { Pricing } from "@/components/academia-landing/pricing";
-import { FinalCta } from "@/components/academia-landing/final-cta";
 import { Footer } from "@/components/academia-landing/footer";
+import { Divisor, Trilhos } from "@/components/academia-landing/grid-bits";
 
 export const metadata: Metadata = {
   title: "PyraLabs · Gestão de academia no automático",
@@ -24,14 +20,14 @@ export default function Page() {
       <Nav />
       <main>
         <Hero />
-        <Stats />
-        <VideoDemo />
-        <Showcase />
-        <HowItWorks />
-        <CobrancaSpotlight />
-        <Proof />
-        <Pricing />
-        <FinalCta />
+        <Trilhos>
+          <Divisor />
+          <BentoFunciona />
+          <Divisor />
+          <Showcase />
+          <Divisor />
+          <Pricing />
+        </Trilhos>
       </main>
       <Footer />
     </>

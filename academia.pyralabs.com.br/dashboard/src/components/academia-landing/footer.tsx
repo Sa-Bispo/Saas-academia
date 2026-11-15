@@ -1,90 +1,64 @@
-import { Logo } from "./logo";
-import { nav, site, whatsappLink } from "@/components/academia-landing/site";
+"use client";
 
+import RidgelineDitherFooter from "./ridgeline-footer";
+import { Logo } from "./logo";
+import { site, whatsappLink } from "@/components/academia-landing/site";
+
+// Rodapé com a cordilheira em dither (21st.dev "ridgeline-dither-footer"), na paleta da
+// landing: fundo #0b0b0d, montanhas em verde escuro discreto e hover no verde do WhatsApp.
 export function Footer() {
   return (
-    <footer className="border-t border-[var(--border)] bg-[var(--bg-elevated)]">
-      <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">
-        <div className="flex flex-col justify-between gap-10 md:flex-row">
-          <div className="max-w-xs">
-            <div className="flex items-center gap-2.5">
-              <Logo />
-              <span className="font-display text-[16px] font-bold uppercase tracking-tight">
-                PyraLabs
-              </span>
-            </div>
-            <p className="mt-4 text-sm leading-relaxed text-[var(--text-tertiary)]">
-              Automação de gestão para academias. Bot de WhatsApp, cobrança
-              automática e painel único.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-                Produto
-              </p>
-              <ul className="mt-4 space-y-2.5">
-                {nav.map((n) => (
-                  <li key={n.href}>
-                    <a
-                      href={n.href}
-                      className="text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                    >
-                      {n.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-                Contato
-              </p>
-              <ul className="mt-4 space-y-2.5">
-                <li>
-                  <a
-                    href={whatsappLink()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                  >
-                    WhatsApp
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href={`mailto:${site.email}`}
-                    className="text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                  >
-                    {site.email}
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-                Acesso
-              </p>
-              <ul className="mt-4 space-y-2.5">
-                <li>
-                  <a
-                    href={site.appUrl}
-                    className="text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                  >
-                    Entrar no painel
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-[var(--border)] pt-6 text-xs text-[var(--text-tertiary)] sm:flex-row">
-          <p>© {new Date().getFullYear()} PyraLabs. Todos os direitos reservados.</p>
-          <p>Feito para donos de academia.</p>
-        </div>
-      </div>
-    </footer>
+    <RidgelineDitherFooter
+      name="PyraLabs"
+      brandHref="/"
+      logo={<Logo size={26} />}
+      tagline="Sistema de gestão pra academia de bairro: alunos, PAR-Q digital e cobrança no WhatsApp, num painel só."
+      columns={[
+        {
+          title: "Produto",
+          links: [
+            { label: "Recursos", href: "#recursos" },
+            { label: "Como funciona", href: "#como-funciona" },
+            { label: "Preço", href: "#planos" },
+          ],
+        },
+        {
+          title: "Planos",
+          links: [
+            { label: "Gestão", href: "#planos" },
+            { label: "Cobrança", href: "#planos", shine: true },
+            { label: "Completo", href: "#planos" },
+          ],
+        },
+        {
+          title: "Contato",
+          links: [
+            { label: "WhatsApp", href: whatsappLink(), external: true },
+            { label: "E-mail", href: `mailto:${site.email}` },
+            { label: "Entrar no painel", href: site.appUrl },
+          ],
+        },
+      ]}
+      socials={[]}
+      copyright={`© ${new Date().getFullYear()} PyraLabs. Todos os direitos reservados.`}
+      credit={null}
+      preset="night"
+      palette={{
+        paper: "#0b0b0d",
+        ink: "#f2f0ec",
+        muted: "#9a9aa2",
+        line: "rgba(255,255,255,0.08)",
+        heart: "#e5484d",
+        accent: "#25d366",
+        tones: ["#0b0b0d", "#0f1412", "#14201a", "#1b3024", "#244430", "#325f42", "#467f58"],
+      }}
+      seed={23}
+      ridges={7}
+      altimeter={false}
+      maxWidth="1216px"
+      height="620px"
+      fontFamily="var(--font-barlow), system-ui, sans-serif"
+      monoFamily="var(--font-space-mono), ui-monospace, monospace"
+    />
   );
 }

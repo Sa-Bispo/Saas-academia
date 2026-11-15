@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { BotChatMock } from "./bot-chat-mock";
 
 // Insets da tela medidos no PNG recortado colado no frame (702x1450)
@@ -8,14 +9,28 @@ const SCREEN = {
   left: "3.419%",
 };
 
-export function PhoneMock({ width = 320 }: { width?: number }) {
+// Sem children: mostra o chat do bot (hero). Com children: qualquer tela (ex.: PAR-Q).
+// A moldura é pointer-events-none, então a tela embaixo continua clicável.
+export function PhoneMock({
+  width = 320,
+  children,
+  glow = true,
+  alt = "Demonstração do assistente PyraLabs no WhatsApp",
+}: {
+  width?: number;
+  children?: ReactNode;
+  glow?: boolean;
+  alt?: string;
+}) {
   return (
     <div
       className="relative isolate w-full"
       style={{ maxWidth: width }}
     >
       {/* Brilho ambiente respirando atrás do celular — maior que o aparelho pra vazar pelas bordas */}
-      <div className="phone-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[92%] w-[135%] rounded-[50%]" />
+      {glow && (
+        <div className="phone-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[92%] w-[135%] rounded-[50%]" />
+      )}
 
       {/* Chat na área da tela, ATRÁS da moldura (a tela do PNG é transparente) */}
       <div
@@ -27,14 +42,14 @@ export function PhoneMock({ width = 320 }: { width?: number }) {
           left: SCREEN.left,
         }}
       >
-        <BotChatMock bare />
+        {children ?? <BotChatMock bare />}
       </div>
 
       {/* Moldura do iPhone por cima, com sombra limpa que segue o contorno */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/phone-mockup.png"
-        alt="Demonstração do assistente PyraLabs no WhatsApp"
+        alt={alt}
         className="pointer-events-none relative z-10 w-full select-none"
         draggable={false}
         style={{

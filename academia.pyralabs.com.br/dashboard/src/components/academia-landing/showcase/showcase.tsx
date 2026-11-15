@@ -1,158 +1,228 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { BotDemo } from "./bot-demo";
-import { BoardCobrancas } from "./board-cobrancas";
+import { CobrancaFluxo } from "./cobranca-fluxo";
 import { PainelDemo } from "./painel-demo";
 import { ParqDemo } from "./parq-demo";
+import { Cruz, Luz, SecaoTitulo } from "../grid-bits";
 
+// Ordem = o que mais vende primeiro. Cada aba diz de qual plano é (ver pricing.tsx).
+// Só prometa aqui o que o sistema faz de verdade.
 const TABS = [
   {
-    id: "bot",
-    tab: "Atendimento no WhatsApp",
-    tabDesc: "Converse e veja o assistente responder",
-    headline: "Seu atendente que nunca dorme",
-    desc: "Tire dúvidas de plano, horário e vencimento a qualquer hora — na linguagem da sua academia. O aluno é atendido na hora, sem você no celular.",
-    points: [
-      "Responde na hora, 24 horas por dia",
-      "Entende o que o aluno quer",
-      "Puxa dados reais da matrícula",
-    ],
-    hint: "Clique nas opções e converse 👉",
-    demo: <BotDemo />,
-  },
-  {
     id: "cobranca",
-    tab: "Cobrança automática",
-    tabDesc: "Dispare um vencimento e veja o Pix",
-    headline: "A mensalidade que se cobra sozinha",
-    desc: "O sistema identifica quem vai vencer, cobra no WhatsApp e dá baixa no pagamento — sem você correr atrás de ninguém.",
+    tab: "Cobrança",
+    plano: "a partir do Gestão",
+    headline: "Pare de correr atrás de aluno atrasado",
+    desc: "O lembrete sai no WhatsApp antes de vencer, o aluno recebe a chave Pix na conversa e manda o comprovante ali mesmo. Você confere e dá baixa em um clique.",
     points: [
-      "Dispara sozinho pros que vão vencer",
-      "Pix gerado dentro da conversa",
-      "Baixa automática assim que paga",
+      "Automático: lembrete antes de vencer e aviso de atraso",
+      "Ou do seu jeito: a mensagem abre pronta e você envia",
+      "Baixa em 1 clique, com confirmação pro aluno",
     ],
-    hint: "Alunos em colunas por status de pagamento 👉",
-    demo: <BoardCobrancas />,
-  },
-  {
-    id: "painel",
-    tab: "Painel de gestão",
-    tabDesc: "Receita e frequência num relance",
-    headline: "Sua academia num relance",
-    desc: "Receita, alunos ativos e frequência em tempo real — sem abrir cinco planilhas pra saber como o mês está indo.",
-    points: [
-      "Receita e inadimplência do período",
-      "Frequência por dia da semana",
-      "Decisão rápida, sem planilha",
-    ],
-    hint: "Troque o período e passe nas barras 👉",
-    demo: <PainelDemo />,
+    hint: "Escolha Automático ou Você envia e siga os botões",
+    demo: <CobrancaFluxo />,
   },
   {
     id: "parq",
     tab: "PAR-Q digital",
-    tabDesc: "Preencha e assine como o aluno faz",
-    headline: "PAR-Q assinado, sem papel",
-    desc: "O aluno preenche e assina a avaliação de saúde direto no celular. Você acha, filtra e arquiva a ficha em segundos.",
+    plano: "todos os planos",
+    headline: "O aluno novo se cadastra sozinho",
+    desc: "Um QR code na recepção abre a ficha no celular do aluno. Ele preenche o PAR-Q, tira a foto e assina com o dedo. Cai tudo no seu painel.",
     points: [
-      "Preenchido e assinado no celular",
-      "Busca e filtros por aluno",
-      "Arquivado automaticamente",
+      "Sem papel e sem digitar ficha na recepção",
+      "Foto e assinatura guardadas com a ficha",
+      "Busca por nome e PDF quando precisar",
     ],
-    hint: "Responda, assine e envie 👉",
+    hint: "Simule o QR, responda e assine",
     demo: <ParqDemo />,
   },
+  {
+    id: "painel",
+    tab: "Painel",
+    plano: "todos os planos",
+    headline: "Quem pagou, quem deve e quanto entrou",
+    desc: "Alunos ativos, receita do mês e inadimplência num lugar só, sem caderno e sem planilha.",
+    points: [
+      "Receita e inadimplência do período",
+      "Lista de quem está vencendo",
+      "Alunos, planos e matrículas organizados",
+    ],
+    hint: "Passe o mouse nas barras e troque entre atrasados e vencendo",
+    demo: <PainelDemo />,
+  },
+  {
+    id: "bot",
+    tab: "Atendimento 24h",
+    plano: "plano Completo",
+    headline: "Dúvida de aluno respondida a qualquer hora",
+    desc: "Vencimento, chave Pix, horário e aula experimental: o assistente responde no WhatsApp da academia, até de madrugada.",
+    points: [
+      "Consulta o vencimento real do aluno",
+      "Manda a chave Pix e recebe o comprovante",
+      "Anota quem quer conhecer a academia e avisa a equipe",
+    ],
+    hint: "Clique nas opções e converse",
+    demo: <BotDemo />,
+  },
 ];
+
+type Caixa = { left: number; width: number };
+
+function SlidingTabs({
+  labels,
+  active,
+  onChange,
+}: {
+  labels: string[];
+  active: number;
+  onChange: (i: number) => void;
+}) {
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [hover, setHover] = useState<number | null>(null);
+  const [caixas, setCaixas] = useState<Caixa[]>([]);
+
+  // mede a posição de cada aba (e remede quando a tela muda de tamanho)
+  useLayoutEffect(() => {
+    const medir = () =>
+      setCaixas(refs.current.map((el) => ({ left: el?.offsetLeft ?? 0, width: el?.offsetWidth ?? 0 })));
+    medir();
+    window.addEventListener("resize", medir);
+    document.fonts?.ready.then(medir);
+    return () => window.removeEventListener("resize", medir);
+  }, []);
+
+  const h = hover !== null ? caixas[hover] : undefined;
+  const a = caixas[active];
+
+  return (
+    <div
+      role="tablist"
+      onMouseLeave={() => setHover(null)}
+      className="relative flex w-max items-center gap-1 pb-2"
+    >
+      {/* fundo do hover */}
+      <span
+        aria-hidden
+        className="absolute top-0 h-9 rounded-md bg-white/[0.08] transition-all duration-300 ease-out"
+        style={{
+          left: h?.left ?? a?.left ?? 0,
+          width: h?.width ?? a?.width ?? 0,
+          opacity: h ? 1 : 0,
+        }}
+      />
+      {/* sublinhado da ativa */}
+      <span
+        aria-hidden
+        className="absolute bottom-0 h-[2px] rounded-full bg-[var(--text-primary)] transition-all duration-300 ease-out"
+        style={{ left: a?.left ?? 0, width: a?.width ?? 0, opacity: a ? 1 : 0 }}
+      />
+      {labels.map((label, i) => (
+        <button
+          key={label}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+          role="tab"
+          aria-selected={i === active}
+          onClick={() => onChange(i)}
+          onMouseEnter={() => setHover(i)}
+          className={`relative z-10 h-9 whitespace-nowrap px-3.5 text-[15px] font-medium transition-colors duration-200 ${
+            i === active || i === hover
+              ? "text-[var(--text-primary)]"
+              : "text-[var(--text-tertiary)]"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function Showcase() {
   const [active, setActive] = useState(0);
   const t = TABS[active];
 
   return (
-    <section id="recursos" className="relative py-24 sm:py-28">
+    <section id="recursos" className="relative scroll-mt-16 py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-            Recursos
-          </p>
-          <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight sm:text-[40px]">
-            Não acredite, teste você mesmo
-          </h2>
-          <p className="mt-4 text-[var(--text-secondary)]">
-            Cada peça do sistema, funcionando aqui na página. Clique, mexa e veja
-            como sua academia rodaria no automático.
-          </p>
-        </div>
+        <SecaoTitulo
+          n="02"
+          rotulo="Recursos"
+          titulo={
+            <>
+              Não acredite.{" "}
+              <span className="text-[var(--text-secondary)]">Teste você mesmo.</span>
+            </>
+          }
+          texto="Clique em cada parte e veja o sistema funcionando do jeito que a sua recepção vai usar."
+        />
 
-        {/* Palco — copy à esquerda, demo funcional à direita */}
-        <div className="mt-14 grid items-center gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:gap-14">
-          {/* copy da feature ativa */}
-          <div key={`copy-${active}`} className="animate-fade-up">
-            <h3 className="font-display text-2xl font-bold leading-tight tracking-tight sm:text-[32px]">
-              {t.headline}
-            </h3>
-            <p className="mt-4 text-[15px] leading-relaxed text-[var(--text-secondary)]">
-              {t.desc}
-            </p>
-            <ul className="mt-6 space-y-3">
-              {t.points.map((p) => (
-                <li key={p} className="flex items-start gap-3 text-[15px]">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[rgba(37,211,102,0.14)] text-[var(--wpp)]">
-                    <Check size={12} strokeWidth={3} />
+        {/* moldura no "esqueleto" da landing: linha fina, "+" nos cantos, abas como
+            primeira linha e duas células (texto | demo) separadas por linha */}
+        <div className="relative border border-[var(--border-strong)]">
+          <Cruz className="left-0 top-0" />
+          <Cruz className="left-full top-0" />
+          <Cruz className="left-0 top-full" />
+          <Cruz className="left-full top-full" />
+
+          {/* abas estilo Vercel: o sublinhado da ativa corre sobre a linha de baixo */}
+          <div className="overflow-x-auto border-b border-[var(--border-strong)]">
+            <div className="min-w-max px-2 pt-2">
+              <SlidingTabs labels={TABS.map((x) => x.tab)} active={active} onChange={setActive} />
+            </div>
+          </div>
+
+          <div className="grid gap-px bg-[var(--border-strong)] lg:grid-cols-[0.82fr_1.18fr]">
+            {/* texto */}
+            <div className="group/spot relative flex flex-col justify-center bg-[var(--bg)] p-7 sm:p-10">
+              <Luz />
+              <Cruz className="left-full top-0 hidden lg:block" />
+              <Cruz className="left-full top-full hidden lg:block" />
+              <div key={`copy-${active}`} className="animate-fade-up relative">
+                <p className="mb-4 font-[family-name:var(--font-space-mono)] text-[10.5px] font-medium uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+                  <span className="mr-1.5 inline-block text-[var(--wpp)] transition-transform duration-300 group-hover/spot:translate-x-0.5">
+                    0{active + 1}
                   </span>
-                  <span className="text-[var(--text-primary)]">{p}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-7 text-[13px] font-medium text-[var(--text-tertiary)]">
-              {t.hint}
-            </p>
-          </div>
+                  {t.tab}
+                  <span className="mx-2 text-[var(--border-strong)]">/</span>
+                  {t.plano}
+                </p>
+                <h3 className="font-display text-2xl font-bold leading-tight tracking-tight sm:text-[32px]">
+                  {t.headline}
+                </h3>
+                <p className="mt-4 text-[15px] leading-relaxed text-[var(--text-secondary)]">{t.desc}</p>
+                <ul className="mt-6 space-y-3">
+                  {t.points.map((p) => (
+                    <li key={p} className="flex items-start gap-3 text-[15px]">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[rgba(37,211,102,0.14)] text-[var(--wpp)]">
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                      <span className="text-[var(--text-primary)]">{p}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-7 text-[13px] font-medium text-[var(--text-tertiary)]">
+                  {t.hint} <span className="hidden lg:inline">👉</span>
+                  <span className="lg:hidden">👇</span>
+                </p>
+              </div>
+            </div>
 
-          {/* superfície interativa */}
-          <div
-            key={`demo-${active}`}
-            className="animate-fade-up h-[560px] [animation-delay:80ms]"
-          >
-            {t.demo}
+            {/* demo sobre a grade quadriculada */}
+            <div className="relative overflow-hidden bg-[var(--bg)] p-4 sm:p-6">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_at_center,#000_25%,transparent_80%)]"
+              />
+              <div key={`demo-${active}`} className="animate-fade-up relative h-[580px] [animation-delay:80ms]">
+                {t.demo}
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Abas embaixo — estilo Linear (linha + rótulo) */}
-        <div className="mt-16 grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-4">
-          {TABS.map((tabItem, i) => {
-            const on = i === active;
-            return (
-              <button
-                key={tabItem.id}
-                onClick={() => setActive(i)}
-                className={`border-t-2 pt-4 text-left transition-colors ${
-                  on
-                    ? "border-[var(--text-primary)]"
-                    : "border-[var(--border)] hover:border-[var(--border-strong)]"
-                }`}
-              >
-                <span
-                  className={`block text-[15px] font-semibold transition-colors ${
-                    on ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)]"
-                  }`}
-                >
-                  {tabItem.tab}
-                </span>
-                <span
-                  className={`mt-1 block text-[13px] leading-snug transition-colors ${
-                    on
-                      ? "text-[var(--text-secondary)]"
-                      : "text-[var(--text-tertiary)]/70"
-                  }`}
-                >
-                  {tabItem.tabDesc}
-                </span>
-              </button>
-            );
-          })}
         </div>
       </div>
     </section>

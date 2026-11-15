@@ -6,89 +6,100 @@ import { RotateCcw, Send } from "lucide-react";
 type Option = { label: string; next: string };
 type Node = { bot: ReactNode; options: Option[] };
 
+// Respostas fiéis ao bot real (academia_flow.py / chains.py): chave Pix + comprovante na
+// conversa (sem gateway, sem "copia-e-cola"); aula experimental = o bot anota nome e
+// horário e a equipe confirma.
+const CHAVE = "financeiro@suaacademia.com.br";
+
+function vencimento() {
+  const d = new Date();
+  d.setDate(d.getDate() + 2);
+  return d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
+}
+
 const FLOW: Record<string, Node> = {
   start: {
-    bot: (
-      <>
-        Oi! 👋 Sou o assistente da academia. Como posso te ajudar hoje?
-      </>
-    ),
+    bot: <>Oi! 👋 Sou o assistente da academia. Como posso te ajudar?</>,
     options: [
-      { label: "Meu vencimento", next: "venc" },
+      { label: "Quando vence meu plano?", next: "venc" },
       { label: "Horários", next: "horarios" },
-      { label: "Sou novo aluno", next: "novo" },
+      { label: "Quero conhecer a academia", next: "novo" },
     ],
   },
   venc: {
     bot: (
       <>
-        Sua mensalidade vence <b>amanhã (28/07)</b> — R${" "}
-        <span className="font-mono">89,90</span>. Quer pagar agora no Pix?
+        Seu plano <b>Mensal</b> vence <b><Venc /></b>, no valor de R${" "}
+        <span className="font-mono">89,90</span>. Quer a chave Pix pra pagar?
       </>
     ),
     options: [
-      { label: "Pagar no Pix", next: "pix" },
-      { label: "Voltar", next: "start" },
+      { label: "Quero a chave Pix", next: "pix" },
+      { label: "Vou pagar em dinheiro", next: "dinheiro" },
     ],
   },
   pix: {
     bot: (
       <>
-        Prontinho! Aqui está o Pix copia-e-cola 👇
+        Aqui está 👇
         <span className="mt-2 block rounded-lg bg-black/40 px-2.5 py-1.5 font-mono text-[11px] text-[var(--text-secondary)]">
-          00020126···5204000053039865802BR
+          {CHAVE}
         </span>
-        <span className="mt-1.5 block text-[12px] text-[var(--wpp)]">
-          Assim que cair, dou baixa automático ✅
-        </span>
+        <span className="mt-1.5 block">Depois é só me mandar o comprovante por aqui 😉</span>
+      </>
+    ),
+    options: [{ label: "📎 Enviar comprovante", next: "comprovante" }],
+  },
+  comprovante: {
+    bot: (
+      <>
+        Recebi seu comprovante! ✅ Assim que a academia conferir, você recebe a
+        confirmação aqui mesmo.
       </>
     ),
     options: [
-      { label: "Ver horários", next: "horarios" },
+      { label: "Horários", next: "horarios" },
       { label: "Recomeçar", next: "start" },
     ],
   },
+  dinheiro: {
+    bot: (
+      <>
+        Fechado! Seu código de pagamento é <b className="font-mono">#A3K7B2</b>. É só
+        mostrar na recepção, que o recibo chega aqui no WhatsApp 🧾
+      </>
+    ),
+    options: [{ label: "Recomeçar", next: "start" }],
+  },
   horarios: {
-    bot: <>Funcionamos seg a sex das 6h às 22h e sábado das 8h às 14h 🕒</>,
+    bot: <>Funcionamos de seg a sex, das 6h às 22h, e sábado das 8h às 14h 🕒</>,
     options: [
-      { label: "Meu vencimento", next: "venc" },
+      { label: "Quando vence meu plano?", next: "venc" },
       { label: "Recomeçar", next: "start" },
     ],
   },
   novo: {
     bot: (
       <>
-        Que massa! 🎉 Posso te mandar os planos e já agendar sua{" "}
-        <b>aula experimental grátis</b>. Bora?
+        Que bom! 🎉 A primeira aula experimental é <b>gratuita</b>. Me diz seu nome e o
+        melhor dia e horário pra você?
       </>
     ),
-    options: [
-      { label: "Ver planos", next: "planos" },
-      { label: "Recomeçar", next: "start" },
-    ],
-  },
-  planos: {
-    bot: (
-      <>
-        Temos Mensal, Trimestral e Anual. O Trimestral sai por R${" "}
-        <span className="font-mono">89,90</span>/mês 💪
-      </>
-    ),
-    options: [
-      { label: "Agendar aula", next: "agendar" },
-      { label: "Recomeçar", next: "start" },
-    ],
+    options: [{ label: "Ana, quinta às 19h", next: "agendar" }],
   },
   agendar: {
     bot: (
       <>
-        Fechado! Sua aula experimental está marcada pra <b>amanhã às 18h</b> ✅
-        Te espero!
+        Anotado, Ana! ✅ Já passei pra equipe, e eles confirmam sua aula por aqui.
       </>
     ),
     options: [{ label: "Recomeçar", next: "start" }],
   },
 };
+
+function Venc() {
+  return <>{vencimento()}</>;
+}
 
 type Msg = { from: "bot" | "user"; node: ReactNode };
 
@@ -141,10 +152,10 @@ export function BotDemo() {
       {/* header */}
       <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[#161419] px-4 py-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent-strong)]">
-          P
+          A
         </div>
         <div className="flex-1 leading-tight">
-          <p className="text-sm font-semibold">Assistente PyraLabs</p>
+          <p className="text-sm font-semibold">Assistente da academia</p>
           <p className="flex items-center gap-1.5 text-[11px] text-[var(--wpp)]">
             <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-[var(--wpp)]" />
             {typing ? "digitando…" : "online"}

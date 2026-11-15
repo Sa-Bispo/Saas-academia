@@ -9,9 +9,24 @@ import { nav, whatsappLink } from "@/components/academia-landing/site";
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [ativa, setAtiva] = useState("");
+  const [progresso, setProgresso] = useState(0);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const ids = nav.map((i) => i.href.slice(1));
+    const onScroll = () => {
+      setScrolled(window.scrollY > 8);
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      setProgresso(max > 0 ? Math.min(1, window.scrollY / max) : 0);
+      // seção ativa = a última cujo topo já passou de 40% da tela
+      const linha = window.innerHeight * 0.4;
+      let atual = "";
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= linha) atual = id;
+      }
+      setAtiva(atual);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -36,8 +51,14 @@ export function Nav() {
             <a
               key={item.href}
               href={item.href}
-              className="rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+              aria-current={ativa === item.href.slice(1) ? "true" : undefined}
+              className={`relative rounded-lg px-3 py-2 text-sm transition-colors hover:text-[var(--text-primary)] ${
+                ativa === item.href.slice(1) ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+              }`}
             >
+              {ativa === item.href.slice(1) && (
+                <span className="absolute left-1/2 top-full h-1 w-1 -translate-x-1/2 rounded-full bg-[var(--wpp)]" />
+              )}
               {item.label}
             </a>
           ))}
@@ -60,6 +81,13 @@ export function Nav() {
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
+
+      {/* progresso do scroll, na linha de baixo da nav */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 -bottom-px h-px origin-left bg-[var(--wpp)]/70 transition-opacity duration-300"
+        style={{ transform: `scaleX(${progresso})`, opacity: scrolled ? 1 : 0 }}
+      />
 
       {open && (
         <div className="nav-glass border-b border-[var(--border)] md:hidden">

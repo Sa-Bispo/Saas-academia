@@ -16,8 +16,7 @@ export const whatsappLink = () =>
   )}`;
 
 export const nav = [
-  { label: "Recursos", href: "#recursos" },
   { label: "Como funciona", href: "#como-funciona" },
-  { label: "Cobrança", href: "#cobranca" },
+  { label: "Recursos", href: "#recursos" },
   { label: "Preço", href: "#planos" },
 ];

@@ -200,9 +200,9 @@ function Typing() {
   );
 }
 
-function StatusBar() {
+export function StatusBar({ className = "bg-[#161419]" }: { className?: string }) {
   return (
-    <div className="flex items-center justify-between bg-[#161419] px-6 pt-2.5 pb-1 text-[11px] font-semibold text-white">
+    <div className={`flex items-center justify-between px-6 pt-2.5 pb-1 text-[11px] font-semibold text-white ${className}`}>
       <span className="font-mono tracking-tight">9:41</span>
       <span className="flex items-center gap-1.5">
         <Signal size={13} />
