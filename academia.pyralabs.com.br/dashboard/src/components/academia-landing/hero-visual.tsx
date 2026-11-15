@@ -11,7 +11,7 @@ export function HeroVisual() {
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-60 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_45%,#000_30%,transparent_75%)]"
-          style={{ backgroundImage: "url(/academia_fundo.png)" }}
+          style={{ backgroundImage: "url(/academia_fundo.webp)" }}
         />
         <div className="relative w-[268px]">
           <PhoneMock width={268} />

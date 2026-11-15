@@ -84,7 +84,11 @@ function PlanoColuna({ p, cartao = false }: { p: Plano; cartao?: boolean }) {
         <BorderTrail
           size={110}
           className="bg-[var(--wpp)]"
-          style={{ boxShadow: "0 0 40px 18px rgba(37,211,102,0.45), 0 0 80px 40px rgba(37,211,102,0.15)" }}
+          style={{
+            boxShadow: cartao
+              ? "0 0 24px 10px rgba(37,211,102,0.4)"
+              : "0 0 40px 18px rgba(37,211,102,0.45), 0 0 80px 40px rgba(37,211,102,0.15)",
+          }}
         />
       )}
 

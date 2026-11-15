@@ -163,3 +163,14 @@ html:has(.landing-scope) {
 @media (prefers-reduced-motion: reduce) {
   html:has(.landing-scope) { scroll-behavior: auto; }
 }
+
+/* celular: o brilho atrás do iPhone fica parado e com blur menor (blur grande animado
+   pesa muito no Safari do iPhone) */
+@media (max-width: 1023px) {
+  .landing-scope .phone-glow {
+    animation: none;
+    filter: blur(28px);
+    opacity: 0.6;
+    transform: translate(-50%, -50%);
+  }
+}

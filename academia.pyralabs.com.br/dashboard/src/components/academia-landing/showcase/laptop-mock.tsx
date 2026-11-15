@@ -19,7 +19,7 @@ export function LaptopMock({ width = 640 }: { width?: number }) {
       {/* moldura do notebook por cima */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/laptop-mockup.png"
+        src="/laptop-mockup.webp"
         alt="Dashboard PyraLabs"
         draggable={false}
         className="pointer-events-none relative z-10 w-full"

@@ -9,7 +9,7 @@ export function Hero() {
       {/* Foto da academia sangrando pela direita (lg+) */}
       <div
         className="pointer-events-none absolute inset-y-0 right-0 z-0 hidden w-[54%] bg-cover bg-center lg:block"
-        style={{ backgroundImage: "url(/academia_fundo.png)" }}
+        style={{ backgroundImage: "url(/academia_fundo.webp)" }}
       >
         {/* escurece a foto levemente (mantém legível o chat) */}
         <div className="absolute inset-0 bg-[#0b0b0d]/25" />
@@ -20,7 +20,7 @@ export function Hero() {
       </div>
 
       {/* Fundo abstrato à esquerda — formas suaves escuras (profundidade, sem neon) */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-0 w-full overflow-hidden lg:w-[68%]">
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-0 hidden w-full overflow-hidden lg:block lg:w-[68%]">
         {/* forma clara suave, canto superior esquerdo */}
         <div className="absolute -left-40 -top-32 h-[560px] w-[560px] rounded-full bg-white/[0.04] blur-[120px]" />
         {/* whisper quente bem sutil, meio-esquerda */}

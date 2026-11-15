@@ -48,9 +48,14 @@ export function PhoneMock({
       {/* Moldura do iPhone por cima, com sombra limpa que segue o contorno */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/phone-mockup.png"
+        src="/phone-mockup.webp"
+        srcSet="/phone-mockup-sm.webp 351w, /phone-mockup.webp 702w"
+        sizes={`${width}px`}
+        width={702}
+        height={1450}
+        decoding="async"
         alt={alt}
-        className="pointer-events-none relative z-10 w-full select-none"
+        className="pointer-events-none relative z-10 h-auto w-full select-none"
         draggable={false}
         style={{
           filter:
