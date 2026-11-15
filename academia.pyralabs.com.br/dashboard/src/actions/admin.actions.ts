@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import crypto from "node:crypto";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma/client";
 
 import { getAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { checklistImplantacao, getPlanoAcademia } from "@/lib/planos-academia";
 
 const ADMIN_IMPERSONATION_COOKIE = "admin_impersonation_tenant_id";
 const EXPIRING_IN_DAYS = 7;
@@ -25,6 +27,8 @@ const createTenantSchema = z.object({
     z.string().min(8, "A senha deve ter pelo menos 8 caracteres.").max(72).optional(),
   ),
   vencimento: z.union([z.string(), z.date()]),
+  // conta de teste/demo: fica fora do MRR e dos alertas
+  teste: z.boolean().optional(),
 });
 
 type AdminSubscriptionStatus =
@@ -60,6 +64,14 @@ export type AdminTenantSummary = {
   statusLabel: string;
   pedidosHoje: number;
   faturamentoHoje: number;
+  // nome da academia (companyName); "nome" é o nome interno do tenant
+  displayName: string;
+  contaTeste: boolean;
+  // tem WhatsApp no plano/módulos ou instância criada — só aí o status do bot importa
+  usaWhatsapp: boolean;
+  alunosAtivos: number;
+  recebidoMesCents: number;
+  cobrancasAtrasadas: number;
 };
 
 export type AdminStats = {
@@ -67,6 +79,10 @@ export type AdminStats = {
   botsConectados: number;
   totalPedidosHoje: number;
   mrrCents: number;
+  clientesPagantes: number;
+  contasTeste: number;
+  alunosAtivosTotal: number;
+  vencendo7d: number;
   tenants: AdminTenantSummary[];
 };
 
@@ -127,6 +143,9 @@ export async function getAdminStats(): Promise<AdminStats> {
   type TenantQueryRow = {
     id: string;
     nome: string;
+    companyName: string | null;
+    evolutionInstanceName: string | null;
+    tenantModulos: Array<{ modulo: { chave: string } }>;
     whatsappStatus: string;
     configNicho: unknown;
     dataCriacao: Date;
@@ -154,6 +173,9 @@ export async function getAdminStats(): Promise<AdminStats> {
     select: {
       id: true,
       nome: true,
+      companyName: true,
+      evolutionInstanceName: true,
+      tenantModulos: { where: { ativo: true }, select: { modulo: { select: { chave: true } } } },
       whatsappStatus: true,
       configNicho: true,
       dataCriacao: true,
@@ -186,8 +208,27 @@ export async function getAdminStats(): Promise<AdminStats> {
     },
   })) as TenantQueryRow[];
 
+  // Números de academia por cliente (3 consultas agrupadas, sem N+1)
+  const inicioMes = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [alunosAtivosRows, recebidoRows, atrasadasRows] = await Promise.all([
+    prisma.aluno.groupBy({ by: ["tenantId"], where: { status: "ATIVO" }, _count: { _all: true } }),
+    prisma.cobrancaAluno.groupBy({
+      by: ["tenantId"],
+      where: { status: "PAGO", dataPagamento: { gte: inicioMes } },
+      _sum: { valorCents: true },
+    }),
+    prisma.cobrancaAluno.groupBy({
+      by: ["tenantId"],
+      where: { status: { in: ["PENDENTE", "VENCIDO"] }, dataVencimento: { lt: today } },
+      _count: { _all: true },
+    }),
+  ]);
+  const alunosAtivosMap = new Map(alunosAtivosRows.map((r) => [r.tenantId, r._count._all]));
+  const recebidoMap = new Map(recebidoRows.map((r) => [r.tenantId, r._sum.valorCents ?? 0]));
+  const atrasadasMap = new Map(atrasadasRows.map((r) => [r.tenantId, r._count._all]));
+
   const hydratedTenants: AdminTenantSummary[] = tenants.map((tenant): AdminTenantSummary => {
-    const config = tenant.configNicho as { sub_nicho?: string; subNicho?: string };
+    const config = tenant.configNicho as { sub_nicho?: string; subNicho?: string; conta_teste?: boolean };
     const subNicho = config?.sub_nicho ?? config?.subNicho ?? "-";
 
     const pedidosHoje = tenant.orders.length;
@@ -216,21 +257,37 @@ export async function getAdminStats(): Promise<AdminStats> {
       statusLabel: resolveSubscriptionStatusLabel(tenant.subscription?.status ?? null, daysUntilDue),
       pedidosHoje,
       faturamentoHoje,
+      displayName: tenant.companyName?.trim() || tenant.nome,
+      contaTeste: config?.conta_teste === true,
+      usaWhatsapp:
+        Boolean(tenant.evolutionInstanceName) ||
+        tenant.tenantModulos.some((tm) => tm.modulo.chave === "comunicacao") ||
+        subNicho !== "academia",
+      alunosAtivos: alunosAtivosMap.get(tenant.id) ?? 0,
+      recebidoMesCents: recebidoMap.get(tenant.id) ?? 0,
+      cobrancasAtrasadas: atrasadasMap.get(tenant.id) ?? 0,
     };
   });
 
   const totalAtivos = hydratedTenants.filter((tenant) => tenant.subscriptionStatus === "ACTIVE").length;
   const botsConectados = hydratedTenants.filter((tenant) => tenant.whatsappStatus === "CONNECTED").length;
   const totalPedidosHoje = hydratedTenants.reduce((acc: number, tenant) => acc + tenant.pedidosHoje, 0);
-  const mrrCents = hydratedTenants
-    .filter((tenant) => tenant.subscriptionStatus === "ACTIVE")
-    .reduce((acc: number, tenant) => acc + tenant.planPriceCents, 0);
+  // MRR e pagantes ignoram contas de teste
+  const pagantes = hydratedTenants.filter(
+    (tenant) => tenant.subscriptionStatus === "ACTIVE" && !tenant.contaTeste && tenant.planPriceCents > 0,
+  );
+  const mrrCents = pagantes.reduce((acc: number, tenant) => acc + tenant.planPriceCents, 0);
+  const reais = hydratedTenants.filter((tenant) => !tenant.contaTeste);
 
   return {
     totalAtivos,
     botsConectados,
     totalPedidosHoje,
     mrrCents,
+    clientesPagantes: pagantes.length,
+    contasTeste: hydratedTenants.length - reais.length,
+    alunosAtivosTotal: reais.reduce((acc, tenant) => acc + tenant.alunosAtivos, 0),
+    vencendo7d: reais.filter((t) => t.daysUntilDue !== null && t.daysUntilDue >= 0 && t.daysUntilDue <= EXPIRING_IN_DAYS).length,
     tenants: hydratedTenants,
   };
 }
@@ -242,6 +299,7 @@ export async function createTenant(input: {
   plano: string;
   senha?: string;
   vencimento: Date | string;
+  teste?: boolean;
 }) {
   await assertAdmin();
 
@@ -270,6 +328,9 @@ export async function createTenant(input: {
   if (!plan) {
     throw new Error("Plano inválido.");
   }
+
+  // Plano de academia da landing (Gestão/Cobrança/Completo): define módulos e o que é automático
+  const planoAcademia = parsed.sub_nicho === "academia" ? getPlanoAcademia(parsed.plano) : null;
 
   const now = new Date();
   const senhaTemp = parsed.senha ?? generateSecurePassword(12);
@@ -342,10 +403,31 @@ export async function createTenant(input: {
           configNicho: {
             sub_nicho: parsed.sub_nicho,
             subNicho: parsed.sub_nicho,
+            ...(parsed.teste ? { conta_teste: true } : {}),
+            ...(planoAcademia
+              ? {
+                  cobranca_automatica: planoAcademia.cobrancaAutomatica,
+                  bot_24h: planoAcademia.bot24h,
+                }
+              : {}),
           },
         },
         select: { id: true },
       });
+
+      // Liga os módulos do plano (só em cliente novo)
+      if (planoAcademia) {
+        const catalogo = await tx.modulo.findMany({
+          where: { chave: { in: planoAcademia.modulos } },
+          select: { id: true },
+        });
+        if (catalogo.length > 0) {
+          await tx.tenantModulo.createMany({
+            data: catalogo.map((m) => ({ tenantId: createdTenant.id, moduloId: m.id, ativo: true })),
+            skipDuplicates: true,
+          });
+        }
+      }
 
       await tx.subscription.create({
         data: {
@@ -368,7 +450,9 @@ export async function createTenant(input: {
 
   const evolutionApiUrl = process.env.EVOLUTION_API_URL;
   const evolutionApiKey = process.env.EVOLUTION_API_KEY ?? process.env.EVOLUTION_GLOBAL_KEY;
-  if (evolutionApiUrl && evolutionApiKey) {
+  // Plano sem WhatsApp (Gestão): não cria instância, então nada de bot nem cobrança automática
+  const precisaWhatsapp = planoAcademia ? planoAcademia.whatsapp : true;
+  if (precisaWhatsapp && evolutionApiUrl && evolutionApiKey) {
     try {
       await fetch(`${evolutionApiUrl.replace(/\/$/, "")}/instance/create`, {
         method: "POST",
@@ -391,6 +475,9 @@ export async function createTenant(input: {
     email: parsed.email,
     senhaTemp,
     url: getLoginUrl(),
+    nome: parsed.nome,
+    planoNome: planoAcademia?.nome ?? null,
+    checklist: parsed.sub_nicho === "academia" ? checklistImplantacao(planoAcademia) : [],
   };
 }
 
@@ -516,6 +603,7 @@ export async function updateTenantFull(input: {
   sub_nicho: "adega" | "lanchonete" | "pizzaria" | "academia";
   plano: string;
   vencimento: string | Date;
+  teste?: boolean;
 }) {
   await assertAdmin();
 
@@ -526,6 +614,7 @@ export async function updateTenantFull(input: {
       sub_nicho: z.enum(["adega", "lanchonete", "pizzaria", "academia"]),
       plano: z.string().trim().min(1),
       vencimento: z.union([z.string(), z.date()]),
+      teste: z.boolean().optional(),
     })
     .parse(input);
 
@@ -543,16 +632,34 @@ export async function updateTenantFull(input: {
 
   if (!plan) throw new Error("Plano inválido.");
 
+  // Preserva o configNicho do cliente (chave Pix, prazos, etc.) e só troca o nicho/flag de
+  // teste. Antes ele era sobrescrito inteiro e a configuração da academia se perdia.
+  // Trocar o plano NÃO mexe nos módulos do cliente.
+  const atual = await prisma.tenant.findUnique({
+    where: { id: parsed.tenantId },
+    select: { configNicho: true },
+  });
+  if (!atual) throw new Error("Cliente não encontrado.");
+  const configAtual =
+    atual.configNicho && typeof atual.configNicho === "object" && !Array.isArray(atual.configNicho)
+      ? (atual.configNicho as Record<string, unknown>)
+      : {};
+  const configNovo: Record<string, unknown> = {
+    ...configAtual,
+    sub_nicho: parsed.sub_nicho,
+    subNicho: parsed.sub_nicho,
+  };
+  if (parsed.teste !== undefined) {
+    if (parsed.teste) configNovo.conta_teste = true;
+    else delete configNovo.conta_teste;
+  }
+
   await prisma.tenant.update({
     where: { id: parsed.tenantId },
     data: {
-      nome: parsed.nome,
       companyName: parsed.nome,
       plano: plan.code,
-      configNicho: {
-        sub_nicho: parsed.sub_nicho,
-        subNicho: parsed.sub_nicho,
-      },
+      configNicho: configNovo as Prisma.InputJsonValue,
     },
   });
 

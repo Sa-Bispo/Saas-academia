@@ -13,9 +13,8 @@ import {
   Plus,
   Search,
   Shield,
-  Store,
   Trash2,
-  Wifi,
+  Users,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -32,6 +31,8 @@ import {
   toggleTenantAtivo,
   updateTenantFull,
 } from "@/actions/admin.actions";
+import { checklistImplantacao, getPlanoAcademia, PLANOS_ACADEMIA } from "@/lib/planos-academia";
+import { MODULOS_CATALOG } from "@/lib/modulos";
 
 type Props = {
   data: AdminStats;
@@ -43,7 +44,7 @@ type Props = {
 };
 
 type FilterStatus = "todos" | "ativo" | "inativo" | "vencendo";
-type FilterNiche = "todos" | "adega" | "lanchonete" | "pizzaria";
+type FilterNiche = "todos" | "adega" | "lanchonete" | "pizzaria" | "academia";
 
 type FeedItem = {
   id: string;
@@ -125,6 +126,55 @@ function expiryColor(days: number | null) {
   return "text-muted";
 }
 
+// Planos da landing primeiro; os antigos de academia ficam no fim, marcados
+const ORDEM_PLANOS_ACADEMIA = Object.keys(PLANOS_ACADEMIA);
+
+// `atual`: o plano que o cliente já tem entra sempre na lista, pra edição nunca trocar
+// o plano sem querer (ex.: plano antigo de outro nicho).
+function planosDoNicho(plans: AdminPlanSummary[], subNicho: string, atual?: string) {
+  const doNicho =
+    subNicho !== "academia" ? plans.filter((p) => p.niche !== "ACADEMIA") : plans.filter((p) => p.niche === "ACADEMIA");
+  const planoAtual = atual ? plans.find((p) => p.code === atual) : undefined;
+  if (planoAtual && !doNicho.includes(planoAtual)) doNicho.push(planoAtual);
+  if (subNicho !== "academia") return doNicho;
+  return [...doNicho].sort((a, b) => {
+    const ia = ORDEM_PLANOS_ACADEMIA.indexOf(a.code);
+    const ib = ORDEM_PLANOS_ACADEMIA.indexOf(b.code);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.priceCents - b.priceCents;
+  });
+}
+
+function planoPadrao(plans: AdminPlanSummary[], subNicho: string) {
+  const lista = planosDoNicho(plans, subNicho);
+  return (lista.find((p) => p.code === "academia_cobranca") ?? lista[0])?.code ?? "";
+}
+
+function rotuloPlano(plan: AdminPlanSummary) {
+  const antigo = plan.niche === "ACADEMIA" && !getPlanoAcademia(plan.code);
+  return `${plan.name} (${BRL.format(plan.priceCents / 100)})${antigo ? " · antigo" : ""}`;
+}
+
+function nomeModulo(chave: string) {
+  return MODULOS_CATALOG.find((m) => m.chave === chave)?.nome ?? chave;
+}
+
+function mensagemBoasVindas(c: { nome: string; url: string; email: string; senha: string; planoNome: string | null; checklist: string[] }) {
+  const linhas = [
+    `Olá! O acesso da ${c.nome} ao painel PyraLabs está pronto 🎉`,
+    "",
+    `🔗 *Link:* ${c.url}`,
+    `📧 *E-mail:* ${c.email}`,
+    `🔑 *Senha:* ${c.senha}`,
+  ];
+  if (c.planoNome) linhas.push(`📦 *Plano:* ${c.planoNome}`);
+  if (c.checklist.length > 0) {
+    linhas.push("", "Na implantação a gente faz junto:");
+    c.checklist.forEach((item, i) => linhas.push(`${i + 1}. ${item}`));
+  }
+  linhas.push("", "Qualquer dúvida é só me chamar aqui!");
+  return linhas.join("\n");
+}
+
 function feedDot(type: FeedItem["type"]) {
   if (type === "new_client") return "bg-brand";
   if (type === "bot_disconnected") return "bg-red-400";
@@ -166,6 +216,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
     subNicho: "adega" | "lanchonete" | "pizzaria" | "academia";
     plano: string;
     vencimento: string;
+    teste: boolean;
   } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -174,6 +225,9 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
     email: string;
     senha: string;
     url: string;
+    nome: string;
+    planoNome: string | null;
+    checklist: string[];
   } | null>(null);
   const [copied, setCopied] = useState<"none" | "creds" | "whatsapp">("none");
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -185,14 +239,17 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
   const [modulosState, setModulosState] = useState<AdminModuloState[]>([]);
   const [modulosLoading, setModulosLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const formVazio = () => ({
     nome: "",
     email: "",
-    sub_nicho: "adega" as "adega" | "lanchonete" | "pizzaria" | "academia",
-    plano: plans[0]?.code ?? "",
+    sub_nicho: "academia" as "adega" | "lanchonete" | "pizzaria" | "academia",
+    plano: planoPadrao(plans, "academia"),
     senha: "",
     vencimento: "",
+    teste: false,
   });
+  const [formData, setFormData] = useState(formVazio);
+  const planoAcademiaForm = formData.sub_nicho === "academia" ? getPlanoAcademia(formData.plano) : null;
 
   useEffect(() => {
     if (!feedback) return;
@@ -208,7 +265,8 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
 
   const filtered = useMemo(() => {
     return data.tenants.filter((tenant) => {
-      const byText = tenant.nome.toLowerCase().includes(search.toLowerCase());
+      const termo = search.toLowerCase();
+      const byText = tenant.displayName.toLowerCase().includes(termo) || tenant.email.toLowerCase().includes(termo);
       const byNiche = niche === "todos" ? true : tenant.subNicho === niche;
       const byStatus =
         status === "todos"
@@ -223,13 +281,16 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
   }, [data.tenants, search, niche, status]);
 
   const alerts = useMemo(() => {
+    // só clientes reais que usam WhatsApp entram no alerta de bot
     const disconnected = data.tenants.filter(
       (t) =>
+        !t.contaTeste &&
+        t.usaWhatsapp &&
         t.whatsappStatus !== "CONNECTED" &&
         (t.statusLabel === "Ativo" || t.statusLabel.startsWith("Vence em")),
     );
     const expiring = data.tenants.filter(
-      (t) => t.daysUntilDue !== null && t.daysUntilDue >= 0 && t.daysUntilDue <= 7,
+      (t) => !t.contaTeste && t.daysUntilDue !== null && t.daysUntilDue >= 0 && t.daysUntilDue <= 7,
     );
     return { disconnected, expiring };
   }, [data.tenants]);
@@ -237,15 +298,16 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
   const activityFeed = useMemo((): FeedItem[] => {
     const items: FeedItem[] = [];
     for (const t of data.tenants) {
+      if (t.contaTeste) continue;
       const ageDays = (Date.now() - new Date(t.createdAt).getTime()) / 864e5;
       if (ageDays <= 30) {
-        items.push({ id: `new-${t.id}`, type: "new_client", label: "Novo cliente", detail: t.nome, time: t.createdAt, urgency: 0 });
+        items.push({ id: `new-${t.id}`, type: "new_client", label: "Novo cliente", detail: t.displayName, time: t.createdAt, urgency: 0 });
       }
-      if (t.whatsappStatus !== "CONNECTED" && (t.statusLabel === "Ativo" || t.statusLabel.startsWith("Vence em"))) {
-        items.push({ id: `bot-${t.id}`, type: "bot_disconnected", label: "Bot offline", detail: t.nome, time: null, urgency: 2 });
+      if (t.usaWhatsapp && t.whatsappStatus !== "CONNECTED" && (t.statusLabel === "Ativo" || t.statusLabel.startsWith("Vence em"))) {
+        items.push({ id: `bot-${t.id}`, type: "bot_disconnected", label: "Bot offline", detail: t.displayName, time: null, urgency: 2 });
       }
       if (t.daysUntilDue !== null && t.daysUntilDue >= 0 && t.daysUntilDue <= 7) {
-        items.push({ id: `exp-${t.id}`, type: "expiring", label: `Vence em ${t.daysUntilDue}d`, detail: t.nome, time: t.dueDate, urgency: t.daysUntilDue <= 2 ? 3 : 1 });
+        items.push({ id: `exp-${t.id}`, type: "expiring", label: `Vence em ${t.daysUntilDue}d`, detail: t.displayName, time: t.dueDate, urgency: t.daysUntilDue <= 2 ? 3 : 1 });
       }
     }
     return items.sort((a, b) => b.urgency - a.urgency);
@@ -311,8 +373,15 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
         const result = await createTenant({ ...formData, vencimento: formData.vencimento });
         setOpenModal(false);
         setModalError(null);
-        setCredenciais({ email: result.email, senha: result.senhaTemp, url: result.url });
-        setFormData({ nome: "", email: "", sub_nicho: "academia", plano: plans[0]?.code ?? "", senha: "", vencimento: "" });
+        setCredenciais({
+          email: result.email,
+          senha: result.senhaTemp,
+          url: result.url,
+          nome: result.nome,
+          planoNome: result.planoNome,
+          checklist: result.checklist,
+        });
+        setFormData(formVazio());
         showFeedback("✓ Cliente criado com sucesso.");
       } catch (error) {
         setModalError(error instanceof Error ? error.message : "Erro ao criar cliente. Tente novamente.");
@@ -330,6 +399,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
           sub_nicho: editingTenant.subNicho,
           plano: editingTenant.plano,
           vencimento: editingTenant.vencimento,
+          teste: editingTenant.teste,
         });
         setEditingTenant(null);
         showFeedback(`${editingTenant.nome} atualizado — plano ${result.planName}.`);
@@ -365,10 +435,11 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
   function onOpenEditTenant(tenant: AdminStats["tenants"][number]) {
     setEditingTenant({
       id: tenant.id,
-      nome: tenant.nome,
+      nome: tenant.displayName,
       subNicho: (tenant.subNicho as "adega" | "lanchonete" | "pizzaria" | "academia") ?? "academia",
       plano: tenant.planCode ?? plans[0]?.code ?? "",
       vencimento: toInputDate(tenant.dueDate),
+      teste: tenant.contaTeste,
     });
   }
 
@@ -483,10 +554,10 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Clientes ativos" value={String(data.totalAtivos)} icon={CheckCircle2} />
-        <MetricCard title="Bots conectados" value={String(data.botsConectados)} icon={Wifi} />
-        <MetricCard title="Pedidos hoje" value={String(data.totalPedidosHoje)} icon={Store} />
-        <MetricCard title="MRR estimado" value={BRL.format(data.mrrCents / 100)} icon={Shield} />
+        <MetricCard title="Clientes pagantes" value={String(data.clientesPagantes)} icon={CheckCircle2} />
+        <MetricCard title="MRR" value={BRL.format(data.mrrCents / 100)} icon={Shield} />
+        <MetricCard title="Alunos nos clientes" value={data.alunosAtivosTotal.toLocaleString("pt-BR")} icon={Users} />
+        <MetricCard title="Vencendo em 7 dias" value={String(data.vencendo7d)} icon={Clock} />
       </div>
 
       {(alerts.disconnected.length > 0 || alerts.expiring.length > 0) && (
@@ -516,7 +587,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
           </div>
           {alerts.disconnected.length > 0 && (
             <p className="mt-2 text-[11px] text-muted/70">
-              Offline: {alerts.disconnected.map((t) => t.nome).join(", ")}
+              Offline: {alerts.disconnected.map((t) => t.displayName).join(", ")}
             </p>
           )}
         </section>
@@ -585,13 +656,20 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
               <div className="flex items-start gap-3">
                 <div className="relative shrink-0">
                   <div className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${nichePalette(tenant.subNicho)}`}>
-                    <span className="text-sm font-semibold">{initials(tenant.nome)}</span>
+                    <span className="text-sm font-semibold">{initials(tenant.displayName)}</span>
                   </div>
-                  <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-zinc-900 ${bot.dot}`} />
+                  {tenant.usaWhatsapp && (
+                    <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-zinc-900 ${bot.dot}`} />
+                  )}
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-semibold text-white">{tenant.nome}</h3>
+                    <h3 className="text-base font-semibold text-white">{tenant.displayName}</h3>
+                    {tenant.contaTeste && (
+                      <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted ring-1 ring-line">
+                        Teste
+                      </span>
+                    )}
                     {recent && (
                       <span className="rounded-full bg-brand/20 px-2 py-0.5 text-[10px] font-semibold text-brand ring-1 ring-brand/30">
                         Novo
@@ -613,21 +691,44 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 </div>
               </div>
 
-              <div className="space-y-1.5 text-sm">
-                <p className="text-muted">Pedidos hoje</p>
-                <p className="font-mono font-bold tabular-nums text-white">{tenant.pedidosHoje}</p>
-                <p className="text-muted">Faturamento do dia</p>
-                <p className="font-mono font-bold tabular-nums text-white">{BRL.format(tenant.faturamentoHoje)}</p>
-              </div>
+              {tenant.subNicho === "academia" ? (
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted">Alunos ativos</p>
+                    <p className="mt-1 font-mono font-bold tabular-nums text-white">{tenant.alunosAtivos}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted">Recebido no mês</p>
+                    <p className="mt-1 font-mono font-bold tabular-nums text-white">{BRL.format(tenant.recebidoMesCents / 100)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted">Em atraso</p>
+                    <p className={`mt-1 font-mono font-bold tabular-nums ${tenant.cobrancasAtrasadas > 0 ? "text-amber-300" : "text-white"}`}>
+                      {tenant.cobrancasAtrasadas}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5 text-sm">
+                  <p className="text-muted">Pedidos hoje</p>
+                  <p className="font-mono font-bold tabular-nums text-white">{tenant.pedidosHoje}</p>
+                  <p className="text-muted">Faturamento do dia</p>
+                  <p className="font-mono font-bold tabular-nums text-white">{BRL.format(tenant.faturamentoHoje)}</p>
+                </div>
+              )}
 
               <div className="space-y-2 text-sm">
                 <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${statusTone(tenant.statusLabel)}`}>
                   {tenant.statusLabel}
                 </span>
-                <div className="flex items-center gap-2 text-xs text-muted">
-                  <span className={`h-2 w-2 rounded-full ${bot.dot}`} />
-                  Bot {bot.label}
-                </div>
+                {tenant.usaWhatsapp ? (
+                  <div className="flex items-center gap-2 text-xs text-muted">
+                    <span className={`h-2 w-2 rounded-full ${bot.dot}`} />
+                    Bot {bot.label}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted">Sem WhatsApp no plano</p>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -641,7 +742,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 </button>
                 <button
                   type="button"
-                  onClick={() => onOpenModulos(tenant.id, tenant.nome)}
+                  onClick={() => onOpenModulos(tenant.id, tenant.displayName)}
                   disabled={pending}
                   className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-60"
                 >
@@ -721,7 +822,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white">Novo cliente</h2>
-                <p className="text-sm text-muted">Cria tenant + lojista + assinatura.</p>
+                <p className="text-sm text-muted">Cria o acesso, a assinatura e já liga os módulos do plano.</p>
               </div>
               <button
                 type="button"
@@ -733,7 +834,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
             </div>
 
             <div className="grid gap-3">
-              <Field label="Nome do negócio">
+              <Field label="Nome da academia">
                 <input
                   value={formData.nome}
                   onChange={(e) => updateFormData({ nome: e.target.value })}
@@ -741,7 +842,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 />
               </Field>
 
-              <Field label="Email do lojista">
+              <Field label="E-mail de acesso do cliente">
                 <input
                   type="email"
                   value={formData.email}
@@ -766,7 +867,10 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 <Field label="Sub-nicho">
                   <select
                     value={formData.sub_nicho}
-                    onChange={(e) => updateFormData({ sub_nicho: e.target.value as "adega" | "lanchonete" | "pizzaria" | "academia" })}
+                    onChange={(e) => {
+                      const sub_nicho = e.target.value as "adega" | "lanchonete" | "pizzaria" | "academia";
+                      updateFormData({ sub_nicho, plano: planoPadrao(plans, sub_nicho) });
+                    }}
                     className="h-10 w-full rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition focus:border-brand/45"
                   >
                     <option value="academia">Academia</option>
@@ -782,14 +886,37 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                     onChange={(e) => updateFormData({ plano: e.target.value })}
                     className="h-10 w-full rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition focus:border-brand/45"
                   >
-                    {plans.map((plan) => (
+                    {planosDoNicho(plans, formData.sub_nicho).map((plan) => (
                       <option key={plan.id} value={plan.code}>
-                        {plan.name} ({BRL.format(plan.priceCents / 100)})
+                        {rotuloPlano(plan)}
                       </option>
                     ))}
                   </select>
                 </Field>
               </div>
+
+              {formData.sub_nicho === "academia" && (
+                <div className="rounded-xl border border-line bg-background/40 px-3 py-2.5 text-xs text-muted">
+                  {planoAcademiaForm ? (
+                    <>
+                      <p>
+                        <span className="text-white">Módulos ligados:</span>{" "}
+                        {planoAcademiaForm.modulos.map(nomeModulo).join(", ")}
+                      </p>
+                      <p className="mt-1">
+                        <span className="text-white">WhatsApp:</span>{" "}
+                        {planoAcademiaForm.whatsapp
+                          ? planoAcademiaForm.bot24h
+                            ? "cobrança automática + bot 24h"
+                            : "cobrança automática"
+                          : "não (cobrança assistida pelo WhatsApp do dono)"}
+                      </p>
+                    </>
+                  ) : (
+                    <p>Plano antigo: nenhum módulo é ligado sozinho. Ligue em “Módulos” depois.</p>
+                  )}
+                </div>
+              )}
 
               <Field label="Data de vencimento">
                 <input
@@ -801,6 +928,13 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
               </Field>
 
               <div className="-mt-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVencimento(addDays(14))}
+                  className="rounded-lg border border-brand/35 bg-brand/10 px-3 py-1 text-xs text-brand transition hover:bg-brand/20"
+                >
+                  14 dias de teste
+                </button>
                 <button
                   type="button"
                   onClick={() => setVencimento(addDays(30))}
@@ -816,6 +950,16 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                   + 90 dias
                 </button>
               </div>
+
+              <label className="flex items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={formData.teste}
+                  onChange={(e) => updateFormData({ teste: e.target.checked })}
+                  className="accent-[var(--color-brand,#22c55e)]"
+                />
+                Conta de teste/demonstração (fica fora do MRR e dos alertas)
+              </label>
 
               {modalError && (
                 <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
@@ -852,7 +996,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-white">Editar cliente</h2>
-                <p className="text-sm text-muted">Altere nome, nicho, plano e vencimento.</p>
+                <p className="text-sm text-muted">Altere nome, plano e vencimento. Os dados e a configuração da academia não mudam.</p>
               </div>
               <button
                 type="button"
@@ -864,7 +1008,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
             </div>
 
             <div className="grid gap-3">
-              <Field label="Nome do negócio">
+              <Field label="Nome da academia">
                 <input
                   value={editingTenant.nome}
                   onChange={(e) => setEditingTenant((p) => p ? { ...p, nome: e.target.value } : p)}
@@ -894,14 +1038,27 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                     onChange={(e) => setEditingTenant((p) => p ? { ...p, plano: e.target.value } : p)}
                     className="h-10 w-full rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition focus:border-brand/45"
                   >
-                    {plans.map((plan) => (
+                    {planosDoNicho(plans, editingTenant.subNicho, data.tenants.find((t) => t.id === editingTenant.id)?.planCode ?? undefined).map((plan) => (
                       <option key={plan.id} value={plan.code}>
-                        {plan.name} ({BRL.format(plan.priceCents / 100)})
+                        {rotuloPlano(plan)}
                       </option>
                     ))}
                   </select>
                 </Field>
               </div>
+
+              <p className="-mt-1 text-xs text-muted">
+                Trocar o plano aqui não liga nem desliga módulos — isso fica no botão “Módulos”.
+              </p>
+
+              <label className="flex items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={editingTenant.teste}
+                  onChange={(e) => setEditingTenant((p) => (p ? { ...p, teste: e.target.checked } : p))}
+                />
+                Conta de teste/demonstração (fica fora do MRR e dos alertas)
+              </label>
 
               <Field label="Data de vencimento">
                 <input
@@ -974,8 +1131,10 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
           <div className="relative z-10 w-full max-w-lg rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-white">Cliente criado com sucesso</h2>
-                <p className="text-sm text-muted">Copie e envie as credenciais abaixo para o cliente.</p>
+                <h2 className="text-lg font-semibold text-white">{credenciais.nome} criado</h2>
+                <p className="text-sm text-muted">
+                  {credenciais.planoNome ? `Plano ${credenciais.planoNome}. ` : ""}Mande a mensagem abaixo pro cliente.
+                </p>
               </div>
               <button
                 type="button"
@@ -996,6 +1155,17 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 <p><strong>Senha:</strong> {credenciais.senha}</p>
               </div>
             </div>
+
+            {credenciais.checklist.length > 0 && (
+              <div className="mt-3 rounded-xl border border-line bg-background/40 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Checklist de implantação</p>
+                <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-white">
+                  {credenciais.checklist.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
 
             <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
               <span className="text-sm text-amber-400">⚠️</span>
@@ -1021,7 +1191,7 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
               <button
                 type="button"
                 onClick={() => {
-                  const mensagemWhatsApp = `Olá! Seu acesso ao Pyra está pronto 🎉\n\n🔗 *Link:* ${credenciais.url}\n📧 *Email:* ${credenciais.email}\n🔑 *Senha:* ${credenciais.senha}\n\nAcesse agora e configure seu cardápio. Qualquer dúvida é só chamar!`;
+                  const mensagemWhatsApp = mensagemBoasVindas(credenciais);
                   void navigator.clipboard.writeText(mensagemWhatsApp);
                   setCopied("whatsapp");
                   setFeedback("Mensagem para WhatsApp copiada.");
