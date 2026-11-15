@@ -72,6 +72,13 @@ function toInputDate(date: Date | string | null) {
   return d.toISOString().slice(0, 10);
 }
 
+// Acesso vitalício = vencimento em 2099 ou depois (ex.: Academia Elite Club)
+const DATA_VITALICIO = "2099-12-31";
+function isVitalicio(date: Date | string | null) {
+  if (!date) return false;
+  return new Date(date).getFullYear() >= 2099;
+}
+
 function addDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -682,7 +689,9 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                   <p className="mt-1 text-xs text-muted">{tenant.email}</p>
                   <p className={`mt-1 text-xs font-medium ${expiryColor(tenant.daysUntilDue)}`}>
                     {tenant.planName}
-                    {tenant.daysUntilDue !== null
+                    {isVitalicio(tenant.dueDate)
+                      ? " · acesso vitalício"
+                      : tenant.daysUntilDue !== null
                       ? ` · vence em ${tenant.daysUntilDue}d`
                       : tenant.dueDate
                         ? ` · ${formatDate(tenant.dueDate)}`
@@ -949,6 +958,13 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                 >
                   + 90 dias
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setVencimento(DATA_VITALICIO)}
+                  className="rounded-lg border border-line px-3 py-1 text-xs text-muted transition hover:border-brand/35 hover:text-brand"
+                >
+                  Vitalício
+                </button>
               </div>
 
               <label className="flex items-center gap-2 text-xs text-muted">
@@ -1068,6 +1084,19 @@ export default function AdminClient({ data, plans, isImpersonating, totalAbertos
                   className="h-10 w-full rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition focus:border-brand/45"
                 />
               </Field>
+
+              <div className="-mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTenant((p) => (p ? { ...p, vencimento: DATA_VITALICIO } : p))}
+                  className="rounded-lg border border-line px-3 py-1 text-xs text-muted transition hover:border-brand/35 hover:text-brand"
+                >
+                  Vitalício
+                </button>
+                {isVitalicio(editingTenant.vencimento) && (
+                  <span className="text-xs text-brand">Acesso vitalício — nunca vence.</span>
+                )}
+              </div>
 
               <button
                 type="button"
