@@ -345,8 +345,11 @@ export async function getAcademiaDashboardData(): Promise<AcademiaDashboardData>
   // Receita mensal — preenche meses sem dados com 0
   const receitaMap = new Map<string, number>();
   for (const r of receitaMensalRaw) {
+    // date_trunc devolve meia-noite (sem fuso) e o Prisma lê como UTC. Com getMonth()
+    // local (UTC-3) o 1º de novembro virava 31 de outubro: cada mês caía no anterior e
+    // o mês atual aparecia zerado no gráfico. Por isso, getters UTC.
     const d = new Date(r.mes);
-    receitaMap.set(`${d.getFullYear()}-${d.getMonth()}`, Number(r.receita) / 100);
+    receitaMap.set(`${d.getUTCFullYear()}-${d.getUTCMonth()}`, Number(r.receita) / 100);
   }
   const meta = receitaMesAnteriorCents > 0
     ? Math.round((receitaMesAnteriorCents / 100) * 1.1)
