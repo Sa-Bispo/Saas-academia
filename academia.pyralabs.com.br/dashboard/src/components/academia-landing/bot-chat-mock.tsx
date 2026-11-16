@@ -53,7 +53,7 @@ const SCRIPTS: Conversa[] = [
         node: (
           <>
             Prontinho! Aqui está o Pix copia-e-cola 👇
-            <span className="mt-2 block rounded-lg bg-black/40 px-2.5 py-1.5 font-mono text-[11px] text-[var(--text-secondary)]">
+            <span className="mb-1.5 mt-2 !block max-w-full truncate rounded-lg bg-black/40 px-2.5 py-1.5 font-mono text-[10.5px] text-[var(--text-secondary)]">
               00020126···5204000053039865802BR
             </span>
           </>
