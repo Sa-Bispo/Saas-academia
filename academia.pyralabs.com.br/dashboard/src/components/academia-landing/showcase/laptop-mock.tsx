@@ -1,19 +1,25 @@
-import { DashboardMock } from "./dashboard-mock";
 
 // Insets da tela medidos no PNG recortado (1545x952)
 const INSET = { top: "5.042%", right: "10.162%", bottom: "13.655%", left: "9.515%" };
 const SCREEN_W_FRAC = 1 - 0.09515 - 0.10162; // largura da tela / largura do laptop
 
 export function LaptopMock({ width = 640 }: { width?: number }) {
-  const scale = (width * SCREEN_W_FRAC) / 1000; // dashboard é desenhado em 1000px
+  // print real do painel com a barra lateral (dados fictícios da Academia Demo)
+  const telaW = Math.round(width * SCREEN_W_FRAC);
 
   return (
     <div className="relative select-none" style={{ width }}>
-      {/* dashboard atrás, na área da tela (a tela do PNG é transparente) */}
-      <div className="absolute z-0 overflow-hidden" style={INSET}>
-        <div style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}>
-          <DashboardMock />
-        </div>
+      {/* tela atrás da moldura (a tela do PNG é transparente) */}
+      <div className="absolute z-0 overflow-hidden bg-[#0b0b0d]" style={INSET}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/sistema/painel-hero-sm.webp"
+          srcSet="/sistema/painel-hero-sm.webp 1200w, /sistema/painel-hero.webp 1919w"
+          sizes={`${telaW}px`}
+          alt="Visão geral do painel da academia"
+          className="h-full w-full object-cover object-left-top"
+          draggable={false}
+        />
       </div>
 
       {/* moldura do notebook por cima */}

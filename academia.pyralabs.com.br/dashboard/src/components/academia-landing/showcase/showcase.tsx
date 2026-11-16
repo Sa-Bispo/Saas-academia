@@ -3,27 +3,54 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { BotDemo } from "./bot-demo";
-import { CobrancaFluxo } from "./cobranca-fluxo";
-import { PainelDemo } from "./painel-demo";
-import { ParqDemo } from "./parq-demo";
+import { PrintSistema, type Sobreposto } from "./print-sistema";
+import { TelaAlunos, TelaFichaAluno } from "./telas/tela-alunos";
+import { TelaCobrancas } from "./telas/tela-cobrancas";
+import { TelaParqCelular, TelaParqFichas } from "./telas/tela-parq";
+import { TelaVisaoGeral } from "./telas/tela-visao-geral";
 import { Cruz, Luz, SecaoTitulo } from "../grid-bits";
 
+type Print = {
+  tela: React.ReactNode;
+  largura: number;
+  alturaMax?: number;
+  url: string;
+  sobreposto?: Sobreposto;
+};
+
+type Tab = {
+  id: string;
+  tab: string;
+  plano: string;
+  headline: string;
+  desc: string;
+  // com tela: cada ponto vira o marcador de mesmo número (data-marca na réplica)
+  points: string[];
+  hint: string;
+  print?: Print;
+  demo?: React.ReactNode;
+};
+
 // Ordem = o que mais vende primeiro. Cada aba diz de qual plano é (ver pricing.tsx).
-// Só prometa aqui o que o sistema faz de verdade.
-const TABS = [
+// Prints reais do sistema (dados fictícios). Só prometa aqui o que o sistema faz de verdade.
+const TABS: Tab[] = [
   {
     id: "cobranca",
     tab: "Cobrança",
     plano: "a partir do Gestão",
     headline: "Pare de correr atrás de aluno atrasado",
-    desc: "O lembrete sai no WhatsApp antes de vencer, o aluno recebe a chave Pix na conversa e manda o comprovante ali mesmo. Você confere e dá baixa em um clique.",
+    desc: "Você vê quem vence, quem atrasou e quanto falta entrar. O aluno manda o comprovante do Pix no WhatsApp e você confere aqui.",
     points: [
-      "Automático: lembrete antes de vencer e aviso de atraso",
-      "Ou do seu jeito: a mensagem abre pronta e você envia",
-      "Baixa em 1 clique, com confirmação pro aluno",
+      "Comprovante de Pix chega e fica esperando você conferir",
+      "Quanto está pendente e vencido, sem fazer conta",
+      "Cobrar no seu WhatsApp: a mensagem abre pronta (no plano Cobrança, sai sozinha)",
     ],
-    hint: "Escolha Automático ou Você envia e siga os botões",
-    demo: <CobrancaFluxo />,
+    hint: "Telas do sistema, com dados de exemplo",
+    print: {
+      tela: <TelaCobrancas />,
+      largura: 1100,
+      url: "academia.pyralabs.com.br/cobrancas",
+    },
   },
   {
     id: "parq",
@@ -32,12 +59,23 @@ const TABS = [
     headline: "O aluno novo se cadastra sozinho",
     desc: "Um QR code na recepção abre a ficha no celular do aluno. Ele preenche o PAR-Q, tira a foto e assina com o dedo. Cai tudo no seu painel.",
     points: [
-      "Sem papel e sem digitar ficha na recepção",
-      "Foto e assinatura guardadas com a ficha",
-      "Busca por nome e PDF quando precisar",
+      "O aluno preenche no próprio celular, sem papel",
+      "Alerta de quem precisa de liberação médica",
+      "Quem preencheu e ainda não se matriculou vira lead: matricula em 1 clique",
     ],
-    hint: "Simule o QR, responda e assine",
-    demo: <ParqDemo />,
+    hint: "Telas do sistema, com dados de exemplo",
+    print: {
+      tela: <TelaParqFichas />,
+      largura: 1180,
+      url: "academia.pyralabs.com.br/parq-config",
+      sobreposto: {
+        tela: <TelaParqCelular />,
+        largura: 390,
+        tipo: "celular",
+        marca: 1,
+        className: "-bottom-2 -left-3 w-[27%] sm:-left-6",
+      },
+    },
   },
   {
     id: "painel",
@@ -46,12 +84,43 @@ const TABS = [
     headline: "Quem pagou, quem deve e quanto entrou",
     desc: "Alunos ativos, receita do mês e inadimplência num lugar só, sem caderno e sem planilha.",
     points: [
-      "Receita e inadimplência do período",
-      "Lista de quem está vencendo",
-      "Alunos, planos e matrículas organizados",
+      "Alunos ativos, inadimplentes e receita do mês num olhar",
+      "Receita dos últimos 6 meses",
+      "Quem venceu ou vence nos próximos 7 dias",
     ],
-    hint: "Passe o mouse nas barras e troque entre atrasados e vencendo",
-    demo: <PainelDemo />,
+    hint: "Telas do sistema, com dados de exemplo",
+    print: {
+      tela: <TelaVisaoGeral />,
+      largura: 1100,
+      alturaMax: 1012,
+      url: "academia.pyralabs.com.br/dashboard/academia",
+    },
+  },
+  {
+    id: "alunos",
+    tab: "Alunos",
+    plano: "todos os planos",
+    headline: "Cada aluno com tudo num lugar só",
+    desc: "Plano, vencimento, PAR-Q, matrícula e contato. Do cadastro ao WhatsApp do aluno em um clique.",
+    points: [
+      "Quem está em dia e quem vence logo, na própria lista",
+      "Um clique pra chamar o aluno no WhatsApp",
+      "Ficha completa: PAR-Q, matrícula e mensalidade",
+    ],
+    hint: "Telas do sistema, com dados de exemplo",
+    print: {
+      tela: <TelaAlunos />,
+      largura: 1100,
+      url: "academia.pyralabs.com.br/alunos",
+      sobreposto: {
+        tela: <TelaFichaAluno />,
+        largura: 470,
+        alturaMax: 560,
+        tipo: "cartao",
+        marca: 3,
+        className: "-bottom-2 -right-3 w-[34%] sm:-right-6",
+      },
+    },
   },
   {
     id: "bot",
@@ -144,6 +213,7 @@ function SlidingTabs({
 
 export function Showcase() {
   const [active, setActive] = useState(0);
+  const [ponto, setPonto] = useState<number | null>(null);
   const t = TABS[active];
 
   return (
@@ -154,11 +224,11 @@ export function Showcase() {
           rotulo="Recursos"
           titulo={
             <>
-              Não acredite.{" "}
-              <span className="text-[var(--text-secondary)]">Teste você mesmo.</span>
+              O sistema de verdade,{" "}
+              <span className="text-[var(--text-secondary)]">por dentro.</span>
             </>
           }
-          texto="Clique em cada parte e veja o sistema funcionando do jeito que a sua recepção vai usar."
+          texto="Nada de tela de mentira: são as telas que a sua recepção vai usar, com dados de exemplo. Passe o mouse nos itens pra ver onde fica cada coisa."
         />
 
         {/* moldura no "esqueleto" da landing: linha fina, "+" nos cantos, abas como
@@ -172,11 +242,11 @@ export function Showcase() {
           {/* abas estilo Vercel: o sublinhado da ativa corre sobre a linha de baixo */}
           <div className="overflow-x-auto border-b border-[var(--border-strong)]">
             <div className="min-w-max px-2 pt-2">
-              <SlidingTabs labels={TABS.map((x) => x.tab)} active={active} onChange={setActive} />
+              <SlidingTabs labels={TABS.map((x) => x.tab)} active={active} onChange={(i) => { setActive(i); setPonto(null); }} />
             </div>
           </div>
 
-          <div className="grid gap-px bg-[var(--border-strong)] lg:grid-cols-[0.82fr_1.18fr]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-px bg-[var(--border-strong)] lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
             {/* texto */}
             <div className="group/spot relative flex flex-col justify-center bg-[var(--bg)] p-7 sm:p-10">
               <Luz />
@@ -196,11 +266,27 @@ export function Showcase() {
                 </h3>
                 <p className="mt-4 text-[15px] leading-relaxed text-[var(--text-secondary)]">{t.desc}</p>
                 <ul className="mt-6 space-y-3">
-                  {t.points.map((p) => (
-                    <li key={p} className="flex items-start gap-3 text-[15px]">
-                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[rgba(37,211,102,0.14)] text-[var(--wpp)]">
-                        <Check size={12} strokeWidth={3} />
-                      </span>
+                  {t.points.map((p, i) => (
+                    <li
+                      key={p}
+                      onMouseEnter={() => t.print && setPonto(i + 1)}
+                      onMouseLeave={() => t.print && !window.matchMedia("(max-width: 1023px)").matches && setPonto(null)}
+                      onClick={() => t.print && setPonto(i + 1)}
+                      className="flex items-start gap-3 text-[15px]"
+                    >
+                      {t.print ? (
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-space-mono)] text-[10.5px] font-bold transition-colors ${
+                            ponto === i + 1 ? "bg-white text-[#04140a]" : "bg-[var(--wpp)] text-[#04140a]"
+                          }`}
+                        >
+                          {i + 1}
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[rgba(37,211,102,0.14)] text-[var(--wpp)]">
+                          <Check size={12} strokeWidth={3} />
+                        </span>
+                      )}
                       <span className="text-[var(--text-primary)]">{p}</span>
                     </li>
                   ))}
@@ -213,13 +299,30 @@ export function Showcase() {
             </div>
 
             {/* demo sobre a grade quadriculada */}
-            <div className="relative overflow-hidden bg-[var(--bg)] p-4 sm:p-6">
+            {/* sem overflow-hidden: a tela cresce no hover por cima da coluna do texto */}
+            {/* z-60 enquanto a tela está ampliada: a animação de entrada (fade-up) cria um
+                contexto de empilhamento próprio, e sem isso as abas ficavam por cima */}
+            <div className="relative bg-[var(--bg)] p-4 sm:p-6 has-[.zoom-tela:hover]:z-[60]">
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_at_center,#000_25%,transparent_80%)]"
               />
-              <div key={`demo-${active}`} className="animate-fade-up relative h-[580px] [animation-delay:80ms]">
-                {t.demo}
+              <div
+                key={`demo-${active}`}
+                className={`animate-fade-up relative flex items-center [animation-delay:80ms] lg:h-[640px] ${
+                  t.print ? "py-2" : "h-[580px]"
+                }`}
+              >
+                {t.print ? (
+                  <PrintSistema
+                    {...t.print}
+                    ativo={ponto}
+                    marcas={t.points.map((_, i) => i + 1)}
+                    onAtivo={setPonto}
+                  />
+                ) : (
+                  <div className="h-[580px] w-full">{t.demo}</div>
+                )}
               </div>
             </div>
           </div>
