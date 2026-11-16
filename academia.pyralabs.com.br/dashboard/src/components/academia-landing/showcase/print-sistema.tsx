@@ -142,12 +142,19 @@ export function PrintSistema({
       {sobreposto && (
         <div className={`absolute z-10 ${sobreposto.className}`}>
           {sobreposto.tipo === "celular" ? (
-            // a mesma moldura de iPhone do hero
+            // a mesma moldura de iPhone do hero, com uma sombra escura atrás que apaga em
+            // degradê o que fica cortado da tela de fundo (em vez de texto pela metade)
+            <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -inset-x-[45%] -inset-y-[12%] -z-10 rounded-full bg-[radial-gradient(closest-side,rgba(11,11,13,0.92),rgba(11,11,13,0.55)_60%,transparent)]"
+            />
             <PhoneMock width={400} glow={false} alt="Ficha PAR-Q no celular do aluno">
               <Escala largura={sobreposto.largura} className="h-full">
                 {sobreposto.tela}
               </Escala>
             </PhoneMock>
+            </>
           ) : (
             <div className="relative overflow-hidden rounded-2xl border border-[var(--border-strong)] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.95)]">
               <Escala largura={sobreposto.largura} alturaMax={sobreposto.alturaMax}>

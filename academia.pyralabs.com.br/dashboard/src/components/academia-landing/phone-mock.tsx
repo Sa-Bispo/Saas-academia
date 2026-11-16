@@ -32,9 +32,10 @@ export function PhoneMock({
         <div className="phone-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[92%] w-[135%] rounded-[50%]" />
       )}
 
-      {/* Chat na área da tela, ATRÁS da moldura (a tela do PNG é transparente) */}
+      {/* Chat na área da tela, ATRÁS da moldura (a tela do PNG é transparente).
+          Raio em % (era 34px fixo): acompanha o tamanho do celular, sem sobrar canto. */}
       <div
-        className="absolute z-0 overflow-hidden rounded-[34px]"
+        className="absolute z-0 overflow-hidden rounded-[11.4%/5.2%]"
         style={{
           top: SCREEN.top,
           right: SCREEN.right,

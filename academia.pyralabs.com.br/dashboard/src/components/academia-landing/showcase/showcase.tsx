@@ -73,7 +73,7 @@ const TABS: Tab[] = [
         largura: 390,
         tipo: "celular",
         marca: 1,
-        className: "-bottom-2 -left-3 w-[27%] sm:-left-6",
+        className: "-bottom-6 -left-4 w-[26%] sm:-left-16",
       },
     },
   },
