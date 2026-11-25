@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import {
   arquivarFichaParq,
+  excluirFichaParq,
   excluirPerguntaParq,
   matricularLeadParq,
   reordenarPerguntasParq,
@@ -662,7 +663,28 @@ function FichasTab({
   const [apenasLibMedica, setApenasLibMedica] = useState(false);
   const [verArquivados, setVerArquivados] = useState(false);
   const [arquivandoId, setArquivandoId] = useState<string | null>(null);
+  const [confirmarExclusaoId, setConfirmarExclusaoId] = useState<string | null>(null);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // 1º clique arma, 2º confirma (mesmo padrão do "Excluir aluno")
+  function handleExcluir(id: string) {
+    if (confirmarExclusaoId !== id) {
+      setConfirmarExclusaoId(id);
+      return;
+    }
+    setConfirmarExclusaoId(null);
+    setExcluindoId(id);
+    startTransition(async () => {
+      try {
+        await excluirFichaParq(id);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Não foi possível excluir a ficha.");
+      } finally {
+        setExcluindoId(null);
+      }
+    });
+  }
 
   function handleArquivar(id: string, arquivado: boolean) {
     setArquivandoId(id);
@@ -807,7 +829,7 @@ function FichasTab({
                   key={f.id}
                   style={{
                     borderTop: i > 0 ? "1px solid var(--border-color)" : undefined,
-                    opacity: arquivandoId === f.id ? 0.5 : 1,
+                    opacity: arquivandoId === f.id || excluindoId === f.id ? 0.5 : 1,
                   }}
                 >
                   <td
@@ -882,6 +904,26 @@ function FichasTab({
                       >
                         {f.arquivado ? <ArchiveRestore size={12} /> : <Archive size={12} />}
                         {f.arquivado ? "Desarquivar" : "Arquivar"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={excluindoId === f.id}
+                        onClick={() => handleExcluir(f.id)}
+                        onBlur={() => setConfirmarExclusaoId((cur) => (cur === f.id ? null : cur))}
+                        title={
+                          f.aluno.status === "SEM_MATRICULA"
+                            ? "Exclui a ficha e o cadastro (ainda não matriculado)"
+                            : "Exclui só a ficha — o aluno continua cadastrado"
+                        }
+                        className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors disabled:opacity-50"
+                        style={
+                          confirmarExclusaoId === f.id
+                            ? { borderColor: "rgba(239,68,68,0.5)", background: "rgba(239,68,68,0.12)", color: "#f87171" }
+                            : { borderColor: "var(--border-color)", color: "var(--text-secondary)" }
+                        }
+                      >
+                        <Trash2 size={12} />
+                        {confirmarExclusaoId === f.id ? "Confirmar?" : "Excluir"}
                       </button>
                       {f.aluno.status === "SEM_MATRICULA" ? (
                         <button

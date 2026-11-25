@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureTenantForUser } from "@/services/tenant.service";
 import { prisma } from "@/lib/prisma";
 import { assertModuloAtivo } from "@/services/modulos.service";
+import { removerFotoAluno } from "@/lib/foto-aluno";
 
 async function getAuthenticatedTenantId(): Promise<string> {
   const supabase = await createClient();
@@ -65,6 +66,53 @@ export async function arquivarFichaParq(id: string, arquivado: boolean) {
   });
 
   revalidatePath("/parq-config");
+}
+
+// Exclui a ficha. Se o aluno é só um lead criado pelo PAR-Q (sem matrícula,
+// sem cobrança, sem frequência e sem outra ficha), apaga o aluno junto — senão
+// ele ficaria "órfão" na lista de alunos (caso: pessoa preencheu e não começou).
+// Aluno com histórico fica: só a ficha some.
+export async function excluirFichaParq(id: string): Promise<{ alunoExcluido: boolean }> {
+  const tenantId = await getAuthenticatedTenantId();
+
+  const ficha = await prisma.fichaParq.findFirst({
+    where: { id, tenantId },
+    select: { id: true, alunoId: true },
+  });
+  if (!ficha) throw new Error("Ficha não encontrada ou sem permissão.");
+
+  await prisma.fichaParq.delete({ where: { id: ficha.id } });
+
+  const aluno = await prisma.aluno.findFirst({
+    where: { id: ficha.alunoId, tenantId },
+    select: {
+      id: true,
+      status: true,
+      _count: { select: { matriculas: true, cobrancas: true, frequencias: true, fichasParq: true } },
+    },
+  });
+
+  let alunoExcluido = false;
+  if (
+    aluno &&
+    aluno.status === "SEM_MATRICULA" &&
+    aluno._count.matriculas === 0 &&
+    aluno._count.cobrancas === 0 &&
+    aluno._count.frequencias === 0 &&
+    aluno._count.fichasParq === 0
+  ) {
+    try {
+      await removerFotoAluno(tenantId, aluno.id);
+    } catch (err) {
+      console.error("[excluirFichaParq] falha ao remover foto:", err);
+    }
+    await prisma.aluno.delete({ where: { id: aluno.id } });
+    alunoExcluido = true;
+  }
+
+  revalidatePath("/parq-config");
+  revalidatePath("/alunos");
+  return { alunoExcluido };
 }
 
 // ─── Perguntas ────────────────────────────────────────────────────────────────

@@ -1346,6 +1346,13 @@ function estaInadimplente(a: Aluno): boolean {
   return !!venc && diasAteVencimento(venc) < 0;
 }
 
+// Inativo/suspenso = fora da operação do dia a dia. Ficam só nas abas próprias
+// (pedido da Academia Elite: ordenando por mensalidade eles subiam pro topo,
+// porque a mensalidade deles está vencida há tempo).
+function estaFora(a: { status: string }): boolean {
+  return a.status === "INATIVO" || a.status === "SUSPENSO";
+}
+
 // Situação da mensalidade DERIVADA da data (não do status guardado — corrige o "Em dia" errado)
 function mensalidadeInfo(
   dataVencimento: Date | string | null | undefined,
@@ -1404,18 +1411,24 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
         a.telefone.includes(busca) ||
         (a.email ?? "").toLowerCase().includes(busca.toLowerCase());
       let matchStatus = true;
-      if (filtroStatus === "NOVO") {
-        matchStatus = ehNovo(dataEntrada(a));
+      if (filtroStatus === "todos") {
+        // Buscando por nome/telefone acha qualquer um, inclusive inativo/suspenso
+        matchStatus = !!busca || !estaFora(a);
+      } else if (filtroStatus === "NOVO") {
+        matchStatus = !estaFora(a) && ehNovo(dataEntrada(a));
       } else if (filtroStatus === "VENCENDO") {
-        matchStatus = !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
+        matchStatus = !estaFora(a) && !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento);
       } else if (filtroStatus === "INADIMPLENTE") {
         matchStatus = estaInadimplente(a);
-      } else if (filtroStatus !== "todos") {
+      } else {
         matchStatus = a.status === filtroStatus;
       }
       return matchBusca && matchStatus;
     })
     .sort((a, b) => {
+      // Inativo/suspenso (só aparecem juntos numa busca) sempre no fim da lista
+      const fa = estaFora(a), fb = estaFora(b);
+      if (fa !== fb) return fa ? 1 : -1;
       let cmp = 0;
       if (sortKey === "nome") {
         cmp = a.nome.localeCompare(b.nome, "pt-BR");
@@ -1443,12 +1456,15 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
     });
 
   const totais = {
-    todos: alunos.length,
+    todos: alunos.filter((a) => !estaFora(a)).length,
     ATIVO: alunos.filter((a) => a.status === "ATIVO").length,
-    NOVO: alunos.filter((a) => ehNovo(dataEntrada(a))).length,
+    NOVO: alunos.filter((a) => !estaFora(a) && ehNovo(dataEntrada(a))).length,
     INADIMPLENTE: alunos.filter(estaInadimplente).length,
     INATIVO: alunos.filter((a) => a.status === "INATIVO").length,
-    VENCENDO: alunos.filter((a) => !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento)).length,
+    SUSPENSO: alunos.filter((a) => a.status === "SUSPENSO").length,
+    VENCENDO: alunos.filter(
+      (a) => !estaFora(a) && !!a.matriculas[0] && isVencendo(a.matriculas[0].dataVencimento),
+    ).length,
   };
 
   // "Pra fazer hoje" — relacionamento manual (sem cobrança/automação)
@@ -1604,6 +1620,7 @@ export function AlunosPageClient({ alunos, planos, tenantId, stats, temFinanceir
             { key: "NOVO",         label: "Novos",        count: totais.NOVO,          danger: false },
             { key: "VENCENDO",     label: "Vencendo",     count: totais.VENCENDO,      danger: true  },
             { key: "INADIMPLENTE", label: "Inadimplentes",count: totais.INADIMPLENTE,  danger: true  },
+            { key: "SUSPENSO",     label: "Suspensos",    count: totais.SUSPENSO,      danger: false },
             { key: "INATIVO",      label: "Inativos",     count: totais.INATIVO,       danger: false },
           ]
             .filter((s) => temFinanceiro || !s.danger)
